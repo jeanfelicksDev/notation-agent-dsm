@@ -1,0 +1,166 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Site {
+  id           String        @id @default(uuid())
+  nom          String        @unique
+  ville        String?
+  createdAt    DateTime      @default(now())
+  utilisateurs Utilisateur[]
+}
+
+model Utilisateur {
+  id                  String        @id @default(uuid())
+  matricule           String        @unique
+  nom                 String
+  prenom              String
+  email               String        @unique
+  telephone           String?
+  motDePasse          String
+  role                Role          @default(UTILISATEUR)
+  service             String?
+  siteId              String?
+  managerId           String?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  affectationsRecues  Affectation[] @relation("EvalueAffectations")
+  affectationsDonnees Affectation[] @relation("EvaluateurAffectations")
+  evaluationsRecues   Note[]        @relation("NoteRecue")
+  evaluationsDonnees  Note[]        @relation("NoteDonnee")
+  scores              ScoreFinal[]
+  otpTokens           OtpToken[]
+  sessions            Session[]
+  manager             Utilisateur?  @relation("ManagerSubordonnes", fields: [managerId], references: [id])
+  subordonnes         Utilisateur[] @relation("ManagerSubordonnes")
+  site                Site?         @relation(fields: [siteId], references: [id])
+}
+
+model OtpToken {
+  id            String      @id @default(uuid())
+  utilisateurId String
+  codeHash      String
+  expiresAt     DateTime
+  attempts      Int         @default(0)
+  consumedAt    DateTime?
+  createdAt     DateTime    @default(now())
+  utilisateur   Utilisateur @relation(fields: [utilisateurId], references: [id], onDelete: Cascade)
+
+  @@index([utilisateurId])
+}
+
+model Session {
+  id            String      @id @default(uuid())
+  token         String      @unique
+  utilisateurId String
+  expiresAt     DateTime
+  createdAt     DateTime    @default(now())
+  userAgent     String?
+  ipAddress     String?
+  utilisateur   Utilisateur @relation(fields: [utilisateurId], references: [id], onDelete: Cascade)
+
+  @@index([utilisateurId])
+  @@index([expiresAt])
+}
+
+model Campagne {
+  id             String         @id @default(uuid())
+  libelle        String
+  dateDebut      DateTime
+  dateFin        DateTime
+  statut         StatutCampagne @default(OUVERTE)
+  poidsCollegues Int            @default(45)
+  poidsManager   Int            @default(55)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  affectations   Affectation[]
+  criteres       Critere[]
+  notes          Note[]
+  scores         ScoreFinal[]
+}
+
+model Critere {
+  id             String   @id @default(uuid())
+  libelle        String
+  description    String?
+  noteMaximale   Int      @default(5)
+  typeEvaluateur TypeEval @default(COLLEGUE)
+  campagneId     String
+  createdAt      DateTime @default(now())
+  campagne       Campagne @relation(fields: [campagneId], references: [id], onDelete: Cascade)
+  notes          Note[]
+}
+
+model Affectation {
+  id           String            @id @default(uuid())
+  evaluateurId String
+  evalueId     String
+  campagneId   String
+  statut       StatutAffectation @default(EN_ATTENTE)
+  createdAt    DateTime          @default(now())
+  campagne     Campagne          @relation(fields: [campagneId], references: [id], onDelete: Cascade)
+  evalue       Utilisateur       @relation("EvalueAffectations", fields: [evalueId], references: [id])
+  evaluateur   Utilisateur       @relation("EvaluateurAffectations", fields: [evaluateurId], references: [id])
+
+  @@unique([evaluateurId, evalueId, campagneId])
+}
+
+model Note {
+  id           String      @id @default(uuid())
+  valeur       Int
+  commentaire  String?
+  evaluateurId String
+  evalueId     String
+  critereId    String
+  campagneId   String
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  campagne     Campagne    @relation(fields: [campagneId], references: [id], onDelete: Cascade)
+  critere      Critere     @relation(fields: [critereId], references: [id])
+  evalue       Utilisateur @relation("NoteRecue", fields: [evalueId], references: [id])
+  evaluateur   Utilisateur @relation("NoteDonnee", fields: [evaluateurId], references: [id])
+}
+
+model ScoreFinal {
+  id             String      @id @default(uuid())
+  utilisateurId  String
+  campagneId     String
+  scoreCollegues Float       @default(0)
+  scoreManager   Float       @default(0)
+  scoreTotal     Float       @default(0)
+  rang           Int?
+  createdAt      DateTime    @default(now())
+  campagne       Campagne    @relation(fields: [campagneId], references: [id], onDelete: Cascade)
+  utilisateur    Utilisateur @relation(fields: [utilisateurId], references: [id])
+
+  @@unique([utilisateurId, campagneId])
+}
+
+enum StatutCampagne {
+  OUVERTE
+  CLOTUREE
+  CALCULEE
+}
+
+enum TypeEval {
+  MANAGER
+  COLLEGUE
+  TOUS
+}
+
+enum StatutAffectation {
+  EN_ATTENTE
+  BROUILLON
+  TERMINEE
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  UTILISATEUR
+  EXTERNE
+}
