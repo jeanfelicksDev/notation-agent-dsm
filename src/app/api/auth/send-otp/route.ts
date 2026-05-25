@@ -102,6 +102,7 @@ export async function POST(request: NextRequest) {
       channel: sendRes.channel,
       // Indice masqué pour l'utilisateur — confirme qu'on a bien envoyé au bon endroit
       emailMasked: maskEmail(email),
+      ...(sendRes.channel === 'console' ? { devCode: code } : {}),
     })
   } catch (error) {
     console.error('send-otp error:', error)

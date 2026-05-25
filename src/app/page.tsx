@@ -74,7 +74,9 @@ export default function Home() {
         return
       }
       setEmailMasked(data.emailMasked || email)
-      if (data.channel === 'console') {
+      if (data.devCode) {
+        setInfo(`Code de développement : ${data.devCode}`)
+      } else if (data.channel === 'console') {
         setInfo('Mode développement : le code apparaît dans la console serveur')
       }
       setStep('otp')
