@@ -1,18 +1,10 @@
 const { PrismaClient } = require('@prisma/client');
+const { PrismaPg } = require('@prisma/adapter-pg');
 
-function createPrisma() {
-  const url = process.env.DATABASE_URL || 'file:dev.db';
+const url = process.env.DATABASE_URL;
+if (!url) throw new Error('DATABASE_URL is required');
 
-  if (url.startsWith('postgresql://') || url.startsWith('postgres://')) {
-    const { PrismaPg } = require('@prisma/adapter-pg');
-    return new PrismaClient({ adapter: new PrismaPg({ connectionString: url }) });
-  }
-
-  const { PrismaLibSql } = require('@prisma/adapter-libsql');
-  return new PrismaClient({ adapter: new PrismaLibSql({ url }) });
-}
-
-const prisma = createPrisma();
+const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: url }) });
 
 async function main() {
   console.log('Seeding database...');
@@ -29,10 +21,10 @@ async function main() {
 
   // Create Admin User
   const admin = await prisma.utilisateur.upsert({
-    where: { matricule: 'ADM-001' },
+    where: { matricule: '7453' },
     update: {},
     create: {
-      matricule: 'ADM-001',
+      matricule: '7453',
       nom: 'ADMIN',
       prenom: 'System',
       email: 'jeanfelicks11@gmail.com',

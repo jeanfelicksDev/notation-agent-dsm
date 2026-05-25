@@ -1,16 +1,10 @@
 import { PrismaClient } from '@prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg'
-import { PrismaLibSql } from '@prisma/adapter-libsql'
 
 const prismaClientSingleton = () => {
-  const url = process.env.DATABASE_URL || 'file:./dev.db'
-
-  if (url.startsWith('postgresql://') || url.startsWith('postgres://')) {
-    const adapter = new PrismaPg({ connectionString: url })
-    return new PrismaClient({ adapter })
-  }
-
-  const adapter = new PrismaLibSql({ url })
+  const url = process.env.DATABASE_URL
+  if (!url) throw new Error('DATABASE_URL is required')
+  const adapter = new PrismaPg({ connectionString: url })
   return new PrismaClient({ adapter })
 }
 
