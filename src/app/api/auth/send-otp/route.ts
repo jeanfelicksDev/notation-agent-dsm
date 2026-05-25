@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
     // (placeholder fréquent : <matricule>@dsm.local), on accepte celui qu'il saisit
     // et on le persiste. Sinon il doit correspondre exactement.
     const storedEmail = utilisateur.email.toLowerCase()
-    const isPlaceholder = storedEmail.endsWith('@dsm.local') || storedEmail === ''
+    const isPlaceholder = storedEmail.endsWith('@dsm.local') || storedEmail === 'admin@dsm.ci' || storedEmail === ''
 
     if (!isPlaceholder && storedEmail !== email) {
       return NextResponse.json(

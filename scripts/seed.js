@@ -1,11 +1,18 @@
 const { PrismaClient } = require('@prisma/client');
-const { PrismaLibSql } = require('@prisma/adapter-libsql');
 
-const adapter = new PrismaLibSql({
-  url: 'file:dev.db',
-});
+function createPrisma() {
+  const url = process.env.DATABASE_URL || 'file:dev.db';
 
-const prisma = new PrismaClient({ adapter });
+  if (url.startsWith('postgresql://') || url.startsWith('postgres://')) {
+    const { PrismaPg } = require('@prisma/adapter-pg');
+    return new PrismaClient({ adapter: new PrismaPg({ connectionString: url }) });
+  }
+
+  const { PrismaLibSql } = require('@prisma/adapter-libsql');
+  return new PrismaClient({ adapter: new PrismaLibSql({ url }) });
+}
+
+const prisma = createPrisma();
 
 async function main() {
   console.log('Seeding database...');
@@ -28,7 +35,7 @@ async function main() {
       matricule: 'ADM-001',
       nom: 'ADMIN',
       prenom: 'System',
-      email: 'admin@dsm.ci',
+      email: 'jeanfelicks11@gmail.com',
       motDePasse: 'admin123', // In a real app, hash this!
       role: 'ADMIN',
       siteId: site.id,
