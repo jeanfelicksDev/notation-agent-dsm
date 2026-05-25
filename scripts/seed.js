@@ -1,10 +1,12 @@
 const { PrismaClient } = require('@prisma/client');
 const { PrismaPg } = require('@prisma/adapter-pg');
+const { Pool } = require('pg');
 
 const url = process.env.DATABASE_URL;
 if (!url) throw new Error('DATABASE_URL is required');
 
-const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: url }) });
+const pool = new Pool({ connectionString: url, ssl: { rejectUnauthorized: false } });
+const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
 
 async function main() {
   console.log('Seeding database...');
