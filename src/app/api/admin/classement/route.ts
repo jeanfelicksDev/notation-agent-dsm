@@ -27,25 +27,36 @@ export async function GET() {
 
     const sites = await prisma.site.findMany()
 
-    const siteScores = sites.map(site => {
-      const siteUsers = campagne.scores
-        .filter(s => s.utilisateur.siteId === site.id)
-        .map(s => ({
-          utilisateurId: s.utilisateurId,
-          matricule: s.utilisateur.matricule,
-          nom: s.utilisateur.nom,
-          prenom: s.utilisateur.prenom,
-          scoreTotal: s.scoreTotal,
-          rang: s.rang || 0,
-          scoreCollegues: s.scoreCollegues,
-          scoreManager: s.scoreManager
-        }))
-
-      return {
-        siteNom: site.nom,
-        scores: siteUsers
+    const siteScores: Array<{
+      siteNom: string
+      scores: Array<{
+        utilisateurId: string; matricule: string; nom: string; prenom: string
+        scoreTotal: number; rang: number; scoreCollegues: number; scoreManager: number
+      }>
+    }> = []
+    for (const site of sites) {
+      const siteUsers: Array<{
+        utilisateurId: string; matricule: string; nom: string; prenom: string
+        scoreTotal: number; rang: number; scoreCollegues: number; scoreManager: number
+      }> = []
+      for (const s of campagne.scores) {
+        if (s.utilisateur.siteId === site.id) {
+          siteUsers.push({
+            utilisateurId: s.utilisateurId,
+            matricule: s.utilisateur.matricule,
+            nom: s.utilisateur.nom,
+            prenom: s.utilisateur.prenom,
+            scoreTotal: s.scoreTotal,
+            rang: s.rang || 0,
+            scoreCollegues: s.scoreCollegues,
+            scoreManager: s.scoreManager
+          })
+        }
       }
-    }).filter(s => s.scores.length > 0)
+      if (siteUsers.length > 0) {
+        siteScores.push({ siteNom: site.nom, scores: siteUsers })
+      }
+    }
 
     return NextResponse.json(siteScores)
   } catch (error) {
@@ -78,7 +89,7 @@ export async function POST(request: NextRequest) {
     })
 
     for (const user of users) {
-      const notesRecues = await prisma.note.findMany({
+      const notesRecues: Array<{ valeur: number; critere: { typeEvaluateur: string; noteMaximale: number } }> = await prisma.note.findMany({
         where: {
           evalueId: user.id,
           campagneId: campagne.id

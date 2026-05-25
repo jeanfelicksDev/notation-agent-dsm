@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: any) => {
       for (const note of notes) {
         if (typeof note?.critereId !== 'string') continue
         if (typeof note.valeur !== 'number' || note.valeur <= 0) continue

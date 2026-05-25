@@ -57,7 +57,7 @@ export async function GET() {
     const isManager = evaluateur.role === 'MANAGER' || evaluateur.role === 'ADMIN'
 
     const filteredCriteres = campagne.criteres.filter(
-      (c) =>
+      (c: { typeEvaluateur: string }) =>
         c.typeEvaluateur === 'TOUS' ||
         (isManager && c.typeEvaluateur === 'MANAGER') ||
         (!isManager && c.typeEvaluateur === 'COLLEGUE')

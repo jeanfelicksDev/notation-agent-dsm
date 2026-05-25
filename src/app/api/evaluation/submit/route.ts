@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (myAffectations.some((a) => a.statut === 'TERMINEE')) {
+    if (myAffectations.some((a: { statut: string }) => a.statut === 'TERMINEE')) {
       return NextResponse.json(
         { error: 'Une partie des évaluations a déjà été soumise' },
         { status: 409 }
