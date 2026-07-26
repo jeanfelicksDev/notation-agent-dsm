@@ -17,6 +17,17 @@ export function hashCode(code: string): string {
   return createHash('sha256').update(code).digest('hex')
 }
 
+export function hashPassword(password: string): string {
+  return createHash('sha256').update(`salt_dsm_${password}`).digest('hex')
+}
+
+export function verifyPassword(password: string, hash: string): boolean {
+  if (!hash) return false
+  // Support à la fois le mot de passe hashé et le mot de passe en clair (pour la compatibilité)
+  if (hash === password) return true
+  return hashPassword(password) === hash
+}
+
 export function generateSessionToken(): string {
   return randomBytes(32).toString('hex')
 }

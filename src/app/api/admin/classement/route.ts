@@ -89,34 +89,45 @@ export async function POST(request: NextRequest) {
     })
 
     for (const user of users) {
-      const notesRecues: Array<{ valeur: number; critere: { typeEvaluateur: string; noteMaximale: number } }> = await prisma.note.findMany({
+      const notesRecues = await prisma.note.findMany({
         where: {
           evalueId: user.id,
-          campagneId: campagne.id
+          campagneId: campagne.id,
         },
-        include: { critere: true }
+        include: { critere: true },
       })
 
       if (notesRecues.length === 0) continue
 
-      const notesCollegues = notesRecues.filter(n => n.critere.typeEvaluateur === 'COLLEGUE')
-      const notesManager = notesRecues.filter(n => n.critere.typeEvaluateur === 'MANAGER')
+      // Notes des collègues
+      const notesCollegues = notesRecues.filter((n) => n.critere.typeEvaluateur === 'COLLEGUE')
+      // Notes du manager
+      const notesManager = notesRecues.filter((n) => n.critere.typeEvaluateur === 'MANAGER')
 
       let scoreCollegues = 0
       if (notesCollegues.length > 0) {
-        const moyenneCollegues = notesCollegues.reduce((sum, n) => sum + n.valeur, 0) / notesCollegues.length
-        const noteMaxCollegues = Math.max(...notesCollegues.map(n => n.critere.noteMaximale), 5)
-        scoreCollegues = (moyenneCollegues / noteMaxCollegues) * campagne.poidsCollegues
+        // Regrouper par évaluateur (chaque collègue attribue des notes sur 45 pts au total)
+        const notesParEvaluateur: Record<string, number> = {}
+        for (const note of notesCollegues) {
+          notesParEvaluateur[note.evaluateurId] =
+            (notesParEvaluateur[note.evaluateurId] || 0) + note.valeur
+        }
+
+        const totalsCollegues = Object.values(notesParEvaluateur)
+        if (totalsCollegues.length > 0) {
+          const moyenneTotaux =
+            totalsCollegues.reduce((sum, val) => sum + val, 0) / totalsCollegues.length
+          // Ajustement si le poids configuré diffère de 45
+          const maxPointsCollegues = 45
+          scoreCollegues = (moyenneTotaux / maxPointsCollegues) * campagne.poidsCollegues
+        }
       }
 
       let scoreManager = 0
       if (notesManager.length > 0) {
-        const noteMaxManager = Math.max(...notesManager.map(n => n.critere.noteMaximale), 55)
-        const sommeManager = notesManager.reduce((sum, n) => {
-          const noteMax = n.critere.noteMaximale || 5
-          return sum + (n.valeur / noteMax) * 55
-        }, 0)
-        scoreManager = Math.min(sommeManager, campagne.poidsManager)
+        const sommeNotesManager = notesManager.reduce((sum, n) => sum + n.valeur, 0)
+        const maxPointsManager = 55
+        scoreManager = (sommeNotesManager / maxPointsManager) * campagne.poidsManager
       }
 
       const scoreTotal = scoreCollegues + scoreManager
@@ -125,8 +136,8 @@ export async function POST(request: NextRequest) {
         where: {
           utilisateurId_campagneId: {
             utilisateurId: user.id,
-            campagneId: campagne.id
-          }
+            campagneId: campagne.id,
+          },
         },
         update: { scoreCollegues, scoreManager, scoreTotal },
         create: {
@@ -134,8 +145,8 @@ export async function POST(request: NextRequest) {
           campagneId: campagne.id,
           scoreCollegues,
           scoreManager,
-          scoreTotal
-        }
+          scoreTotal,
+        },
       })
     }
 

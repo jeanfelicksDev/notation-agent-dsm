@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { requireAdmin } from '@/lib/auth'
+import { CRITERES_OFFICIELS_DSM } from '@/lib/default-criteres'
 
 export async function GET() {
   const admin = await requireAdmin()
@@ -37,8 +38,19 @@ export async function POST(request: NextRequest) {
         dateDebut: new Date(dateDebut),
         dateFin: new Date(dateFin),
         poidsCollegues: poidsCollegues || 45,
-        poidsManager: poidsManager || 55
-      }
+        poidsManager: poidsManager || 55,
+        criteres: {
+          create: CRITERES_OFFICIELS_DSM.map((c) => ({
+            libelle: c.libelle,
+            description: c.description,
+            noteMaximale: c.noteMaximale,
+            typeEvaluateur: c.typeEvaluateur,
+          })),
+        },
+      },
+      include: {
+        criteres: true,
+      },
     })
 
     return NextResponse.json(campagne)

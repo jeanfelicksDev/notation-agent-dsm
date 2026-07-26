@@ -4,9 +4,12 @@ import { Pool } from 'pg'
 
 const prismaClientSingleton = () => {
   const url = process.env.DATABASE_URL
-  if (!url) throw new Error('DATABASE_URL is required')
+  if (!url) throw new Error('DATABASE_URL manquant dans .env')
 
-  const pool = new Pool({ connectionString: url, ssl: { rejectUnauthorized: false } })
+  const pool = new Pool({
+    connectionString: url,
+    ssl: url.includes('localhost') ? false : { rejectUnauthorized: false },
+  })
   const adapter = new PrismaPg(pool)
   return new PrismaClient({ adapter })
 }

@@ -80,6 +80,25 @@ export default function CampaignCriteresPage({ params }: { params: Promise<{ id:
     }
   }
 
+  const handleSeedOfficial = async () => {
+    if (!confirm('Remplacer les critères actuels par la grille officielle DSM (15 critères) ?')) return
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/admin/campagnes/${id}/seed-criteres`, { method: 'POST' })
+      const data = await res.json()
+      if (res.ok && data.criteres) {
+        setCriteres(data.criteres)
+        setError('')
+      } else {
+        setError(data.error || 'Erreur lors de l’importation')
+      }
+    } catch {
+      setError('Erreur de connexion')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -101,12 +120,20 @@ export default function CampaignCriteresPage({ params }: { params: Promise<{ id:
               <p className="text-sm text-gray-500">{campaignName}</p>
             </div>
           </div>
-          <button
-            onClick={() => setShowAddForm(!showAddForm)}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-          >
-            <Plus className="w-4 h-4" /> Ajouter un critère
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleSeedOfficial}
+              className="flex items-center gap-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wider transition-colors"
+            >
+              ⚡ Importer Grille Officielle DSM (15)
+            </button>
+            <button
+              onClick={() => setShowAddForm(!showAddForm)}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+            >
+              <Plus className="w-4 h-4" /> Ajouter
+            </button>
+          </div>
         </div>
       </header>
 
