@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import prisma from '@/lib/prisma'
+import prisma, { Prisma } from '@/lib/prisma'
 import { getSessionUser } from '@/lib/auth'
 
 type IncomingNote = {
@@ -31,7 +31,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Aucune campagne ouverte' }, { status: 404 })
     }
 
-    const evalueIds = [...new Set(notes.map((n) => n.evalueId).filter(Boolean))]
+    // Filtrer les evalueId vides/nuls AVANT de construire le Set
+    const evalueIds = [
+      ...new Set(
+        notes
+          .map((n) => n.evalueId)
+          .filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
+      ),
+    ]
+
+    // Interdire formellement l'auto-évaluation
+    if (evalueIds.includes(sessionUser.id)) {
+      return NextResponse.json(
+        { error: "L'auto-évaluation est strictement interdite" },
+        { status: 403 }
+      )
+    }
 
     // Vérifier que toutes les affectations appartiennent bien à l'évaluateur connecté
     const myAffectations = await prisma.affectation.findMany({
@@ -56,46 +71,58 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    await prisma.$transaction(async (tx) => {
-      for (const note of notes) {
-        if (typeof note?.critereId !== 'string' || typeof note?.evalueId !== 'string') {
-          continue
-        }
-        if (typeof note.valeur !== 'number' || note.valeur <= 0) continue
+    const existingNotes = await prisma.note.findMany({
+      where: {
+        evaluateurId: sessionUser.id,
+        campagneId: campagne.id,
+        evalueId: { in: evalueIds },
+      },
+    })
+    const existingMap = new Map(
+      existingNotes.map((n) => [`${n.evalueId}_${n.critereId}`, n])
+    )
 
-        const existing = await tx.note.findFirst({
+    const operations: Prisma.PrismaPromise<unknown>[] = []
+
+    for (const note of notes) {
+      if (typeof note?.critereId !== 'string' || typeof note?.evalueId !== 'string') {
+        continue
+      }
+      if (typeof note.valeur !== 'number' || note.valeur <= 0) continue
+
+      const key = `${note.evalueId}_${note.critereId}`
+      const existing = existingMap.get(key)
+
+      // Upsert : idempotent en cas de double-soumission ou condition de course
+      operations.push(
+        prisma.note.upsert({
           where: {
+            evaluateurId_evalueId_critereId_campagneId: {
+              evaluateurId: sessionUser.id,
+              evalueId: note.evalueId,
+              critereId: note.critereId,
+              campagneId: campagne.id,
+            },
+          },
+          update: {
+            valeur: note.valeur,
+            commentaire: note.commentaire ?? null,
+          },
+          create: {
+            valeur: note.valeur,
+            commentaire: note.commentaire ?? null,
             evaluateurId: sessionUser.id,
             evalueId: note.evalueId,
             critereId: note.critereId,
             campagneId: campagne.id,
           },
         })
+      )
+    }
 
-        if (existing) {
-          await tx.note.update({
-            where: { id: existing.id },
-            data: {
-              valeur: note.valeur,
-              commentaire: note.commentaire ?? null,
-            },
-          })
-        } else {
-          await tx.note.create({
-            data: {
-              valeur: note.valeur,
-              commentaire: note.commentaire ?? null,
-              evaluateurId: sessionUser.id,
-              evalueId: note.evalueId,
-              critereId: note.critereId,
-              campagneId: campagne.id,
-            },
-          })
-        }
-      }
-
-      for (const evalueId of evalueIds) {
-        await tx.affectation.update({
+    for (const evalueId of evalueIds) {
+      operations.push(
+        prisma.affectation.update({
           where: {
             evaluateurId_evalueId_campagneId: {
               evaluateurId: sessionUser.id,
@@ -105,8 +132,10 @@ export async function POST(request: NextRequest) {
           },
           data: { statut: 'TERMINEE' },
         })
-      }
-    })
+      )
+    }
+
+    await prisma.$transaction(operations)
 
     return NextResponse.json({ success: true })
   } catch (error) {

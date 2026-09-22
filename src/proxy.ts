@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { SESSION_COOKIE_NAME } from '@/lib/auth'
+
+export const SESSION_COOKIE_NAME = 'eval_session'
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -8,14 +9,12 @@ export function proxy(request: NextRequest) {
 
   if (!token) {
     const url = new URL('/', request.url)
-    url.searchParams.set('reason', 'auth_required')
+    if (pathname.startsWith('/admin')) {
+      url.searchParams.set('reason', 'admin_required')
+    } else {
+      url.searchParams.set('reason', 'auth_required')
+    }
     return NextResponse.redirect(url)
-  }
-
-  // Pour les routes admin, on redirige les non-admins vers /evaluer
-  if (pathname.startsWith('/admin')) {
-    // La vérification fine du rôle se fait dans les API routes côté serveur
-    return NextResponse.next()
   }
 
   return NextResponse.next()

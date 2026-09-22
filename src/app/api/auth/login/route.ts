@@ -2,9 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import {
   createSession,
+  hashPassword,
   normalizeMatricule,
   verifyPassword,
 } from '@/lib/auth'
+
+function normalizePhone(phone: string): string {
+  return phone.replace(/\s+/g, '').replace(/[-()+]/g, '')
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,36 +25,78 @@ export async function POST(request: NextRequest) {
 
     if (!matriculeInput.trim() || !passInput) {
       return NextResponse.json(
-        { error: 'Le matricule et le mot de passe sont requis' },
+        { error: 'Le matricule (ou téléphone / email) et le mot de passe sont requis' },
         { status: 400 }
       )
     }
 
-    const matricule = normalizeMatricule(matriculeInput)
+    const cleanInput = matriculeInput.trim()
+    const matricule = normalizeMatricule(cleanInput)
+    const emailCandidate = cleanInput.toLowerCase()
+    const cleanPhone = normalizePhone(cleanInput)
 
-    // Rechercher l'utilisateur par son matricule ou son email
-    const utilisateur = await prisma.utilisateur.findFirst({
+    // 1. Recherche par matricule exact, email exact, ou téléphone direct
+    let utilisateur = await prisma.utilisateur.findFirst({
       where: {
         OR: [
-          { matricule },
-          { email: matriculeInput.trim().toLowerCase() },
+          { matricule: { equals: matricule, mode: 'insensitive' } },
+          { email: { equals: emailCandidate, mode: 'insensitive' } },
+          { telephone: { equals: cleanInput, mode: 'insensitive' } },
         ],
       },
     })
 
+    // 2. Recherche tolérante par numéro de téléphone nettoyé
+    if (!utilisateur && cleanPhone.length >= 4) {
+      const candidates = await prisma.utilisateur.findMany({
+        where: { telephone: { not: null } },
+      })
+      utilisateur = candidates.find((u) => {
+        if (!u.telephone) return false
+        const uPhoneClean = normalizePhone(u.telephone)
+        return (
+          uPhoneClean === cleanPhone ||
+          uPhoneClean.endsWith(cleanPhone) ||
+          cleanPhone.endsWith(uPhoneClean)
+        )
+      }) || null
+    }
+
+    // 3. Recherche par matricule tolérant aux espaces/zéros
+    if (!utilisateur && cleanPhone.length >= 1) {
+      const allUsers = await prisma.utilisateur.findMany()
+      utilisateur = allUsers.find((u) => {
+        const uMatClean = normalizePhone(u.matricule)
+        return uMatClean === cleanPhone
+      }) || null
+    }
+
     if (!utilisateur) {
       return NextResponse.json(
-        { error: 'Matricule ou mot de passe incorrect. Avez-vous créé votre compte ?' },
+        { error: 'Matricule/Téléphone ou mot de passe incorrect.' },
         { status: 401 }
       )
     }
 
-    const isValidPassword = verifyPassword(passInput, utilisateur.motDePasse)
-    if (!isValidPassword) {
+    const { isValid, needsRehash } = verifyPassword(passInput, utilisateur.motDePasse)
+    if (!isValid) {
       return NextResponse.json(
-        { error: 'Matricule ou mot de passe incorrect' },
+        { error: 'Matricule/Téléphone ou mot de passe incorrect.' },
         { status: 401 }
       )
+    }
+
+    // Mise à niveau transparente du hash vers scrypt sécurisé si nécessaire
+    if (needsRehash) {
+      try {
+        const upgradedHash = hashPassword(passInput)
+        await prisma.utilisateur.update({
+          where: { id: utilisateur.id },
+          data: { motDePasse: upgradedHash },
+        })
+      } catch (err) {
+        console.warn('Could not upgrade password hash for user', utilisateur.id, err)
+      }
     }
 
     // Créer la session pour connecter l'utilisateur

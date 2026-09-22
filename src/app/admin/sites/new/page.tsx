@@ -43,7 +43,7 @@ export default function NewSitePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="flex-1 flex flex-col min-w-0 overflow-y-auto bg-gray-50">
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-2xl mx-auto px-6 py-4 flex items-center gap-4">
           <Link href="/admin/sites" className="text-gray-600 hover:text-gray-800">

@@ -15,6 +15,14 @@ export async function GET(
       where: { id },
       include: {
         criteres: true,
+        scores: {
+          include: {
+            utilisateur: {
+              include: { site: true }
+            }
+          },
+          orderBy: { scoreTotal: 'desc' }
+        },
         _count: { select: { affectations: true, notes: true } }
       }
     })
@@ -39,7 +47,18 @@ export async function PATCH(
 
   try {
     const { id } = await params
-    const { libelle, dateDebut, dateFin, poidsCollegues, poidsManager, statut } = await request.json()
+    const { 
+      libelle, 
+      dateDebut, 
+      dateFin, 
+      poidsCollegues, 
+      poidsManager, 
+      statut,
+      prixDirection,
+      prixDepartement,
+      prixService,
+      prixGlobal
+    } = await request.json()
 
     const campagne = await prisma.campagne.update({
       where: { id },
@@ -49,7 +68,11 @@ export async function PATCH(
         dateFin: dateFin ? new Date(dateFin) : undefined,
         poidsCollegues,
         poidsManager,
-        statut
+        statut,
+        prixDirection,
+        prixDepartement,
+        prixService,
+        prixGlobal
       }
     })
 
@@ -65,7 +88,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const admin = await requireAdmin()
-  if (!admin) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
+  if (!admin || admin.role !== 'ADMIN') {
+    return NextResponse.json({ error: 'Action réservée exclusivement aux administrateurs' }, { status: 403 })
+  }
 
   try {
     const { id } = await params

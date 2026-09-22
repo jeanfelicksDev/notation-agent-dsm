@@ -54,7 +54,10 @@ export async function POST(request: NextRequest) {
     // (placeholder fréquent : <matricule>@dsm.local), on accepte celui qu'il saisit
     // et on le persiste. Sinon il doit correspondre exactement.
     const storedEmail = utilisateur.email.toLowerCase()
-    const isPlaceholder = storedEmail.endsWith('@dsm.local') || storedEmail === 'admin@dsm.ci' || storedEmail === ''
+    const isPlaceholder = 
+      storedEmail.endsWith('@dsm.local') || 
+      (storedEmail.endsWith('@dsm.ci') && storedEmail !== 'admin@dsm.ci') || 
+      storedEmail === ''
 
     if (!isPlaceholder && storedEmail !== email) {
       return NextResponse.json(
@@ -102,7 +105,7 @@ export async function POST(request: NextRequest) {
       channel: sendRes.channel,
       // Indice masqué pour l'utilisateur — confirme qu'on a bien envoyé au bon endroit
       emailMasked: maskEmail(email),
-      ...(sendRes.channel === 'console' ? { devCode: code } : {}),
+      ...(process.env.NODE_ENV !== 'production' && sendRes.channel === 'console' ? { devCode: code } : {}),
     })
   } catch (error) {
     console.error('send-otp error:', error)

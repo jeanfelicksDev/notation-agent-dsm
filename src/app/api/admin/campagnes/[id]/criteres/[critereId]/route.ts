@@ -39,6 +39,14 @@ export async function DELETE(
 
   try {
     const { critereId } = await params
+
+    // Supprimer les notes internes et notes clients associées à ce critère avant de le supprimer
+    await Promise.all([
+      prisma.note.deleteMany({ where: { critereId } }),
+      prisma.noteClient.deleteMany({ where: { critereId } })
+    ])
+
+    // Supprimer le critère
     await prisma.critere.delete({
       where: { id: critereId }
     })
@@ -46,6 +54,6 @@ export async function DELETE(
     return NextResponse.json({ message: 'Critère supprimé avec succès' })
   } catch (error) {
     console.error('API DELETE Error [critereId]:', error)
-    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
+    return NextResponse.json({ error: 'Erreur lors de la suppression du critère' }, { status: 500 })
   }
 }

@@ -2,8 +2,7 @@
 
 import { useState, useEffect, use } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { ArrowLeft, Plus, Trash2, Save, AlertCircle, ListChecks } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, ListChecks, AlertCircle, Save } from 'lucide-react'
 
 interface Critere {
   id: string
@@ -15,7 +14,6 @@ interface Critere {
 
 export default function CampaignCriteresPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
-  const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [criteres, setCriteres] = useState<Critere[]>([])
   const [campaignName, setCampaignName] = useState('')
@@ -74,9 +72,17 @@ export default function CampaignCriteresPage({ params }: { params: Promise<{ id:
       })
       if (res.ok) {
         setCriteres(criteres.filter(c => c.id !== critereId))
+      } else {
+        let errMsg = 'Erreur lors de la suppression'
+        try {
+          const data = await res.json()
+          errMsg = data.error || errMsg
+        } catch {}
+        alert(errMsg)
       }
     } catch (err) {
-      alert('Erreur lors de la suppression')
+      console.error('Delete critere error:', err)
+      alert('Erreur réseau lors de la suppression')
     }
   }
 
@@ -101,14 +107,14 @@ export default function CampaignCriteresPage({ params }: { params: Promise<{ id:
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex-1 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="flex-1 flex flex-col min-w-0 overflow-y-auto bg-gray-50">
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -167,9 +173,9 @@ export default function CampaignCriteresPage({ params }: { params: Promise<{ id:
                     value={newCritere.typeEvaluateur}
                     onChange={e => setNewCritere({ ...newCritere, typeEvaluateur: e.target.value as any })}
                   >
-                    <option value="COLLEGUE">Collègues uniquement</option>
-                    <option value="MANAGER">Manager uniquement</option>
-                    <option value="TOUS">Tous (Collègues & Manager)</option>
+                    <option value="TOUS">Tous</option>
+                    <option value="COLLEGUE">Client Interne ou Externe</option>
+                    <option value="MANAGER">Manager</option>
                   </select>
                 </div>
               </div>

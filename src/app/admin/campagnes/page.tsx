@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Plus, Calendar, CheckCircle, Clock, XCircle, ChevronRight, BarChart3, Users2, ClipboardList } from 'lucide-react'
-import Sidebar from '@/components/Sidebar'
 import AdminHeader from '@/components/AdminHeader'
 
 interface Campagne {
@@ -61,16 +60,14 @@ export default function CampagnesPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="flex-1 flex items-center justify-center">
         <div className="h-12 w-12 rounded-full border-4 border-brand-100 border-t-brand-500 animate-spin"></div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
-      <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0">
+    <div className="flex-1 flex flex-col min-w-0">
         <AdminHeader title="Gestion des Campagnes" />
         
         <main className="flex-1 overflow-y-auto p-6">
@@ -167,7 +164,6 @@ export default function CampagnesPage() {
             </div>
           </div>
         </main>
-      </div>
     </div>
   )
 }

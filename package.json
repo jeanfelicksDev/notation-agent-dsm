@@ -7,13 +7,11 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
+    "admin:seed": "node scripts/seed_admin.js",
     "postinstall": "prisma generate"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
-    "@libsql/client": "^0.17.3",
-    "@libsql/isomorphic-fetch": "^0.3.1",
-    "@prisma/adapter-libsql": "^7.8.0",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "clsx": "^2.1.1",

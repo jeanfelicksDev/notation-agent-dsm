@@ -24,20 +24,26 @@ model Utilisateur {
   motDePasse          String
   role                Role          @default(UTILISATEUR)
   service             String?
+  departement         String?
+  direction           String?
   siteId              String?
-  managerId           String?
+  qrcodeActif         Boolean       @default(false)
+  qrToken             String?       @unique
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
   affectationsRecues  Affectation[] @relation("EvalueAffectations")
   affectationsDonnees Affectation[] @relation("EvaluateurAffectations")
   evaluationsRecues   Note[]        @relation("NoteRecue")
   evaluationsDonnees  Note[]        @relation("NoteDonnee")
+  notesClients        NoteClient[]
   scores              ScoreFinal[]
   otpTokens           OtpToken[]
   sessions            Session[]
-  manager             Utilisateur?  @relation("ManagerSubordonnes", fields: [managerId], references: [id])
-  subordonnes         Utilisateur[] @relation("ManagerSubordonnes")
   site                Site?         @relation(fields: [siteId], references: [id])
+
+  @@index([role])
+  @@index([siteId])
+  @@index([qrcodeActif])
 }
 
 model OtpToken {
@@ -80,7 +86,15 @@ model Campagne {
   affectations   Affectation[]
   criteres       Critere[]
   notes          Note[]
-  scores         ScoreFinal[]
+  notesClients   NoteClient[]
+  scores          ScoreFinal[]
+  poidsClient     Int            @default(0)
+  prixDirection   String?        @default("Trophée d'Excellence + Dotation Spéciale")
+  prixDepartement String?        @default("Certificat de Mérite + Prime")
+  prixService     String?        @default("Diplôme d'Honneur + Prime")
+  prixGlobal      String?        @default("Super Lauréat DSM 360°")
+
+  @@index([statut])
 }
 
 model Critere {
@@ -93,6 +107,10 @@ model Critere {
   createdAt      DateTime @default(now())
   campagne       Campagne @relation(fields: [campagneId], references: [id], onDelete: Cascade)
   notes          Note[]
+  notesClients   NoteClient[]
+
+  @@index([campagneId])
+  @@index([campagneId, typeEvaluateur])
 }
 
 model Affectation {
@@ -103,10 +121,13 @@ model Affectation {
   statut       StatutAffectation @default(EN_ATTENTE)
   createdAt    DateTime          @default(now())
   campagne     Campagne          @relation(fields: [campagneId], references: [id], onDelete: Cascade)
-  evalue       Utilisateur       @relation("EvalueAffectations", fields: [evalueId], references: [id])
-  evaluateur   Utilisateur       @relation("EvaluateurAffectations", fields: [evaluateurId], references: [id])
+  evalue       Utilisateur       @relation("EvalueAffectations", fields: [evalueId], references: [id], onDelete: Cascade)
+  evaluateur   Utilisateur       @relation("EvaluateurAffectations", fields: [evaluateurId], references: [id], onDelete: Cascade)
 
   @@unique([evaluateurId, evalueId, campagneId])
+  @@index([evaluateurId, campagneId])
+  @@index([evalueId, campagneId])
+  @@index([campagneId, statut])
 }
 
 model Note {
@@ -120,9 +141,34 @@ model Note {
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
   campagne     Campagne    @relation(fields: [campagneId], references: [id], onDelete: Cascade)
-  critere      Critere     @relation(fields: [critereId], references: [id])
-  evalue       Utilisateur @relation("NoteRecue", fields: [evalueId], references: [id])
-  evaluateur   Utilisateur @relation("NoteDonnee", fields: [evaluateurId], references: [id])
+  critere      Critere     @relation(fields: [critereId], references: [id], onDelete: Cascade)
+  evalue       Utilisateur @relation("NoteRecue", fields: [evalueId], references: [id], onDelete: Cascade)
+  evaluateur   Utilisateur @relation("NoteDonnee", fields: [evaluateurId], references: [id], onDelete: Cascade)
+
+  @@unique([evaluateurId, evalueId, critereId, campagneId])
+  @@index([campagneId])
+  @@index([evaluateurId, evalueId, campagneId])
+  @@index([evalueId, campagneId])
+  @@index([critereId])
+}
+
+model NoteClient {
+  id          String      @id @default(uuid())
+  agentId     String
+  campagneId  String
+  critereId   String
+  valeur      Int
+  commentaire String?
+  ipHash      String?
+  clientId    String?
+  createdAt   DateTime    @default(now())
+  agent       Utilisateur @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  campagne    Campagne    @relation(fields: [campagneId], references: [id], onDelete: Cascade)
+  critere     Critere     @relation(fields: [critereId], references: [id], onDelete: Cascade)
+
+  @@index([agentId, campagneId])
+  @@index([ipHash, agentId, campagneId])
+  @@index([clientId, agentId, campagneId])
 }
 
 model ScoreFinal {
@@ -131,13 +177,15 @@ model ScoreFinal {
   campagneId     String
   scoreCollegues Float       @default(0)
   scoreManager   Float       @default(0)
+  scoreClient    Float       @default(0)
   scoreTotal     Float       @default(0)
   rang           Int?
   createdAt      DateTime    @default(now())
   campagne       Campagne    @relation(fields: [campagneId], references: [id], onDelete: Cascade)
-  utilisateur    Utilisateur @relation(fields: [utilisateurId], references: [id])
+  utilisateur    Utilisateur @relation(fields: [utilisateurId], references: [id], onDelete: Cascade)
 
   @@unique([utilisateurId, campagneId])
+  @@index([campagneId, scoreTotal(sort: Desc)])
 }
 
 enum StatutCampagne {
@@ -150,6 +198,7 @@ enum TypeEval {
   MANAGER
   COLLEGUE
   TOUS
+  CLIENT
 }
 
 enum StatutAffectation {

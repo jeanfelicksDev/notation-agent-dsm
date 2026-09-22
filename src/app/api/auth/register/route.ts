@@ -3,10 +3,18 @@ import prisma from '@/lib/prisma'
 import {
   createSession,
   hashPassword,
-  normalizeEmail,
   normalizeMatricule,
+  verifyOtpCode,
 } from '@/lib/auth'
 
+function normalizePhone(phone: string): string {
+  return phone.replace(/\s+/g, '').replace(/[-()+]/g, '')
+}
+
+/**
+ * POST /api/auth/register
+ * Validates registration with matricule/telephone and 4-digit password.
+ */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => null)
@@ -14,97 +22,88 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Corps de requête invalide' }, { status: 400 })
     }
 
-    const { rawMatricule, rawEmail, password, confirmPassword } = body
+    const { matricule: rawMatricule, password } = body
 
-    const matriculeInput = typeof rawMatricule === 'string' ? rawMatricule : typeof body.matricule === 'string' ? body.matricule : ''
-    const emailInput = typeof rawEmail === 'string' ? rawEmail : typeof body.email === 'string' ? body.email : ''
-    const passInput = typeof password === 'string' ? password : ''
-    const confirmInput = typeof confirmPassword === 'string' ? confirmPassword : ''
+    const matriculeInput = typeof rawMatricule === 'string' ? rawMatricule.trim() : ''
+    const passInput = typeof password === 'string' ? password.trim() : ''
 
-    if (!matriculeInput.trim()) {
-      return NextResponse.json({ error: 'Le matricule est obligatoire' }, { status: 400 })
-    }
-    if (!emailInput.trim()) {
-      return NextResponse.json({ error: 'L’adresse email est obligatoire' }, { status: 400 })
+    if (!matriculeInput) {
+      return NextResponse.json({ error: 'Le matricule ou numéro de téléphone est obligatoire' }, { status: 400 })
     }
     if (!passInput) {
       return NextResponse.json({ error: 'Le mot de passe est obligatoire' }, { status: 400 })
     }
-    if (passInput !== confirmInput) {
+    if (!/^\d{4}$/.test(passInput)) {
       return NextResponse.json(
-        { error: 'Les mots de passe ne correspondent pas' },
-        { status: 400 }
-      )
-    }
-    if (passInput.length < 4) {
-      return NextResponse.json(
-        { error: 'Le mot de passe doit contenir au moins 4 caractères' },
+        { error: 'Le mot de passe doit comporter exactement 4 chiffres' },
         { status: 400 }
       )
     }
 
     const matricule = normalizeMatricule(matriculeInput)
-    const email = normalizeEmail(emailInput)
-    const hashedPassword = hashPassword(passInput)
+    const cleanPhone = normalizePhone(matriculeInput)
 
-    // Vérifier si le matricule existe déjà
-    let utilisateur = await prisma.utilisateur.findUnique({
-      where: { matricule },
+    // Trouver l'utilisateur pré-inscrit par matricule, email ou téléphone
+    let utilisateur = await prisma.utilisateur.findFirst({
+      where: {
+        OR: [
+          { matricule: { equals: matricule, mode: 'insensitive' } },
+          { email: { equals: matriculeInput.toLowerCase(), mode: 'insensitive' } },
+          { telephone: { equals: matriculeInput, mode: 'insensitive' } },
+        ],
+      },
     })
 
-    if (utilisateur) {
-      // Si l'utilisateur est déjà enregistré avec cet email et a changé son mdp
-      // On met à jour son compte avec le mot de passe et l'email
-      utilisateur = await prisma.utilisateur.update({
-        where: { id: utilisateur.id },
-        data: {
-          email,
-          motDePasse: hashedPassword,
-        },
+    if (!utilisateur && cleanPhone.length >= 4) {
+      const candidates = await prisma.utilisateur.findMany({
+        where: { telephone: { not: null } },
       })
-    } else {
-      // Sinon on le crée
-      utilisateur = await prisma.utilisateur.create({
-        data: {
-          matricule,
-          email,
-          motDePasse: hashedPassword,
-          nom: matricule,
-          prenom: 'Agent',
-          role: 'UTILISATEUR',
-        },
-      })
+      utilisateur = candidates.find((u) => {
+        if (!u.telephone) return false
+        const uPhoneClean = normalizePhone(u.telephone)
+        return (
+          uPhoneClean === cleanPhone ||
+          uPhoneClean.endsWith(cleanPhone) ||
+          cleanPhone.endsWith(uPhoneClean)
+        )
+      }) || null
     }
 
-    // Créer la session automatiquement pour connecter l'utilisateur
+    if (!utilisateur) {
+      return NextResponse.json(
+        { error: 'Ce matricule ou numéro de téléphone n’est pas pré-inscrit dans la base. Veuillez contacter l’administrateur.' },
+        { status: 404 }
+      )
+    }
+
+    // Hasher le mot de passe à 4 chiffres et enregistrer
+    const hashedPassword = hashPassword(passInput)
+    const updatedUser = await prisma.utilisateur.update({
+      where: { id: utilisateur.id },
+      data: {
+        motDePasse: hashedPassword,
+      },
+    })
+
+    // Créer la session pour connecter automatiquement l'agent
     const userAgent = request.headers.get('user-agent')
     const ipAddress = request.headers.get('x-forwarded-for') || null
-    await createSession(utilisateur.id, userAgent, ipAddress)
+    await createSession(updatedUser.id, userAgent, ipAddress)
 
     return NextResponse.json({
       success: true,
-      role: utilisateur.role,
+      role: updatedUser.role,
       user: {
-        id: utilisateur.id,
-        matricule: utilisateur.matricule,
-        nom: utilisateur.nom,
-        prenom: utilisateur.prenom,
-        email: utilisateur.email,
-        role: utilisateur.role,
+        id: updatedUser.id,
+        matricule: updatedUser.matricule,
+        nom: updatedUser.nom,
+        prenom: updatedUser.prenom,
+        email: updatedUser.email,
+        role: updatedUser.role,
       },
     })
   } catch (error: any) {
     console.error('Register error:', error)
-    if (
-      error?.code === 'P2002' ||
-      error?.message?.includes('P2002') ||
-      error?.message?.includes('Unique constraint')
-    ) {
-      return NextResponse.json(
-        { error: 'Ce matricule ou cet email est déjà utilisé. Essayez de vous connecter dans l’onglet "Se connecter".' },
-        { status: 409 }
-      )
-    }
     return NextResponse.json(
       { error: error?.message || 'Erreur serveur lors de la création du compte' },
       { status: 500 }

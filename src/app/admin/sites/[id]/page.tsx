@@ -67,9 +67,12 @@ export default function SiteDetailPage({ params }: { params: Promise<{ id: strin
     }
   }
 
-  const handleDelete = async () => {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer ce site ?')) return
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
+  const executeDelete = async () => {
+    setDeleting(true)
+    setError('')
     try {
       const res = await fetch(`/api/admin/sites/${id}`, { method: 'DELETE' })
       if (res.ok) {
@@ -77,23 +80,27 @@ export default function SiteDetailPage({ params }: { params: Promise<{ id: strin
         router.refresh()
       } else {
         const data = await res.json()
-        alert(data.error || 'Erreur lors de la suppression')
+        setError(data.error || 'Erreur lors de la suppression')
+        setShowDeleteModal(false)
       }
     } catch (err) {
-      alert('Erreur de connexion')
+      setError('Erreur de connexion lors de la suppression')
+      setShowDeleteModal(false)
+    } finally {
+      setDeleting(false)
     }
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex-1 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="flex-1 flex flex-col min-w-0 overflow-y-auto bg-gray-50">
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-2xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -102,13 +109,6 @@ export default function SiteDetailPage({ params }: { params: Promise<{ id: strin
             </Link>
             <h1 className="text-2xl font-bold text-gray-800">Détails du Site</h1>
           </div>
-          <button
-            onClick={handleDelete}
-            className="text-red-600 hover:text-red-700 p-2 rounded-lg hover:bg-red-50 transition-colors"
-            title="Supprimer le site"
-          >
-            <Trash2 className="w-5 h-5" />
-          </button>
         </div>
       </header>
 
@@ -143,7 +143,14 @@ export default function SiteDetailPage({ params }: { params: Promise<{ id: strin
               />
             </div>
 
-            <div className="flex justify-end gap-4 pt-4">
+            <div className="flex items-center justify-end gap-4 pt-4 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(true)}
+                className="mr-auto px-5 py-2 text-sm bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 rounded-lg font-bold transition-colors"
+              >
+                Supprimer ce site
+              </button>
               <Link
                 href="/admin/sites"
                 className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium"
@@ -161,6 +168,43 @@ export default function SiteDetailPage({ params }: { params: Promise<{ id: strin
           </form>
         </div>
       </main>
+
+      {/* Custom Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4 border border-slate-100">
+            <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            
+            <div className="text-center space-y-2">
+              <h3 className="text-lg font-bold text-slate-900">Confirmer la suppression</h3>
+              <p className="text-sm text-slate-500">
+                Êtes-vous sûr de vouloir supprimer le site <strong className="text-slate-800">{formData.nom || 'ce site'}</strong> ? Les collaborateurs affectés seront simplement dissociés sans être supprimés.
+              </p>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                disabled={deleting}
+                className="flex-1 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={executeDelete}
+                disabled={deleting}
+                className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold transition-colors disabled:opacity-50"
+              >
+                {deleting ? 'Suppression...' : 'Oui, supprimer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

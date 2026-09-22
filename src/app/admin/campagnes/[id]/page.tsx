@@ -3,9 +3,16 @@
 import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Save, Trash2, AlertCircle, Calendar, Plus, Pencil, X, Check, ClipboardList, Settings2, Users2, ChevronRight, LayoutDashboard, Search, Activity, Clock, CheckCircle2, Lock, BarChart3 } from 'lucide-react'
+import { 
+  ArrowLeft, Save, Trash2, AlertCircle, Calendar, Plus, Pencil, X, Check, 
+  ClipboardList, Settings2, Users2, ChevronRight, LayoutDashboard, Search, 
+  Activity, Clock, CheckCircle2, Lock, BarChart3, Trophy, Medal, Award, Gift, 
+  RefreshCw, Loader2, Target, UserCheck, ArrowLeftRight, FileSpreadsheet, 
+  ExternalLink, Building2, FolderGit2, Sparkles, Crown, ListOrdered, Eye, EyeOff, Filter
+} from 'lucide-react'
 import Sidebar from '@/components/Sidebar'
 import AdminHeader from '@/components/AdminHeader'
+import { getAppreciationInfo } from '@/lib/default-criteres'
 
 interface Critere {
   id: string
@@ -21,6 +28,9 @@ interface User {
   nom: string
   prenom: string
   role: string
+  service?: string | null
+  departement?: string | null
+  direction?: string | null
 }
 
 export default function CampagneDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -28,8 +38,9 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [saveSuccess, setSaveSuccess] = useState(false)
   const [error, setError] = useState('')
-  const [activeTab, setActiveTab] = useState<'config' | 'criteres' | 'affectations' | 'suivi'>('config')
+  const [activeTab, setActiveTab] = useState<'config' | 'criteres' | 'affectations' | 'suivi' | 'prix' | 'classement'>('config')
 
   const [formData, setFormData] = useState({
     libelle: '',
@@ -37,12 +48,19 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
     dateFin: '',
     poidsCollegues: 45,
     poidsManager: 55,
-    statut: 'OUVERTE'
+    statut: 'OUVERTE',
+    prixGlobal: '',
+    prixDirection: '',
+    prixDepartement: '',
+    prixService: ''
   })
 
   const [criteres, setCriteres] = useState<Critere[]>([])
   const [showCritereForm, setShowCritereForm] = useState(false)
   const [editingCritere, setEditingCritere] = useState<string | null>(null)
+  const [critereSearch, setCritereSearch] = useState('')
+  const [critereFilter, setCritereFilter] = useState<'ALL' | 'TOUS' | 'COLLEGUE' | 'MANAGER' | 'CLIENT'>('ALL')
+  const [seedingCriteres, setSeedingCriteres] = useState(false)
   const [critereForm, setCritereForm] = useState({
     libelle: '',
     description: '',
@@ -54,6 +72,25 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
   const [affectations, setAffectations] = useState<any[]>([])
   const [closing, setClosing] = useState(false)
   const [calculating, setCalculating] = useState(false)
+
+  const handleSeedOfficialCriteres = async () => {
+    if (!confirm('Rétablir la grille officielle DSM standard (15 critères) pour cette campagne ?')) return
+    setSeedingCriteres(true)
+    try {
+      const res = await fetch(`/api/admin/campagnes/${id}/seed-criteres`, { method: 'POST' })
+      const data = await res.json()
+      if (res.ok && data.criteres) {
+        setCriteres(data.criteres)
+        alert('Grille officielle des 15 critères DSM rétablie avec succès !')
+      } else {
+        alert(data.error || 'Erreur lors du rétablissement')
+      }
+    } catch {
+      alert('Erreur réseau')
+    } finally {
+      setSeedingCriteres(false)
+    }
+  }
 
   const loadCriteres = () => {
     fetch(`/api/admin/campagnes/${id}/criteres`)
@@ -82,12 +119,16 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
           setError(data.error)
         } else {
           setFormData({
-            libelle: data.libelle,
-            dateDebut: new Date(data.dateDebut).toISOString().split('T')[0],
-            dateFin: new Date(data.dateFin).toISOString().split('T')[0],
-            poidsCollegues: data.poidsCollegues,
-            poidsManager: data.poidsManager,
-            statut: data.statut
+            libelle: data.libelle || '',
+            dateDebut: data.dateDebut ? new Date(data.dateDebut).toISOString().split('T')[0] : '',
+            dateFin: data.dateFin ? new Date(data.dateFin).toISOString().split('T')[0] : '',
+            poidsCollegues: data.poidsCollegues ?? 45,
+            poidsManager: data.poidsManager ?? 55,
+            statut: data.statut || 'OUVERTE',
+            prixGlobal: data.prixGlobal ?? 'Super Lauréat DSM TAMIS (1 500 000 FCFA + Séjour)',
+            prixDirection: data.prixDirection ?? "Trophée d'Excellence + Dotation Spéciale",
+            prixDepartement: data.prixDepartement ?? 'Certificat de Mérite + Prime (1 000 000 FCFA)',
+            prixService: data.prixService ?? "Diplôme d'Honneur + Prime (500 000 FCFA)"
           })
         }
       })
@@ -98,10 +139,11 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
     loadAffectations()
   }, [id])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
     setSaving(true)
     setError('')
+    setSaveSuccess(false)
 
     try {
       const res = await fetch(`/api/admin/campagnes/${id}`, {
@@ -111,8 +153,9 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
       })
 
       if (res.ok) {
+        setSaveSuccess(true)
+        setTimeout(() => setSaveSuccess(false), 4000)
         router.refresh()
-        // Success feedback could be added here
       } else {
         const data = await res.json()
         setError(data.error || 'Une erreur est survenue')
@@ -137,6 +180,85 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
       }
     } catch (err) {
       alert('Erreur de connexion')
+    }
+  }
+
+  const handleCloture = async () => {
+    if (!confirm('Voulez-vous vraiment clôturer cette campagne ? Les votes seront figés et les scores seront calculés.')) return
+    setClosing(true)
+    setError('')
+    try {
+      const res = await fetch(`/api/admin/campagnes/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ statut: 'CLOTUREE' })
+      })
+      if (res.ok) {
+        setFormData(prev => ({ ...prev, statut: 'CLOTUREE' }))
+        await handleCalculScores(false)
+        alert('Campagne clôturée et scores calculés avec succès !')
+      } else {
+        const data = await res.json()
+        setError(data.error || 'Erreur lors de la clôture')
+      }
+    } catch {
+      setError('Erreur de connexion')
+    } finally {
+      setClosing(false)
+    }
+  }
+
+  const handleCalculScores = async (showAlert = true) => {
+    setCalculating(true)
+    setError('')
+    try {
+      const res = await fetch('/api/admin/classement', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campagneId: id })
+      })
+      if (res.ok) {
+        await fetch(`/api/admin/campagnes/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ statut: 'CALCULEE' })
+        })
+        setFormData(prev => ({ ...prev, statut: 'CALCULEE' }))
+        if (showAlert) {
+          alert('Scores et palmarès de la campagne calculés avec succès !')
+        }
+      } else {
+        const data = await res.json()
+        setError(data.error || 'Erreur lors du calcul des scores')
+      }
+    } catch {
+      setError('Erreur de connexion')
+    } finally {
+      setCalculating(false)
+    }
+  }
+
+  const handleRouvrir = async () => {
+    if (!confirm('Voulez-vous rouvrir cette campagne ? La notation redeviendra active pour les évaluateurs.')) return
+    setSaving(true)
+    setError('')
+    try {
+      const res = await fetch(`/api/admin/campagnes/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ statut: 'OUVERTE' })
+      })
+      if (res.ok) {
+        setFormData(prev => ({ ...prev, statut: 'OUVERTE' }))
+        alert('La campagne est de nouveau ouverte !')
+      } else {
+        const data = await res.json()
+        setError(data.error || 'Erreur lors de la réouverture')
+      }
+    } catch {
+      setError('Erreur de connexion')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -189,53 +311,6 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
     setShowCritereForm(true)
   }
 
-  const handleCloture = async () => {
-    if (!confirm('Clôturer cette campagne ? Les évaluateurs ne pourront plus soumettre de notes.')) return
-    setClosing(true)
-    setError('')
-    try {
-      const res = await fetch(`/api/admin/campagnes/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ statut: 'CLOTUREE' }),
-      })
-      if (res.ok) {
-        setFormData(prev => ({ ...prev, statut: 'CLOTUREE' }))
-      } else {
-        const data = await res.json()
-        setError(data.error || 'Erreur lors de la clôture')
-      }
-    } catch {
-      setError('Erreur de connexion')
-    } finally {
-      setClosing(false)
-    }
-  }
-
-  const handleCalculScores = async () => {
-    if (!confirm('Calculer les scores définitifs ? Cette action est irréversible.')) return
-    setCalculating(true)
-    setError('')
-    try {
-      const res = await fetch('/api/admin/classement', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ campagneId: id }),
-      })
-      const data = await res.json()
-      if (res.ok) {
-        setFormData(prev => ({ ...prev, statut: 'CALCULEE' }))
-        alert('Scores calculés avec succès !')
-      } else {
-        setError(data.error || 'Erreur lors du calcul')
-      }
-    } catch {
-      setError('Erreur de connexion')
-    } finally {
-      setCalculating(false)
-    }
-  }
-
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -247,6 +322,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
   const typeLabels: Record<string, string> = {
     COLLEGUE: 'Collègues',
     MANAGER: 'Managers',
+    CLIENT: 'Clients externes (QR Code)',
     TOUS: 'Tous'
   }
 
@@ -257,7 +333,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
         <AdminHeader title={formData.libelle || 'Détails Campagne'} />
         
         <main className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-5xl mx-auto space-y-6">
+          <div className="max-w-[1780px] w-full mx-auto space-y-6">
             {/* Header / Actions */}
             <div className="flex items-center justify-between animate-fade-in">
               <Link href="/admin/campagnes" className="group flex items-center gap-2 text-slate-500 hover:text-slate-800 font-bold transition-colors">
@@ -265,43 +341,68 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
               </Link>
               <button
                 onClick={handleDelete}
-                className="flex items-center gap-2 text-red-500 hover:text-red-600 hover:bg-red-50 px-4 py-2 rounded-xl transition-all font-bold"
+                className="flex items-center gap-2 text-red-500 hover:text-red-600 hover:bg-red-50 px-4 py-2 rounded-xl transition-all font-bold text-sm"
               >
                 <Trash2 className="w-5 h-5" /> Supprimer
               </button>
             </div>
 
-            {/* Navigation Tabs */}
-            <div className="flex items-center gap-1 bg-white p-1 rounded-2xl border border-slate-200 shadow-sm animate-fade-in">
-              <button 
-                onClick={() => setActiveTab('config')}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all ${activeTab === 'config' ? 'bg-brand-500 text-white shadow-lg shadow-brand-100' : 'text-slate-500 hover:bg-slate-50'}`}
-              >
-                <Settings2 className="w-5 h-5" /> Configuration
-              </button>
-              <button 
-                onClick={() => setActiveTab('criteres')}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all ${activeTab === 'criteres' ? 'bg-brand-500 text-white shadow-lg shadow-brand-100' : 'text-slate-500 hover:bg-slate-50'}`}
-              >
-                <ClipboardList className="w-5 h-5" /> Critères
-              </button>
-              <button 
-                onClick={() => setActiveTab('affectations')}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all ${activeTab === 'affectations' ? 'bg-brand-500 text-white shadow-lg shadow-brand-100' : 'text-slate-500 hover:bg-slate-50'}`}
-              >
-                <Users2 className="w-5 h-5" /> Affectations
-              </button>
-              <button 
-                onClick={() => setActiveTab('suivi')}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all ${activeTab === 'suivi' ? 'bg-brand-500 text-white shadow-lg shadow-brand-100' : 'text-slate-500 hover:bg-slate-50'}`}
-              >
-                <Activity className="w-5 h-5" /> Suivi
-              </button>
+            {/* Navigation Tabs (Compacte, sans élargissement artificiel) */}
+            <div className="flex items-center justify-start overflow-x-auto pb-1 animate-fade-in">
+              <div className="inline-flex items-center gap-1.5 bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm">
+                <button 
+                  onClick={() => setActiveTab('config')}
+                  className={`flex items-center gap-2 py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition-all ${activeTab === 'config' ? 'bg-brand-500 text-white shadow-md shadow-brand-100' : 'text-slate-600 hover:bg-slate-50'}`}
+                >
+                  <Settings2 className="w-4 h-4" /> Configuration
+                </button>
+                <button 
+                  onClick={() => setActiveTab('criteres')}
+                  className={`flex items-center gap-2 py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition-all ${activeTab === 'criteres' ? 'bg-brand-500 text-white shadow-md shadow-brand-100' : 'text-slate-600 hover:bg-slate-50'}`}
+                >
+                  <ClipboardList className="w-4 h-4" /> Critères ({criteres.length})
+                </button>
+                <button 
+                  onClick={() => setActiveTab('affectations')}
+                  className={`flex items-center gap-2 py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition-all ${activeTab === 'affectations' ? 'bg-brand-500 text-white shadow-md shadow-brand-100' : 'text-slate-600 hover:bg-slate-50'}`}
+                >
+                  <Users2 className="w-4 h-4" /> Affectations
+                </button>
+                <button 
+                  onClick={() => setActiveTab('suivi')}
+                  className={`flex items-center gap-2 py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition-all ${activeTab === 'suivi' ? 'bg-brand-500 text-white shadow-md shadow-brand-100' : 'text-slate-600 hover:bg-slate-50'}`}
+                >
+                  <Activity className="w-4 h-4" /> Suivi
+                </button>
+                <button 
+                  onClick={() => setActiveTab('prix')}
+                  className={`flex items-center gap-2 py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition-all ${activeTab === 'prix' ? 'bg-brand-500 text-white shadow-md shadow-brand-100' : 'text-slate-600 hover:bg-slate-50'}`}
+                >
+                  <Gift className="w-4 h-4" /> Prix & Distinctions
+                </button>
+                <button 
+                  onClick={() => setActiveTab('classement')}
+                  className={`flex items-center gap-2 py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition-all ${
+                    activeTab === 'classement' 
+                      ? 'bg-[#002B49] text-[#D4AF37] shadow-md border border-[#D4AF37]/30' 
+                      : 'text-[#002B49] hover:bg-amber-50/50 font-black'
+                  }`}
+                >
+                  <Trophy className="w-4 h-4 text-[#D4AF37]" /> Classement & Palmarès
+                </button>
+              </div>
             </div>
+
+            {saveSuccess && (
+              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3 text-emerald-800 animate-fade-in shadow-sm">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+                <p className="font-bold">Modifications enregistrées avec succès !</p>
+              </div>
+            )}
 
             {error && (
               <div className="p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 text-red-700 animate-fade-in">
-                <AlertCircle className="w-5 h-5" />
+                <AlertCircle className="w-5 h-5 flex-shrink-0" />
                 <p className="font-bold">{error}</p>
               </div>
             )}
@@ -358,13 +459,13 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Statut Actuel</label>
                       <select
-                        className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-brand-100 focus:border-brand-500 focus:bg-white transition-all outline-none font-bold text-slate-800 appearance-none"
+                        className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-brand-100 focus:border-brand-500 focus:bg-white transition-all outline-none font-bold text-slate-800 cursor-pointer"
                         value={formData.statut}
                         onChange={e => setFormData({ ...formData, statut: e.target.value })}
                       >
-                        <option value="OUVERTE">Ouverte</option>
-                        <option value="CLOTUREE">Clôturée</option>
-                        <option value="CALCULEE">Calculée</option>
+                        <option value="OUVERTE">🟢 Ouverte (En cours de notation)</option>
+                        <option value="CLOTUREE">🔒 Clôturée (Votes figés)</option>
+                        <option value="CALCULEE">📊 Calculée (Scores générés)</option>
                       </select>
                     </div>
 
@@ -405,42 +506,96 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                       </div>
                     </div>
 
-                    <div className="md:col-span-2 pt-6 flex flex-wrap items-center justify-between gap-4">
-                      <div className="flex items-center gap-3">
+                    <div className="md:col-span-2 pt-6 flex flex-wrap items-center justify-between gap-4 border-t border-slate-100">
+                      <div className="flex items-center gap-3 flex-wrap">
                         {formData.statut === 'OUVERTE' && (
-                          <button
-                            type="button"
-                            onClick={handleCloture}
-                            disabled={closing}
-                            className="bg-amber-500 hover:bg-amber-600 text-white px-8 py-4 rounded-2xl font-black transition-all active:scale-[0.98] shadow-xl disabled:opacity-50 flex items-center gap-3"
-                          >
-                            {closing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Lock className="w-5 h-5" />}
-                            Clôturer la campagne
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              onClick={handleCloture}
+                              disabled={closing}
+                              className="bg-amber-600 hover:bg-amber-700 text-white px-7 py-3.5 rounded-2xl font-black transition-all active:scale-[0.98] shadow-lg shadow-amber-600/20 disabled:opacity-50 flex items-center gap-2.5 text-sm"
+                            >
+                              {closing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
+                              Clôturer la campagne
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleCalculScores(true)}
+                              disabled={calculating}
+                              className="bg-blue-600 hover:bg-blue-700 text-white px-7 py-3.5 rounded-2xl font-black transition-all active:scale-[0.98] shadow-lg shadow-blue-600/20 disabled:opacity-50 flex items-center gap-2.5 text-sm"
+                            >
+                              {calculating ? <Loader2 className="w-4 h-4 animate-spin" /> : <BarChart3 className="w-4 h-4" />}
+                              Calculer les scores
+                            </button>
+                          </>
                         )}
                         {formData.statut === 'CLOTUREE' && (
-                          <button
-                            type="button"
-                            onClick={handleCalculScores}
-                            disabled={calculating}
-                            className="bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black transition-all active:scale-[0.98] shadow-xl disabled:opacity-50 flex items-center gap-3"
-                          >
-                            {calculating ? <Loader2 className="w-5 h-5 animate-spin" /> : <BarChart3 className="w-5 h-5" />}
-                            Calculer les scores
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleCalculScores(true)}
+                              disabled={calculating}
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white px-7 py-3.5 rounded-2xl font-black transition-all active:scale-[0.98] shadow-lg shadow-emerald-600/20 disabled:opacity-50 flex items-center gap-2.5 text-sm"
+                            >
+                              {calculating ? <Loader2 className="w-4 h-4 animate-spin" /> : <BarChart3 className="w-4 h-4" />}
+                              Calculer les scores
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleRouvrir}
+                              disabled={saving}
+                              className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-5 py-3.5 rounded-2xl font-bold transition-all text-sm flex items-center gap-2 shadow-sm"
+                            >
+                              <RefreshCw className="w-4 h-4 text-slate-500" />
+                              Rouvrir la campagne
+                            </button>
+                          </>
                         )}
                         {formData.statut === 'CALCULEE' && (
-                          <span className="inline-flex items-center gap-2 px-5 py-3 bg-emerald-50 text-emerald-700 rounded-2xl font-black border border-emerald-200">
-                            <CheckCircle2 className="w-5 h-5" /> Scores calculés
-                          </span>
+                          <>
+                            <button
+                              type="button"
+                              onClick={handleCloture}
+                              disabled={closing}
+                              className="bg-amber-600 hover:bg-amber-700 text-white px-6 py-3.5 rounded-2xl font-black transition-all active:scale-[0.98] shadow-lg shadow-amber-600/20 disabled:opacity-50 flex items-center gap-2 text-sm"
+                            >
+                              {closing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
+                              Clôturer / Figer
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleCalculScores(true)}
+                              disabled={calculating}
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3.5 rounded-2xl font-black transition-all active:scale-[0.98] shadow-lg shadow-emerald-600/20 disabled:opacity-50 flex items-center gap-2 text-sm"
+                            >
+                              {calculating ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                              Recalculer les scores
+                            </button>
+                            <Link
+                              href={`/admin/classement?campagneId=${id}`}
+                              className="bg-[#002B49] hover:bg-[#001d33] text-[#D4AF37] border border-[#D4AF37]/40 px-6 py-3.5 rounded-2xl font-black text-sm transition-all shadow-md flex items-center gap-2"
+                            >
+                              <Trophy className="w-4 h-4" />
+                              Voir le classement
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={handleRouvrir}
+                              disabled={saving}
+                              className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-5 py-3.5 rounded-2xl font-bold transition-all text-sm flex items-center gap-2 shadow-sm"
+                            >
+                              Rouvrir la campagne
+                            </button>
+                          </>
                         )}
                       </div>
                       <button
                         type="submit"
                         disabled={saving}
-                        className="bg-slate-900 hover:bg-slate-800 text-white px-10 py-4 rounded-2xl font-black text-lg transition-all active:scale-[0.98] shadow-xl disabled:opacity-50 flex items-center gap-3"
+                        className="bg-slate-900 hover:bg-slate-800 text-white px-8 py-3.5 rounded-2xl font-black text-base transition-all active:scale-[0.98] shadow-xl disabled:opacity-50 flex items-center gap-2.5"
                       >
-                        {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                         Enregistrer les modifications
                       </button>
                     </div>
@@ -449,20 +604,36 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
               )}
 
               {activeTab === 'criteres' && (
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between">
+                <div className="space-y-6 animate-fade-in">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
-                      <h3 className="text-2xl font-display font-bold text-slate-900">Critères d'évaluation</h3>
-                      <p className="text-slate-500 font-medium">Définissez sur quels points les agents seront notés.</p>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-2xl font-display font-bold text-slate-900">Critères d'évaluation</h3>
+                        <span className="bg-brand-50 text-brand-700 text-xs font-black px-2.5 py-0.5 rounded-full border border-brand-100">
+                          {criteres.length} critère{criteres.length > 1 ? 's' : ''}
+                        </span>
+                      </div>
+                      <p className="text-slate-500 font-medium text-sm mt-0.5">Définissez sur quels points les agents seront notés (Collègues, Managers, Clients QR).</p>
                     </div>
-                    {!showCritereForm && (
+                    <div className="flex items-center gap-2 flex-wrap">
                       <button
-                        onClick={() => { resetCritereForm(); setShowCritereForm(true) }}
-                        className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white px-6 py-3 rounded-2xl font-black shadow-lg shadow-brand-100 transition-all active:scale-95"
+                        type="button"
+                        onClick={handleSeedOfficialCriteres}
+                        disabled={seedingCriteres}
+                        className="text-xs font-bold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 px-4 py-2.5 rounded-xl transition-all border border-slate-200 shadow-sm flex items-center gap-2 disabled:opacity-50"
                       >
-                        <Plus className="w-5 h-5" /> Ajouter un critère
+                        {seedingCriteres ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4 text-brand-600" />}
+                        <span>Rétablir grille DSM (15 critères)</span>
                       </button>
-                    )}
+                      {!showCritereForm && (
+                        <button
+                          onClick={() => { resetCritereForm(); setShowCritereForm(true) }}
+                          className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white px-5 py-2.5 rounded-xl font-bold text-xs shadow-md shadow-brand-100 transition-all active:scale-95"
+                        >
+                          <Plus className="w-4 h-4" /> Ajouter un critère
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {showCritereForm && (
@@ -510,6 +681,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                             >
                               <option value="COLLEGUE">Uniquement Collègues</option>
                               <option value="MANAGER">Uniquement Manager</option>
+                              <option value="CLIENT">Clients externes (QR Code)</option>
                               <option value="TOUS">Tous les évaluateurs</option>
                             </select>
                           </div>
@@ -545,50 +717,138 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                     </div>
                   )}
 
-                  <div className="grid grid-cols-1 gap-4">
-                    {criteres.map((critere, index) => (
-                      <div 
-                        key={critere.id} 
-                        className="glass card-hover rounded-2xl border border-slate-200/50 p-6 flex items-center justify-between group animate-fade-in"
-                        style={{ animationDelay: `${index * 50}ms` }}
+                  {/* Barre de recherche et filtres pour les critères */}
+                  <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-3">
+                    <div className="relative w-full md:w-80">
+                      <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input 
+                        type="text"
+                        placeholder="Filtrer les critères..."
+                        className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 focus:bg-white outline-none text-xs font-semibold"
+                        value={critereSearch}
+                        onChange={e => setCritereSearch(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-1 md:pb-0">
+                      <button
+                        onClick={() => setCritereFilter('ALL')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                          critereFilter === 'ALL'
+                            ? 'bg-slate-900 text-white shadow-sm'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
                       >
-                        <div className="flex-1">
-                          <div className="flex flex-wrap items-center gap-3">
-                            <h4 className="text-lg font-bold text-slate-900">{critere.libelle}</h4>
-                            <span className="px-2.5 py-0.5 rounded-full bg-brand-50 text-brand-600 text-xs font-black border border-brand-100">
-                              Note: 0 à {critere.noteMaximale}
-                            </span>
-                            <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs font-black">
-                              {typeLabels[critere.typeEvaluateur] || critere.typeEvaluateur}
-                            </span>
+                        Tous ({criteres.length})
+                      </button>
+                      <button
+                        onClick={() => setCritereFilter('TOUS')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                          critereFilter === 'TOUS'
+                            ? 'bg-brand-600 text-white shadow-sm'
+                            : 'bg-brand-50 text-brand-700 hover:bg-brand-100'
+                        }`}
+                      >
+                        Tous évaluateurs ({criteres.filter(c => c.typeEvaluateur === 'TOUS').length})
+                      </button>
+                      <button
+                        onClick={() => setCritereFilter('COLLEGUE')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                          critereFilter === 'COLLEGUE'
+                            ? 'bg-blue-600 text-white shadow-sm'
+                            : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                        }`}
+                      >
+                        Collègues ({criteres.filter(c => c.typeEvaluateur === 'COLLEGUE').length})
+                      </button>
+                      <button
+                        onClick={() => setCritereFilter('MANAGER')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                          critereFilter === 'MANAGER'
+                            ? 'bg-purple-600 text-white shadow-sm'
+                            : 'bg-purple-50 text-purple-700 hover:bg-purple-100'
+                        }`}
+                      >
+                        Managers ({criteres.filter(c => c.typeEvaluateur === 'MANAGER').length})
+                      </button>
+                      <button
+                        onClick={() => setCritereFilter('CLIENT')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                          critereFilter === 'CLIENT'
+                            ? 'bg-amber-600 text-white shadow-sm'
+                            : 'bg-amber-50 text-amber-800 hover:bg-amber-100'
+                        }`}
+                      >
+                        Clients QR ({criteres.filter(c => c.typeEvaluateur === 'CLIENT').length})
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Conteneur avec ascenseur (scrollbar visible) */}
+                  <div className="space-y-3.5 max-h-[580px] overflow-y-auto pr-2 custom-scrollbar">
+                    {criteres
+                      .filter(c => {
+                        const matchesSearch =
+                          c.libelle.toLowerCase().includes(critereSearch.toLowerCase()) ||
+                          (c.description && c.description.toLowerCase().includes(critereSearch.toLowerCase()))
+                        const matchesFilter =
+                          critereFilter === 'ALL' ||
+                          c.typeEvaluateur === critereFilter
+                        return matchesSearch && matchesFilter
+                      })
+                      .map((critere, index) => (
+                        <div 
+                          key={critere.id} 
+                          className="glass card-hover rounded-2xl border border-slate-200/70 p-5 flex items-center justify-between group animate-fade-in shadow-sm bg-white"
+                          style={{ animationDelay: `${index * 30}ms` }}
+                        >
+                          <div className="flex-1 pr-4">
+                            <div className="flex flex-wrap items-center gap-2.5">
+                              <h4 className="text-base font-bold text-slate-900">{critere.libelle}</h4>
+                              <span className="px-2.5 py-0.5 rounded-full bg-brand-50 text-brand-600 text-xs font-black border border-brand-100">
+                                Note: 0 à {critere.noteMaximale}
+                              </span>
+                              <span className={`px-2.5 py-0.5 rounded-full text-xs font-black ${
+                                critere.typeEvaluateur === 'MANAGER'
+                                  ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                                  : critere.typeEvaluateur === 'CLIENT'
+                                  ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                  : critere.typeEvaluateur === 'TOUS'
+                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                  : 'bg-blue-100 text-blue-800 border border-blue-200'
+                              }`}>
+                                {typeLabels[critere.typeEvaluateur] || critere.typeEvaluateur}
+                              </span>
+                            </div>
+                            {critere.description && (
+                              <p className="text-xs text-slate-500 mt-1.5 font-medium leading-relaxed">{critere.description}</p>
+                            )}
                           </div>
-                          {critere.description && (
-                            <p className="text-sm text-slate-500 mt-2 font-medium leading-relaxed">{critere.description}</p>
-                          )}
+                          <div className="flex items-center gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                            <button
+                              onClick={() => startEditCritere(critere)}
+                              className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-xl transition-all"
+                              title="Modifier ce critère"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteCritere(critere.id)}
+                              className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                              title="Supprimer ce critère"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2 ml-6 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button
-                            onClick={() => startEditCritere(critere)}
-                            className="p-3 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-xl transition-all"
-                          >
-                            <Pencil className="w-5 h-5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteCritere(critere.id)}
-                            className="p-3 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                          >
-                            <Trash2 className="w-5 h-5" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                      ))}
                     {criteres.length === 0 && !showCritereForm && (
-                      <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-slate-300 animate-fade-in">
-                        <div className="flex flex-col items-center gap-4 opacity-30">
-                          <ClipboardList className="w-16 h-16" />
+                      <div className="text-center py-16 bg-white rounded-3xl border border-dashed border-slate-300 animate-fade-in">
+                        <div className="flex flex-col items-center gap-3 opacity-40">
+                          <ClipboardList className="w-12 h-12" />
                           <div className="space-y-1">
-                            <p className="text-xl font-display font-bold">Aucun critère</p>
-                            <p className="text-slate-500 font-medium">Démarrez en ajoutant votre premier critère de notation.</p>
+                            <p className="text-lg font-bold">Aucun critère</p>
+                            <p className="text-xs text-slate-500">Ajoutez un critère ou cliquez sur « Rétablir grille DSM ».</p>
                           </div>
                         </div>
                       </div>
@@ -609,6 +869,186 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
               {activeTab === 'suivi' && (
                 <SuiviDashboard affectations={affectations} users={allUsers} />
               )}
+
+              {activeTab === 'prix' && (
+                <div className="glass rounded-3xl p-8 border border-slate-200/50 shadow-sm space-y-8 animate-fade-in">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 text-amber-500 font-extrabold text-xs uppercase tracking-widest">
+                        <Trophy className="w-4 h-4" /> Récompenses & Palmarès Officiels
+                      </div>
+                      <h3 className="text-2xl font-display font-bold text-slate-900">Grille des Prix & Distinctions</h3>
+                      <p className="text-slate-500 text-sm font-medium">Définissez les 3 paliers officiels de distinctions : Direction (Super Lauréat), Département et Service.</p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const standardDirectionPrix = "Super Lauréat Direction DSM (1 500 000 FCFA + Séjour familial & Gala AGL)"
+                        setFormData(prev => ({
+                          ...prev,
+                          prixGlobal: standardDirectionPrix,
+                          prixDirection: standardDirectionPrix,
+                          prixDepartement: "Certificat de Mérite + Prime (1 000 000 FCFA)",
+                          prixService: "Diplôme d'Honneur + Prime (500 000 FCFA)"
+                        }))
+                      }}
+                      className="text-xs font-bold text-brand-600 hover:text-brand-700 bg-brand-50 hover:bg-brand-100 px-4 py-2.5 rounded-xl transition-all self-start sm:self-auto border border-brand-100"
+                    >
+                      Rétablir les dotations DSM standards
+                    </button>
+                  </div>
+
+                  {/* Summary preview cards (3 Paliers Officiels) */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* 1. Super Lauréat Direction */}
+                    <div className="bg-gradient-to-br from-amber-500/15 via-yellow-500/10 to-amber-500/25 border border-amber-300/80 rounded-2xl p-5 flex flex-col justify-between shadow-sm relative overflow-hidden">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-amber-700 font-black text-xs uppercase tracking-wider">
+                          <Trophy className="w-4 h-4 text-amber-600 flex-shrink-0" /> Super Lauréat Direction DSM
+                        </div>
+                        <p className="text-sm font-black text-amber-950 mt-2 line-clamp-2">
+                          {formData.prixDirection || formData.prixGlobal || "Non configuré"}
+                        </p>
+                      </div>
+                      <span className="text-[10px] text-amber-800 font-black mt-3 bg-amber-200/80 px-2.5 py-1 rounded-md w-fit">1er Prix • Niveau Direction</span>
+                    </div>
+
+                    {/* 2. Prix Département */}
+                    <div className="bg-gradient-to-br from-purple-500/10 via-purple-500/5 to-pink-500/20 border border-purple-300/60 rounded-2xl p-5 flex flex-col justify-between shadow-sm">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-purple-700 font-black text-xs uppercase tracking-wider">
+                          <Medal className="w-4 h-4 text-purple-600 flex-shrink-0" /> Meilleur Agent par Département
+                        </div>
+                        <p className="text-sm font-bold text-purple-950 mt-2 line-clamp-2">
+                          {formData.prixDepartement || "Non configuré"}
+                        </p>
+                      </div>
+                      <span className="text-[10px] text-purple-700 font-black mt-3 bg-purple-100 px-2.5 py-1 rounded-md w-fit">2ème Prix • Niveau Département</span>
+                    </div>
+
+                    {/* 3. Prix Service / Cellule */}
+                    <div className="bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-teal-500/20 border border-emerald-300/60 rounded-2xl p-5 flex flex-col justify-between shadow-sm">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-emerald-700 font-black text-xs uppercase tracking-wider">
+                          <Gift className="w-4 h-4 text-emerald-600 flex-shrink-0" /> Meilleur Agent de Service
+                        </div>
+                        <p className="text-sm font-bold text-emerald-950 mt-2 line-clamp-2">
+                          {formData.prixService || "Non configuré"}
+                        </p>
+                      </div>
+                      <span className="text-[10px] text-emerald-700 font-black mt-3 bg-emerald-100 px-2.5 py-1 rounded-md w-fit">3ème Prix • Niveau Service / Cellule</span>
+                    </div>
+                  </div>
+
+                  <form onSubmit={handleSubmit} className="space-y-6">
+                    {/* Form Cards (3 Paliers) */}
+                    <div className="grid grid-cols-1 gap-6">
+                      {/* 1. Super Lauréat Direction */}
+                      <div className="p-6 bg-white rounded-2xl border border-amber-200/80 shadow-sm space-y-3 relative overflow-hidden bg-gradient-to-r from-amber-50/40 to-transparent">
+                        <div className="flex items-center gap-3">
+                          <div className="w-11 h-11 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold flex-shrink-0 shadow-sm">
+                            <Trophy className="w-6 h-6" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-black text-slate-900 text-base">Super Lauréat de la Direction (Meilleur Agent Direction DSM)</h4>
+                              <span className="text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full border border-amber-200">Palier 1</span>
+                            </div>
+                            <p className="text-xs text-slate-500">Major de la Direction • Dotation de référence DSM (1 500 000 FCFA + Séjour familial & Gala AGL)</p>
+                          </div>
+                        </div>
+                        <div className="space-y-1.5 pt-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Description du Prix & Dotation Direction</label>
+                          <input
+                            type="text"
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-amber-100 focus:border-amber-500 focus:bg-white transition-all outline-none font-bold text-slate-800"
+                            placeholder="Ex: Super Lauréat Direction DSM (1 500 000 FCFA + Séjour familial & Gala AGL)"
+                            value={formData.prixDirection || formData.prixGlobal}
+                            onChange={e => {
+                              const val = e.target.value
+                              setFormData({ ...formData, prixDirection: val, prixGlobal: val })
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* 2. Prix Département */}
+                        <div className="p-6 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-3 relative overflow-hidden">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold flex-shrink-0">
+                              <Medal className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-bold text-slate-900 text-base">Meilleur Agent par Département</h4>
+                                <span className="text-[10px] font-black uppercase tracking-wider bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full">Palier 2</span>
+                              </div>
+                              <p className="text-xs text-slate-500">Major de chaque Département (1 000 000 FCFA)</p>
+                            </div>
+                          </div>
+                          <div className="space-y-1.5 pt-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Description du Prix & Dotation Département</label>
+                            <input
+                              type="text"
+                              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-purple-100 focus:border-purple-500 focus:bg-white transition-all outline-none font-bold text-slate-800"
+                              placeholder="Ex: Certificat de Mérite + Prime (1 000 000 FCFA)"
+                              value={formData.prixDepartement}
+                              onChange={e => setFormData({ ...formData, prixDepartement: e.target.value })}
+                            />
+                          </div>
+                        </div>
+
+                        {/* 3. Prix Service / Cellule */}
+                        <div className="p-6 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-3 relative overflow-hidden">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold flex-shrink-0">
+                              <Gift className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-bold text-slate-900 text-base">Meilleur Agent de Service / Cellule</h4>
+                                <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">Palier 3</span>
+                              </div>
+                              <p className="text-xs text-slate-500">Major de chaque cellule de travail (500 000 FCFA)</p>
+                            </div>
+                          </div>
+                          <div className="space-y-1.5 pt-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Description du Prix & Dotation Service</label>
+                            <input
+                              type="text"
+                              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 focus:bg-white transition-all outline-none font-bold text-slate-800"
+                              placeholder="Ex: Diplôme d'Honneur + Prime (500 000 FCFA)"
+                              value={formData.prixService}
+                              onChange={e => setFormData({ ...formData, prixService: e.target.value })}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end pt-4">
+                      <button
+                        type="submit"
+                        disabled={saving}
+                        className="bg-slate-900 hover:bg-slate-800 text-white px-10 py-4 rounded-2xl font-black text-lg transition-all active:scale-[0.98] shadow-xl disabled:opacity-50 flex items-center gap-3"
+                      >
+                        {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                        Enregistrer la grille des 3 prix
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+              {activeTab === 'classement' && (
+                <ClassementCampagneView 
+                  campagneId={id} 
+                  formData={formData} 
+                  onRecalculate={() => handleCalculScores(false)} 
+                />
+              )}
             </div>
           </div>
         </main>
@@ -618,31 +1058,141 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
 }
 
 function AffectationsManager({ campagneId, users, initialAffectations, onUpdate }: { campagneId: string, users: User[], initialAffectations: any[], onUpdate: () => void }) {
+  const [perspective, setPerspective] = useState<'BY_EVALUE' | 'BY_EVALUATEUR'>('BY_EVALUE')
   const [search, setSearch] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState<'ALL' | 'PAIR' | 'MANAGER' | 'EXTERNE'>('ALL')
+  const [sortOrder, setSortOrder] = useState<'name_asc' | 'role' | 'count_desc'>('name_asc')
+  
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [targets, setTargets] = useState<string[]>([])
   const [targetSearch, setTargetSearch] = useState('')
+  const [targetCategory, setTargetCategory] = useState<'ALL' | 'PAIR' | 'MANAGER' | 'EXTERNE'>('ALL')
+  const [targetSort, setTargetSort] = useState<'name_asc' | 'role'>('name_asc')
   const [showSelectedOnly, setShowSelectedOnly] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  // Get users that the selected user MUST evaluate
-  const currentTargets = initialAffectations
-    .filter(a => a.evaluateurId === selectedUser?.id)
-    .map(a => a.evalueId)
-
+  // Calcule les cibles courantes selon la perspective
   useEffect(() => {
-    if (selectedUser) {
-      setTargets(currentTargets)
+    if (!selectedUser) {
+      setTargets([])
+      return
     }
-  }, [selectedUser, initialAffectations])
+    if (perspective === 'BY_EVALUE') {
+      // Pour le noté sélectionné, qui sont ses évaluateurs ? (exclut strictement le noté lui-même)
+      const currentEvaluators = initialAffectations
+        .filter(a => a.evalueId === selectedUser.id && a.evaluateurId !== selectedUser.id)
+        .map(a => a.evaluateurId)
+      setTargets(currentEvaluators)
+    } else {
+      // Pour l'évaluateur sélectionné, qui sont ses notés ? (exclut strictement l'évaluateur lui-même)
+      const currentEvalues = initialAffectations
+        .filter(a => a.evaluateurId === selectedUser.id && a.evalueId !== selectedUser.id)
+        .map(a => a.evalueId)
+      setTargets(currentEvalues)
+    }
+  }, [selectedUser, perspective, initialAffectations])
 
-  const filteredUsers = users.filter(u => 
-    u.nom.toLowerCase().includes(search.toLowerCase()) || 
-    u.prenom.toLowerCase().includes(search.toLowerCase()) ||
-    u.matricule.toLowerCase().includes(search.toLowerCase())
-  )
+  const getRoleCategory = (role: string): 'PAIR' | 'MANAGER' | 'EXTERNE' | 'ADMIN' => {
+    if (role === 'MANAGER') return 'MANAGER'
+    if (role === 'EXTERNE') return 'EXTERNE'
+    if (role === 'ADMIN') return 'ADMIN'
+    return 'PAIR'
+  }
+
+  const getCategoryLabel = (role: string) => {
+    switch (role) {
+      case 'MANAGER':
+        return { label: 'Manager', badge: 'bg-purple-100 text-purple-800 border-purple-200' }
+      case 'EXTERNE':
+        return { label: 'Client Ext.', badge: 'bg-amber-100 text-amber-800 border-amber-200' }
+      case 'ADMIN':
+        return { label: 'Admin', badge: 'bg-red-100 text-red-800 border-red-200' }
+      default:
+        return { label: 'Pair (Collaborateur)', badge: 'bg-blue-100 text-blue-800 border-blue-200' }
+    }
+  }
+
+  // Règle métier DSM : seuls les collaborateurs pairs sont notés (ni managers, ni clients externes, ni admins)
+  const isNoteEligible = (u: User) => u.role !== 'MANAGER' && u.role !== 'EXTERNE' && u.role !== 'ADMIN'
+
+  // Liste de gauche (selon perspective)
+  const baseLeftUsers = perspective === 'BY_EVALUE'
+    ? users.filter(isNoteEligible)
+    : users
+
+  const filteredLeftUsers = baseLeftUsers
+    .filter(u => {
+      const matchesSearch =
+        u.nom.toLowerCase().includes(search.toLowerCase()) || 
+        u.prenom.toLowerCase().includes(search.toLowerCase()) ||
+        u.matricule.toLowerCase().includes(search.toLowerCase()) ||
+        (u.service && u.service.toLowerCase().includes(search.toLowerCase())) ||
+        (u.departement && u.departement.toLowerCase().includes(search.toLowerCase()))
+
+      const cat = getRoleCategory(u.role)
+      const matchesCat = perspective === 'BY_EVALUE' || categoryFilter === 'ALL' || cat === categoryFilter
+
+      return matchesSearch && matchesCat
+    })
+    .sort((a, b) => {
+      if (sortOrder === 'name_asc') {
+        return a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom)
+      }
+      if (sortOrder === 'role') {
+        const order: Record<string, number> = { MANAGER: 1, UTILISATEUR: 2, EXTERNE: 3, ADMIN: 4 }
+        return (order[a.role] || 99) - (order[b.role] || 99) || a.nom.localeCompare(b.nom)
+      }
+      if (sortOrder === 'count_desc') {
+        const countA = perspective === 'BY_EVALUE'
+          ? initialAffectations.filter(x => x.evalueId === a.id).length
+          : initialAffectations.filter(x => x.evaluateurId === a.id).length
+        const countB = perspective === 'BY_EVALUE'
+          ? initialAffectations.filter(x => x.evalueId === b.id).length
+          : initialAffectations.filter(x => x.evaluateurId === b.id).length
+        return countB - countA || a.nom.localeCompare(b.nom)
+      }
+      return 0
+    })
+
+  // Compteurs pour la liste de gauche
+  const countPairs = baseLeftUsers.filter(u => getRoleCategory(u.role) === 'PAIR').length
+  const countManagers = baseLeftUsers.filter(u => getRoleCategory(u.role) === 'MANAGER').length
+  const countExternes = baseLeftUsers.filter(u => getRoleCategory(u.role) === 'EXTERNE').length
+
+  // Liste de droite (les personnes à cocher)
+  // RÈGLE ABSOLUE : INTERDICTION DE L'AUTO-ÉVALUATION (u.id !== selectedUser?.id)
+  const baseRightUsers = (perspective === 'BY_EVALUE'
+    ? users
+    : users.filter(isNoteEligible)
+  ).filter(u => selectedUser ? (u.id !== selectedUser.id && u.matricule !== selectedUser.matricule) : true)
+
+  const filteredRightUsers = baseRightUsers
+    .filter(u => {
+      const matchesSearch =
+        u.nom.toLowerCase().includes(targetSearch.toLowerCase()) || 
+        u.prenom.toLowerCase().includes(targetSearch.toLowerCase()) ||
+        u.matricule.toLowerCase().includes(targetSearch.toLowerCase()) ||
+        (u.service && u.service.toLowerCase().includes(targetSearch.toLowerCase())) ||
+        (u.departement && u.departement.toLowerCase().includes(targetSearch.toLowerCase()))
+
+      const cat = getRoleCategory(u.role)
+      const matchesCat = perspective === 'BY_EVALUATEUR' || targetCategory === 'ALL' || cat === targetCategory
+      const matchesSelection = showSelectedOnly ? targets.includes(u.id) : true
+
+      return matchesSearch && matchesCat && matchesSelection
+    })
+    .sort((a, b) => {
+      if (targetSort === 'role') {
+        const order: Record<string, number> = { MANAGER: 1, UTILISATEUR: 2, EXTERNE: 3, ADMIN: 4 }
+        return (order[a.role] || 99) - (order[b.role] || 99) || a.nom.localeCompare(b.nom)
+      }
+      return a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom)
+    })
 
   const handleToggleTarget = (userId: string) => {
+    // Interdire formellement l'auto-évaluation
+    if (!selectedUser || userId === selectedUser.id) return
+
     if (targets.includes(userId)) {
       setTargets(targets.filter(id => id !== userId))
     } else {
@@ -650,20 +1200,48 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
     }
   }
 
+  const handleSelectAllFiltered = () => {
+    if (!selectedUser) return
+    const visibleIds = filteredRightUsers.map(u => u.id).filter(id => id !== selectedUser.id)
+    const newTargets = Array.from(new Set([...targets, ...visibleIds]))
+    setTargets(newTargets)
+  }
+
+  const handleDeselectAllFiltered = () => {
+    const visibleIds = new Set(filteredRightUsers.map(u => u.id))
+    setTargets(targets.filter(id => !visibleIds.has(id)))
+  }
+
   const saveAffectations = async () => {
     if (!selectedUser) return
     setSaving(true)
     try {
-      await fetch(`/api/admin/campagnes/${campagneId}/affectations`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          evaluateurId: selectedUser.id,
-          evalueIds: targets
+      // Nettoyer strictement toute auto-évaluation éventuelle
+      const cleanTargets = targets.filter(tId => tId !== selectedUser.id)
+
+      if (perspective === 'BY_EVALUE') {
+        await fetch(`/api/admin/campagnes/${campagneId}/affectations`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            mode: 'by_evalue',
+            evalueId: selectedUser.id,
+            evaluateurIds: cleanTargets
+          })
         })
-      })
+      } else {
+        await fetch(`/api/admin/campagnes/${campagneId}/affectations`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            mode: 'by_evaluateur',
+            evaluateurId: selectedUser.id,
+            evalueIds: cleanTargets
+          })
+        })
+      }
       onUpdate()
-      alert('Affectations mises à jour avec succès')
+      alert('Affectations enregistrées avec succès !')
     } catch (err) {
       alert('Erreur lors de la sauvegarde')
     } finally {
@@ -672,147 +1250,491 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 animate-fade-in">
-      {/* Left: User List */}
-      <div className="lg:col-span-2 space-y-4">
-        <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-          <input 
-            type="text" 
-            placeholder="Rechercher un participant..."
-            className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-2xl focus:ring-4 focus:ring-brand-100 outline-none font-bold"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
+    <div className="space-y-5 animate-fade-in text-slate-800">
+      {/* ⇄ Barre de Permutation des Colonnes (Notants ↔ Notés) & Agrandissement x1.2 */}
+      <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5 w-full md:w-auto">
+          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-white shadow-md transition-all ${
+            perspective === 'BY_EVALUE' ? 'bg-brand-600 shadow-brand-200' : 'bg-slate-900 shadow-slate-300'
+          }`}>
+            <ArrowLeftRight className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className="text-[11px] font-black uppercase tracking-wider text-slate-400">Disposition des colonnes</span>
+              <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                <Check className="w-3 h-3" /> Auto-évaluation interdite
+              </span>
+            </div>
+            <h3 className="text-base sm:text-lg font-black text-slate-900 leading-tight">
+              {perspective === 'BY_EVALUE' ? (
+                <>Colonne gauche : <span className="text-brand-600">COLLABORATEURS NOTÉS</span> ➔ Colonne droite : <span className="text-slate-600">LEURS NOTANTS</span></>
+              ) : (
+                <>Colonne gauche : <span className="text-slate-900">ÉVALUATEURS NOTANTS</span> ➔ Colonne droite : <span className="text-brand-600">PERSONNES QU'ILS NOTENT</span></>
+              )}
+            </h3>
+          </div>
         </div>
-        
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden max-h-[600px] overflow-y-auto">
-          {filteredUsers.map(user => {
-            const count = initialAffectations.filter(a => a.evaluateurId === user.id).length
-            return (
-              <button
-                key={user.id}
-                onClick={() => setSelectedUser(user)}
-                className={`w-full text-left p-4 border-b border-slate-100 flex items-center justify-between group transition-all ${selectedUser?.id === user.id ? 'bg-brand-50' : 'hover:bg-slate-50'}`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs ${selectedUser?.id === user.id ? 'bg-brand-500 text-white' : 'bg-slate-100 text-slate-500'}`}>
-                    {user.nom[0]}{user.prenom[0]}
-                  </div>
-                  <div>
-                    <p className={`font-bold ${selectedUser?.id === user.id ? 'text-brand-900' : 'text-slate-800'}`}>{user.nom} {user.prenom}</p>
-                    <p className="text-xs text-slate-500 font-medium">{user.matricule}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {count > 0 && (
-                    <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-black">
-                      {count} cibles
-                    </span>
-                  )}
-                  <ChevronRight className={`w-4 h-4 transition-transform ${selectedUser?.id === user.id ? 'text-brand-500 translate-x-1' : 'text-slate-300'}`} />
-                </div>
-              </button>
-            )
-          })}
+
+        <div className="flex items-center gap-2.5 w-full md:w-auto justify-end flex-wrap">
+          {/* Sélecteur direct à deux modes */}
+          <div className="inline-flex p-1 bg-slate-100 rounded-2xl border border-slate-200 text-xs sm:text-sm font-bold">
+            <button
+              type="button"
+              onClick={() => {
+                if (perspective !== 'BY_EVALUE') {
+                  setPerspective('BY_EVALUE')
+                  setSelectedUser(null)
+                }
+              }}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all ${
+                perspective === 'BY_EVALUE'
+                  ? 'bg-brand-600 text-white shadow-md'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+              }`}
+            >
+              <Target className="w-4 h-4" />
+              <span>1. Notés à gauche</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (perspective !== 'BY_EVALUATEUR') {
+                  setPerspective('BY_EVALUATEUR')
+                  setSelectedUser(null)
+                }
+              }}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all ${
+                perspective === 'BY_EVALUATEUR'
+                  ? 'bg-slate-900 text-white shadow-md'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+              }`}
+            >
+              <UserCheck className="w-4 h-4" />
+              <span>2. Notants à gauche</span>
+            </button>
+          </div>
+
+          {/* Bouton de Permutation Rapide Notants ↔ Notés */}
+          <button
+            type="button"
+            onClick={() => {
+              setPerspective(prev => prev === 'BY_EVALUE' ? 'BY_EVALUATEUR' : 'BY_EVALUE')
+              setSelectedUser(null)
+            }}
+            className="flex items-center gap-2.5 px-5 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white rounded-2xl text-xs sm:text-sm font-black shadow-md shadow-amber-500/20 active:scale-95 transition-all cursor-pointer"
+            title="Permuter les colonnes (Notants ↔ Notés)"
+          >
+            <ArrowLeftRight className="w-4 h-4 animate-pulse" />
+            <span>Permuter les colonnes</span>
+          </button>
         </div>
       </div>
 
-      {/* Right: Targets Selection */}
-      <div className="lg:col-span-3">
-        {selectedUser ? (
-          <div className="glass rounded-3xl border border-slate-200/50 shadow-sm flex flex-col h-full overflow-hidden">
-            <div className="p-6 border-b border-slate-100 bg-white/50 backdrop-blur-sm sticky top-0 z-10 flex items-center justify-between">
-              <div>
-                <h4 className="text-xl font-display font-black text-slate-900">
-                  Qui doit noter <span className="text-brand-500">{selectedUser.prenom}</span> ?
-                </h4>
-                <p className="text-sm text-slate-500 font-medium">Sélectionnez les personnes qu'il devra évaluer.</p>
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+        {/* Left: Liste principale (Les Notés ou Les Notants) (xl:col-span-5) */}
+        <div className="xl:col-span-5 space-y-3.5">
+          <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-3.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                {perspective === 'BY_EVALUE' ? (
+                  <Target className="w-5 h-5 text-brand-600" />
+                ) : (
+                  <UserCheck className="w-5 h-5 text-slate-700" />
+                )}
+                <h3 className="text-base font-black text-slate-900 uppercase tracking-wide">
+                  {perspective === 'BY_EVALUE' ? 'LES NOTÉS (COLLABORATEURS)' : 'LES NOTANTS (ÉVALUATEURS)'}
+                </h3>
               </div>
-              <button
-                onClick={saveAffectations}
-                disabled={saving}
-                className="bg-slate-900 hover:bg-slate-800 text-white px-6 py-2.5 rounded-xl font-bold transition-all flex items-center gap-2 shadow-lg disabled:opacity-50"
-              >
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                Sauvegarder
-              </button>
-            </div>
-            
-            <div className="p-4 bg-slate-50/50 border-b border-slate-100 flex flex-col md:flex-row gap-4 items-center justify-between">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input 
-                  type="text" 
-                  placeholder="Rechercher une cible..."
-                  className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-brand-100 outline-none text-sm font-bold"
-                  value={targetSearch}
-                  onChange={e => setTargetSearch(e.target.value)}
-                />
-              </div>
-              <label className="flex items-center gap-2 cursor-pointer select-none">
-                <div 
-                  onClick={() => setShowSelectedOnly(!showSelectedOnly)}
-                  className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${showSelectedOnly ? 'bg-brand-500 border-brand-500 shadow-sm shadow-brand-100' : 'bg-white border-slate-300'}`}
-                >
-                  {showSelectedOnly && <Check className="w-3.5 h-3.5 text-white" />}
-                </div>
-                <span className="text-sm font-bold text-slate-600">Sélectionnés uniquement</span>
-              </label>
+              <span className="text-xs sm:text-sm font-black text-slate-600 bg-slate-100 px-3 py-1 rounded-full">
+                {filteredLeftUsers.length} / {baseLeftUsers.length}
+              </span>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-3 max-h-[500px]">
-              {users.filter(u => {
-                const isNotSelf = u.id !== selectedUser.id
-                const matchesSearch = u.nom.toLowerCase().includes(targetSearch.toLowerCase()) || 
-                                     u.prenom.toLowerCase().includes(targetSearch.toLowerCase()) ||
-                                     u.matricule.toLowerCase().includes(targetSearch.toLowerCase())
-                const matchesSelection = showSelectedOnly ? targets.includes(u.id) : true
-                return isNotSelf && matchesSearch && matchesSelection
-              }).map(user => {
-                const isSelected = targets.includes(user.id)
+            {/* Filtres par Catégorie (affichés si mode Notant) */}
+            {perspective === 'BY_EVALUATEUR' ? (
+              <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                <button
+                  onClick={() => setCategoryFilter('ALL')}
+                  className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all ${
+                    categoryFilter === 'ALL'
+                      ? 'bg-slate-900 text-white shadow-sm'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  Tous ({baseLeftUsers.length})
+                </button>
+                <button
+                  onClick={() => setCategoryFilter('PAIR')}
+                  className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all ${
+                    categoryFilter === 'PAIR'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                  }`}
+                >
+                  Pairs ({countPairs})
+                </button>
+                <button
+                  onClick={() => setCategoryFilter('MANAGER')}
+                  className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all ${
+                    categoryFilter === 'MANAGER'
+                      ? 'bg-purple-600 text-white shadow-sm'
+                      : 'bg-purple-50 text-purple-700 hover:bg-purple-100'
+                  }`}
+                >
+                  Managers ({countManagers})
+                </button>
+                {countExternes > 0 && (
+                  <button
+                    onClick={() => setCategoryFilter('EXTERNE')}
+                    className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all ${
+                      categoryFilter === 'EXTERNE'
+                        ? 'bg-amber-600 text-white shadow-sm'
+                        : 'bg-amber-50 text-amber-800 hover:bg-amber-100'
+                    }`}
+                  >
+                    Clients ({countExternes})
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 py-0.5">
+                <span className="text-xs sm:text-sm font-bold text-slate-600 bg-slate-50 border border-slate-200/80 px-3.5 py-1.5 rounded-xl">
+                  {baseLeftUsers.length} agents opérationnels évalués (hors managers & clients)
+                </span>
+              </div>
+            )}
+
+            {/* Recherche & Tri (Agrandis x1.2) */}
+            <div className="flex items-center gap-2.5">
+              <div className="relative flex-1">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input 
+                  type="text" 
+                  placeholder={perspective === 'BY_EVALUE' ? "Rechercher par nom, matricule, service..." : "Rechercher un notant..."}
+                  className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 focus:bg-white outline-none text-xs sm:text-sm font-semibold"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                />
+              </div>
+              <select
+                value={sortOrder}
+                onChange={e => setSortOrder(e.target.value as any)}
+                className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-bold text-slate-700 outline-none"
+                title="Trier la liste"
+              >
+                <option value="name_asc">Nom A-Z</option>
+                {perspective === 'BY_EVALUATEUR' && <option value="role">Par Catégorie</option>}
+                <option value="count_desc">
+                  {perspective === 'BY_EVALUE' ? 'Nb Notants ↓' : 'Nb Cibles ↓'}
+                </option>
+              </select>
+            </div>
+          </div>
+          
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden max-h-[700px] overflow-y-auto custom-scrollbar divide-y divide-slate-100">
+            {filteredLeftUsers.length === 0 ? (
+              <div className="p-10 text-center text-slate-400 text-sm font-medium">
+                Aucun collaborateur ne correspond à votre filtre.
+              </div>
+            ) : (
+              filteredLeftUsers.map(user => {
+                const count = perspective === 'BY_EVALUE'
+                  ? initialAffectations.filter(a => a.evalueId === user.id).length
+                  : initialAffectations.filter(a => a.evaluateurId === user.id).length
+                const catInfo = getCategoryLabel(user.role)
+                const isSelected = selectedUser?.id === user.id
+
                 return (
                   <button
                     key={user.id}
-                    onClick={() => handleToggleTarget(user.id)}
-                    className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all ${isSelected ? 'bg-emerald-50 border-emerald-200 ring-2 ring-emerald-100' : 'bg-white border-slate-100 hover:border-brand-200'}`}
+                    onClick={() => setSelectedUser(user)}
+                    className={`w-full text-left p-4 sm:p-4.5 flex items-center justify-between group transition-all ${
+                      isSelected ? 'bg-brand-50/90 border-l-4 border-brand-500' : 'hover:bg-slate-50'
+                    }`}
                   >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-[10px] ${isSelected ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <div className={`w-11 h-11 rounded-2xl flex items-center justify-center font-bold text-sm flex-shrink-0 shadow-sm ${
+                        user.role === 'MANAGER'
+                          ? 'bg-purple-100 text-purple-800'
+                          : user.role === 'EXTERNE'
+                          ? 'bg-amber-100 text-amber-800'
+                          : 'bg-blue-100 text-blue-800'
+                      }`}>
                         {user.nom[0]}{user.prenom[0]}
                       </div>
-                      <div className="text-left">
-                        <p className={`text-sm font-bold ${isSelected ? 'text-emerald-900' : 'text-slate-800'}`}>{user.nom} {user.prenom}</p>
-                        <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">{user.matricule} • {user.role}</p>
+                      <div className="min-w-0">
+                        <p className={`font-black text-sm sm:text-base truncate ${isSelected ? 'text-brand-950' : 'text-slate-900'}`}>
+                          {user.nom} {user.prenom}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          <span className="text-xs font-mono text-slate-500 font-bold">#{user.matricule}</span>
+                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${catInfo.badge}`}>
+                            {catInfo.label}
+                          </span>
+                          {user.service && (
+                            <span className="text-xs text-slate-400 truncate max-w-[140px]">
+                              • {user.service}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    {isSelected && (
-                      <div className="w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center">
-                        <Check className="w-4 h-4 text-white" />
-                      </div>
-                    )}
+                    <div className="flex items-center gap-2.5 flex-shrink-0 ml-2">
+                      {count > 0 ? (
+                        <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-black">
+                          {count} {perspective === 'BY_EVALUE' ? `notant${count > 1 ? 's' : ''}` : `cible${count > 1 ? 's' : ''}`}
+                        </span>
+                      ) : (
+                        <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-400 text-xs font-bold">
+                          0
+                        </span>
+                      )}
+                      <ChevronRight className={`w-4 h-4 transition-transform ${isSelected ? 'text-brand-600 translate-x-1' : 'text-slate-300'}`} />
+                    </div>
                   </button>
                 )
-              })}
+              })
+            )}
+          </div>
+        </div>
+
+        {/* Right: Panneau d'assignation (Ceux qui notent OU Les Notés) (xl:col-span-7) */}
+        <div className="xl:col-span-7">
+          {selectedUser ? (
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col h-full overflow-hidden">
+              {/* Header de droite (Agrandi x1.2) */}
+              <div className="p-5 sm:p-6 border-b border-slate-100 bg-slate-50/50 sticky top-0 z-10 flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2.5">
+                    <span className={`text-xs font-black px-2.5 py-1 rounded-lg ${getCategoryLabel(selectedUser.role).badge}`}>
+                      {getCategoryLabel(selectedUser.role).label}
+                    </span>
+                    <h4 className="text-lg sm:text-xl font-black text-slate-900">
+                      {perspective === 'BY_EVALUE' ? (
+                        <>Ceux qui notent <span className="text-brand-600">{selectedUser.prenom} {selectedUser.nom}</span></>
+                      ) : (
+                        <>Les agents notés par <span className="text-brand-600">{selectedUser.prenom} {selectedUser.nom}</span></>
+                      )}
+                    </h4>
+                  </div>
+                  <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
+                    {perspective === 'BY_EVALUE'
+                      ? `Sélectionnez les pairs, managers ou clients qui doivent noter ce collaborateur (${targets.length} notant${targets.length > 1 ? 's' : ''} assigné${targets.length > 1 ? 's' : ''}).`
+                      : `Sélectionnez les collaborateurs opérationnels que cet évaluateur devra noter (${targets.length} sélectionné${targets.length > 1 ? 's' : ''}).`}
+                  </p>
+                </div>
+                <button
+                  onClick={saveAffectations}
+                  disabled={saving}
+                  className="bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-2xl font-black text-xs sm:text-sm transition-all flex items-center gap-2 shadow-md disabled:opacity-50 active:scale-95 cursor-pointer"
+                >
+                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  <span>Enregistrer ({targets.length})</span>
+                </button>
+              </div>
+              
+              {/* Filtres & Recherche de droite */}
+              <div className="p-4 sm:p-5 bg-slate-50/30 border-b border-slate-100 space-y-3.5">
+                <div className="flex items-center justify-between flex-wrap gap-2.5">
+                  {perspective === 'BY_EVALUE' ? (
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                      <span className="text-xs font-black text-slate-400 uppercase mr-1">
+                        Notant :
+                      </span>
+                      <button
+                        onClick={() => setTargetCategory('ALL')}
+                        className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+                          targetCategory === 'ALL'
+                            ? 'bg-slate-900 text-white shadow-sm'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                      >
+                        Tous
+                      </button>
+                      <button
+                        onClick={() => setTargetCategory('PAIR')}
+                        className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+                          targetCategory === 'PAIR'
+                            ? 'bg-blue-600 text-white shadow-sm'
+                            : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                        }`}
+                      >
+                        Pairs / Collègues
+                      </button>
+                      <button
+                        onClick={() => setTargetCategory('MANAGER')}
+                        className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+                          targetCategory === 'MANAGER'
+                            ? 'bg-purple-600 text-white shadow-sm'
+                            : 'bg-purple-50 text-purple-700 hover:bg-purple-100'
+                        }`}
+                      >
+                        Managers
+                      </button>
+                      <button
+                        onClick={() => setTargetCategory('EXTERNE')}
+                        className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+                          targetCategory === 'EXTERNE'
+                            ? 'bg-amber-600 text-white shadow-sm'
+                            : 'bg-amber-50 text-amber-800 hover:bg-amber-100'
+                        }`}
+                      >
+                        Clients Externes
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs sm:text-sm font-black text-slate-600 bg-slate-100 px-3.5 py-1.5 rounded-xl">
+                        {baseRightUsers.length} collaborateurs évaluables disponibles
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={handleSelectAllFiltered}
+                      className="text-xs font-bold text-brand-600 hover:underline"
+                    >
+                      Tout cocher ({filteredRightUsers.length})
+                    </button>
+                    <span className="text-slate-300">•</span>
+                    <button
+                      onClick={handleDeselectAllFiltered}
+                      className="text-xs font-bold text-slate-500 hover:underline"
+                    >
+                      Tout décocher
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
+                  <div className="relative flex-1 w-full">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input 
+                      type="text" 
+                      placeholder={perspective === 'BY_EVALUE' ? "Rechercher qui doit le noter..." : "Rechercher un agent par nom, service..."}
+                      className="w-full pl-10 pr-3.5 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-xs sm:text-sm font-semibold"
+                      value={targetSearch}
+                      onChange={e => setTargetSearch(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-3 w-full sm:w-auto justify-between">
+                    <select
+                      value={targetSort}
+                      onChange={e => setTargetSort(e.target.value as any)}
+                      className="px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm font-bold text-slate-700 outline-none"
+                      title="Trier la liste"
+                    >
+                      <option value="name_asc">Trier Nom A-Z</option>
+                      {perspective === 'BY_EVALUE' && <option value="role">Trier par Catégorie</option>}
+                    </select>
+
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <div 
+                        onClick={() => setShowSelectedOnly(!showSelectedOnly)}
+                        className={`w-5 h-5 rounded-lg border flex items-center justify-center transition-all ${showSelectedOnly ? 'bg-brand-500 border-brand-500 text-white' : 'border-slate-300 bg-white'}`}
+                      >
+                        {showSelectedOnly && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                      </div>
+                      <span className="text-xs sm:text-sm font-bold text-slate-700 whitespace-nowrap">
+                        Sélectionnés ({targets.length})
+                      </span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Liste des personnes à cocher (Grille 2 colonnes avec ascenseur agrandie x1.2) */}
+              <div className="flex-1 overflow-y-auto p-4 sm:p-5 max-h-[680px] custom-scrollbar">
+                {filteredRightUsers.length === 0 ? (
+                  <div className="p-10 text-center text-slate-400 text-sm font-medium">
+                    Aucun collaborateur trouvé avec les filtres sélectionnés.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                    {filteredRightUsers.map(user => {
+                      const isSelected = targets.includes(user.id)
+                      const catInfo = getCategoryLabel(user.role)
+
+                      return (
+                        <button
+                          key={user.id}
+                          onClick={() => handleToggleTarget(user.id)}
+                          className={`w-full flex items-center justify-between p-3.5 sm:p-4 rounded-2xl border transition-all cursor-pointer ${
+                            isSelected 
+                              ? 'bg-emerald-50/95 border-emerald-300 ring-2 ring-emerald-100 shadow-sm' 
+                              : 'bg-white border-slate-100 hover:border-slate-300 hover:bg-slate-50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-xs sm:text-sm flex-shrink-0 shadow-sm ${
+                              user.role === 'MANAGER'
+                                ? 'bg-purple-100 text-purple-800'
+                                : user.role === 'EXTERNE'
+                                ? 'bg-amber-100 text-amber-800'
+                                : 'bg-blue-100 text-blue-800'
+                            }`}>
+                              {user.nom[0]}{user.prenom[0]}
+                            </div>
+                            <div className="text-left min-w-0">
+                              <p className={`text-xs sm:text-sm font-bold truncate ${isSelected ? 'text-emerald-950 font-black' : 'text-slate-900'}`}>
+                                {user.nom} {user.prenom}
+                              </p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="text-xs font-mono text-slate-500 font-bold">#{user.matricule}</span>
+                                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${catInfo.badge}`}>
+                                  {catInfo.label}
+                                </span>
+                                {user.service && (
+                                  <span className="text-[11px] text-slate-400 truncate max-w-[110px]">
+                                    • {user.service}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                            <div className={`w-6 h-6 rounded-xl flex items-center justify-center border transition-all ${
+                              isSelected ? 'bg-emerald-500 border-emerald-600 text-white shadow-sm' : 'border-slate-300 bg-white'
+                            }`}>
+                              {isSelected && <Check className="w-4 h-4 stroke-[3]" />}
+                            </div>
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        ) : (
-          <div className="h-full flex flex-col items-center justify-center p-12 bg-white rounded-3xl border border-dashed border-slate-300 opacity-40 space-y-4">
-            <Users2 className="w-16 h-16" />
-            <p className="text-xl font-display font-bold">Sélectionnez un évaluateur</p>
-            <p className="text-slate-500 font-medium text-center max-w-xs">Choisissez un participant à gauche pour configurer les personnes qu'il doit évaluer.</p>
-          </div>
-        )}
+          ) : (
+            <div className="h-full min-h-[380px] flex flex-col items-center justify-center p-12 bg-white rounded-3xl border border-dashed border-slate-300 opacity-70 space-y-4">
+              <Users2 className="w-16 h-16 text-slate-400" />
+              <p className="text-lg sm:text-xl font-bold text-slate-800">
+                {perspective === 'BY_EVALUE' ? "Sélectionnez un collaborateur noté" : "Sélectionnez un notant"}
+              </p>
+              <p className="text-slate-500 text-xs sm:text-sm text-center max-w-sm font-medium">
+                {perspective === 'BY_EVALUE'
+                  ? "Choisissez un agent dans la liste de gauche pour configurer les pairs, managers et clients qui doivent le noter."
+                  : "Choisissez un évaluateur dans la liste de gauche pour lui assigner les personnes qu'il doit noter."}
+              </p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
 }
 
-function Loader2(props: any) {
-  return <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
-}
 
 function SuiviDashboard({ affectations, users }: { affectations: any[], users: User[] }) {
+  const [suiviCategory, setSuiviCategory] = useState<'ALL' | 'PAIR' | 'MANAGER' | 'EXTERNE'>('ALL')
+  const [suiviSearch, setSuiviSearch] = useState('')
+
   // Get all unique evaluateurs from affectations
   const evaluateurIds = [...new Set(affectations.map(a => a.evaluateurId))]
   
@@ -820,7 +1742,6 @@ function SuiviDashboard({ affectations, users }: { affectations: any[], users: U
   const trackingData = evaluateurIds.map(evalId => {
     const user = users.find(u => u.id === evalId)
     const userAffectations = affectations.filter(a => a.evaluateurId === evalId)
-    // Statut global: Si un seul est TERMINEE, on considère terminé (vu qu'ils soumettent tout en bloc). Sinon BROUILLON, sinon EN_ATTENTE
     const isTerminee = userAffectations.some(a => a.statut === 'TERMINEE')
     const isBrouillon = userAffectations.some(a => a.statut === 'BROUILLON')
     
@@ -829,22 +1750,41 @@ function SuiviDashboard({ affectations, users }: { affectations: any[], users: U
     else if (isBrouillon) statut = 'BROUILLON'
 
     return {
-      user: user || { id: evalId, nom: 'Inconnu', prenom: '', matricule: '', role: '' },
+      user: user || { id: evalId, nom: 'Inconnu', prenom: '', matricule: '', role: 'UTILISATEUR' },
       statut,
       totalToEvaluate: userAffectations.length
     }
   })
 
-  const countTerminee = trackingData.filter(d => d.statut === 'TERMINEE').length
-  const countBrouillon = trackingData.filter(d => d.statut === 'BROUILLON').length
-  const countAttente = trackingData.filter(d => d.statut === 'EN_ATTENTE').length
-  const total = trackingData.length
+  const getRoleCategory = (role: string) => {
+    if (role === 'MANAGER') return 'MANAGER'
+    if (role === 'EXTERNE') return 'EXTERNE'
+    return 'PAIR'
+  }
+
+  const filteredTracking = trackingData.filter(d => {
+    const matchesSearch =
+      d.user.nom.toLowerCase().includes(suiviSearch.toLowerCase()) ||
+      d.user.prenom.toLowerCase().includes(suiviSearch.toLowerCase()) ||
+      d.user.matricule.toLowerCase().includes(suiviSearch.toLowerCase())
+
+    const cat = getRoleCategory(d.user.role)
+    const matchesCat = suiviCategory === 'ALL' || cat === suiviCategory
+
+    return matchesSearch && matchesCat
+  })
+
+  const countTerminee = filteredTracking.filter(d => d.statut === 'TERMINEE').length
+  const countBrouillon = filteredTracking.filter(d => d.statut === 'BROUILLON').length
+  const countAttente = filteredTracking.filter(d => d.statut === 'EN_ATTENTE').length
+  const total = filteredTracking.length
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Stat Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center">
-          <span className="text-slate-500 font-bold text-sm">Total Évaluateurs</span>
+          <span className="text-slate-500 font-bold text-sm">Évaluateurs Filtrés</span>
           <span className="text-3xl font-black text-slate-900 mt-2">{total}</span>
         </div>
         <div className="bg-emerald-50 p-6 rounded-2xl border border-emerald-100 shadow-sm flex flex-col justify-center">
@@ -867,24 +1807,95 @@ function SuiviDashboard({ affectations, users }: { affectations: any[], users: U
         </div>
       </div>
 
+      {/* Tableau détaillé avec filtres */}
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-slate-100 bg-slate-50/50">
-          <h3 className="text-lg font-bold text-slate-900">Détail par évaluateur</h3>
+        <div className="p-4 sm:p-6 border-b border-slate-100 bg-slate-50/50 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div>
+            <h3 className="text-lg font-bold text-slate-900">Détail par évaluateur</h3>
+            <p className="text-xs text-slate-500 font-medium">Suivi de la participation par profil</p>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
+            {/* Category pills */}
+            <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200">
+              <button
+                onClick={() => setSuiviCategory('ALL')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
+                  suiviCategory === 'ALL' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                Tous
+              </button>
+              <button
+                onClick={() => setSuiviCategory('PAIR')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
+                  suiviCategory === 'PAIR' ? 'bg-blue-600 text-white' : 'text-blue-700 hover:bg-blue-50'
+                }`}
+              >
+                Pairs
+              </button>
+              <button
+                onClick={() => setSuiviCategory('MANAGER')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
+                  suiviCategory === 'MANAGER' ? 'bg-purple-600 text-white' : 'text-purple-700 hover:bg-purple-50'
+                }`}
+              >
+                Managers
+              </button>
+              <button
+                onClick={() => setSuiviCategory('EXTERNE')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
+                  suiviCategory === 'EXTERNE' ? 'bg-amber-600 text-white' : 'text-amber-800 hover:bg-amber-50'
+                }`}
+              >
+                Clients
+              </button>
+            </div>
+
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Filtrer..."
+                value={suiviSearch}
+                onChange={e => setSuiviSearch(e.target.value)}
+                className="pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none"
+              />
+            </div>
+          </div>
         </div>
+
         <div className="divide-y divide-slate-100">
-          {trackingData.length === 0 && (
+          {filteredTracking.length === 0 && (
             <div className="p-8 text-center text-slate-500 font-medium">
-              Aucune affectation définie pour cette campagne.
+              Aucun évaluateur ne correspond aux filtres.
             </div>
           )}
-          {trackingData.map((data, idx) => (
+          {filteredTracking.map((data, idx) => (
             <div key={idx} className="p-4 md:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-slate-50 transition-colors">
               <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center font-bold text-xs">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs ${
+                  data.user.role === 'MANAGER'
+                    ? 'bg-purple-100 text-purple-800'
+                    : data.user.role === 'EXTERNE'
+                    ? 'bg-amber-100 text-amber-800'
+                    : 'bg-blue-100 text-blue-800'
+                }`}>
                   {data.user.nom?.[0] || '?'}{data.user.prenom?.[0] || '?'}
                 </div>
                 <div>
-                  <p className="font-bold text-slate-900">{data.user.prenom} {data.user.nom}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-bold text-slate-900">{data.user.prenom} {data.user.nom}</p>
+                    <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${
+                      data.user.role === 'MANAGER'
+                        ? 'bg-purple-100 text-purple-800'
+                        : data.user.role === 'EXTERNE'
+                        ? 'bg-amber-100 text-amber-800'
+                        : 'bg-blue-100 text-blue-800'
+                    }`}>
+                      {data.user.role === 'MANAGER' ? 'Manager' : data.user.role === 'EXTERNE' ? 'Client Ext.' : 'Pair'}
+                    </span>
+                  </div>
                   <p className="text-sm text-slate-500 font-medium">Matricule: {data.user.matricule} • Doit évaluer {data.totalToEvaluate} agents</p>
                 </div>
               </div>
@@ -909,6 +1920,675 @@ function SuiviDashboard({ affectations, users }: { affectations: any[], users: U
           ))}
         </div>
       </div>
+    </div>
+  )
+}
+
+function ClassementCampagneView({ 
+  campagneId, 
+  formData, 
+  onRecalculate 
+}: { 
+  campagneId: string
+  formData: any
+  onRecalculate: () => Promise<void> 
+}) {
+  const [data, setData] = useState<any | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [calculating, setCalculating] = useState(false)
+  const [subTab, setSubTab] = useState<'palmares' | 'global' | 'direction' | 'departement' | 'service'>('palmares')
+  const [search, setSearch] = useState('')
+  const [filterDirection, setFilterDirection] = useState('ALL')
+  const [filterDepartement, setFilterDepartement] = useState('ALL')
+  const [filterService, setFilterService] = useState('ALL')
+  const [anonymized, setAnonymized] = useState(false)
+
+  const loadData = async () => {
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/admin/classement?campagneId=${encodeURIComponent(campagneId)}&t=${Date.now()}`, {
+        cache: 'no-store',
+        headers: { Pragma: 'no-cache', 'Cache-Control': 'no-cache' }
+      })
+      const resData = await res.json()
+      if (resData && !resData.error) {
+        setData(resData)
+      }
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadData()
+  }, [campagneId])
+
+  const handleTriggerRecalculate = async () => {
+    setCalculating(true)
+    try {
+      const res = await fetch('/api/admin/classement', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Pragma: 'no-cache', 'Cache-Control': 'no-cache' },
+        body: JSON.stringify({ campagneId }),
+      })
+      const resData = await res.json()
+      if (resData && !resData.error) {
+        setData(resData)
+      } else {
+        await loadData()
+      }
+      await onRecalculate()
+    } catch (e) {
+      console.error(e)
+      await loadData()
+    } finally {
+      setCalculating(false)
+    }
+  }
+
+  const exportToExcel = async () => {
+    if (!data || !data.tousLesScores || data.tousLesScores.length === 0) return
+    const XLSX = await import('xlsx')
+    const wb = XLSX.utils.book_new()
+
+    // 1. Feuille Palmarès
+    const palmaresData: any[] = []
+    if (data.laureats?.majorGlobal) {
+      const mg = data.laureats.majorGlobal
+      palmaresData.push({
+        Distinction: '🏆 SUPER LAURÉAT DIRECTION DSM',
+        Entité: mg.direction,
+        Matricule: mg.matricule,
+        Nom: mg.nom,
+        Prénom: mg.prenom,
+        Service: mg.service,
+        Département: mg.departement,
+        'Score Total (%)': mg.scoreTotal,
+        Dotation: formData.prixDirection || formData.prixGlobal || '1 500 000 FCFA + Séjour familial & Gala AGL',
+      })
+    }
+    data.laureats?.majorsDepartement?.forEach((md: any) => {
+      palmaresData.push({
+        Distinction: '🎖️ MEILLEUR DÉPARTEMENT',
+        Entité: `${md.departementNom} (${md.directionNom})`,
+        Matricule: md.major.matricule,
+        Nom: md.major.nom,
+        Prénom: md.major.prenom,
+        Service: md.major.service,
+        Département: md.departementNom,
+        'Score Total (%)': md.major.scoreTotal,
+        Dotation: formData.prixDepartement || '1 000 000 FCFA',
+      })
+    })
+    data.laureats?.majorsService?.forEach((ms: any) => {
+      palmaresData.push({
+        Distinction: '🥇 MEILLEUR SERVICE',
+        Entité: `${ms.serviceNom} (${ms.departementNom})`,
+        Matricule: ms.major.matricule,
+        Nom: ms.major.nom,
+        Prénom: ms.major.prenom,
+        Service: ms.serviceNom,
+        Département: ms.departementNom,
+        'Score Total (%)': ms.major.scoreTotal,
+        Dotation: formData.prixService || '500 000 FCFA',
+      })
+    })
+    const wsPalmares = XLSX.utils.json_to_sheet(palmaresData)
+    XLSX.utils.book_append_sheet(wb, wsPalmares, 'Palmarès & Lauréats')
+
+    // 2. Feuille Tous les scores
+    const allData = data.tousLesScores.map((s: any, idx: number) => ({
+      Rang: s.rangGlobal || idx + 1,
+      Matricule: s.matricule,
+      Nom: s.nom,
+      Prénom: s.prenom,
+      Direction: s.direction,
+      Département: s.departement,
+      Service: s.service,
+      'Score Collègues (%)': s.scoreCollegues,
+      'Score Manager (%)': s.scoreManager,
+      'Score Client (%)': s.scoreClient,
+      'Score Total (%)': s.scoreTotal,
+      Appréciation: getAppreciationInfo(s.scoreTotal).appreciation,
+    }))
+    const wsAll = XLSX.utils.json_to_sheet(allData)
+    XLSX.utils.book_append_sheet(wb, wsAll, 'Classement Général')
+
+    XLSX.writeFile(wb, `Classement_${formData.libelle ? formData.libelle.replace(/\s+/g, '_') : 'Campagne'}.xlsx`)
+  }
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-3xl p-16 border border-slate-200 shadow-sm flex flex-col items-center justify-center space-y-4">
+        <div className="w-12 h-12 rounded-full border-4 border-amber-100 border-t-[#D4AF37] animate-spin"></div>
+        <p className="text-slate-600 font-bold text-sm">Chargement des résultats et palmarès de la campagne...</p>
+      </div>
+    )
+  }
+
+  const allScores = data?.tousLesScores || []
+  const majorGlobal = data?.laureats?.majorGlobal
+  const majorsDepartement = data?.laureats?.majorsDepartement || []
+  const majorsService = data?.laureats?.majorsService || []
+  const groupesDirection = data?.groupesDirection || []
+  const groupesDepartement = data?.groupesDepartement || []
+  const groupesService = data?.groupesService || []
+
+  const directions = Array.from(new Set(allScores.map((s: any) => s.direction).filter(Boolean))) as string[]
+  const departements = Array.from(new Set(allScores.map((s: any) => s.departement).filter(Boolean))) as string[]
+  const services = Array.from(new Set(allScores.map((s: any) => s.service).filter(Boolean))) as string[]
+
+  const filteredScores = allScores.filter((s: any) => {
+    const matchesSearch = 
+      s.nom?.toLowerCase().includes(search.toLowerCase()) ||
+      s.prenom?.toLowerCase().includes(search.toLowerCase()) ||
+      s.matricule?.toLowerCase().includes(search.toLowerCase()) ||
+      s.service?.toLowerCase().includes(search.toLowerCase())
+    const matchesDir = filterDirection === 'ALL' || s.direction === filterDirection
+    const matchesDept = filterDepartement === 'ALL' || s.departement === filterDepartement
+    const matchesServ = filterService === 'ALL' || s.service === filterService
+    return matchesSearch && matchesDir && matchesDept && matchesServ
+  })
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      {/* Header Banner Classement de la Session */}
+      <div className="bg-gradient-to-r from-[#001D33] via-[#002B49] to-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-white/10 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 relative z-10">
+          <div>
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              <span className="text-[#D4AF37] font-black text-xs uppercase tracking-widest flex items-center gap-1.5">
+                <Trophy className="w-4 h-4 text-[#D4AF37]" /> Session DSM TAMIS
+              </span>
+              {formData.statut === 'OUVERTE' && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Notation active
+                </span>
+              )}
+              {formData.statut === 'CLOTUREE' && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-400/30">
+                  <Lock className="w-3 h-3" />
+                  Session clôturée
+                </span>
+              )}
+              {formData.statut === 'CALCULEE' && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-blue-500/20 text-blue-300 border border-blue-400/30">
+                  <CheckCircle2 className="w-3 h-3" />
+                  Scores définitifs
+                </span>
+              )}
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-black text-white">{formData.libelle || 'Classement de la Campagne'}</h2>
+            <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-xl">
+              Pondération appliquée : Collègues {formData.poidsCollegues}% • Manager {formData.poidsManager}% • Total agents évalués : {allScores.length}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <button
+              type="button"
+              onClick={handleTriggerRecalculate}
+              disabled={calculating}
+              className="flex items-center gap-2 px-4 py-2.5 bg-[#D4AF37] hover:bg-[#c49f2f] text-[#002B49] rounded-xl text-xs font-black transition-all shadow-md active:scale-95 disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${calculating ? 'animate-spin' : ''}`} />
+              <span>{calculating ? 'Calcul en cours...' : 'Recalculer'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={exportToExcel}
+              disabled={allScores.length === 0}
+              className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 disabled:opacity-50"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              <span>Exporter Excel</span>
+            </button>
+
+            <Link
+              href={`/admin/classement?campagneId=${campagneId}`}
+              className="flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-xl text-xs font-bold transition-all shadow-md"
+            >
+              <ExternalLink className="w-4 h-4" />
+              <span>Plein écran</span>
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {allScores.length === 0 ? (
+        <div className="bg-white rounded-3xl p-12 text-center border border-slate-200 shadow-sm space-y-4">
+          <div className="w-16 h-16 bg-amber-50 rounded-2xl flex items-center justify-center mx-auto text-amber-600">
+            <Trophy className="w-8 h-8" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-lg font-bold text-slate-900">Aucun résultat pour le moment</h3>
+            <p className="text-slate-500 text-xs max-w-md mx-auto">
+              Les scores de cette campagne n'ont pas encore été calculés ou aucune note n'a été soumise.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleTriggerRecalculate}
+            disabled={calculating}
+            className="px-6 py-3 bg-[#002B49] text-[#D4AF37] border border-[#D4AF37]/40 rounded-xl text-xs font-black transition-all hover:bg-[#001D33] shadow-md"
+          >
+            {calculating ? 'Calcul en cours...' : 'Calculer les scores maintenant'}
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {/* Sous-onglets de navigation du classement */}
+          <div className="flex items-center justify-between gap-4 overflow-x-auto pb-1">
+            <div className="inline-flex items-center gap-1.5 bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm">
+              <button
+                onClick={() => setSubTab('palmares')}
+                className={`flex items-center gap-2 py-2 px-3.5 rounded-xl font-bold text-xs whitespace-nowrap transition-all ${
+                  subTab === 'palmares'
+                    ? 'bg-[#002B49] text-[#D4AF37] shadow-sm'
+                    : 'text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <Trophy className="w-3.5 h-3.5" /> Palmarès Officiel
+              </button>
+              <button
+                onClick={() => setSubTab('global')}
+                className={`flex items-center gap-2 py-2 px-3.5 rounded-xl font-bold text-xs whitespace-nowrap transition-all ${
+                  subTab === 'global'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <ListOrdered className="w-3.5 h-3.5" /> Classement Général ({allScores.length})
+              </button>
+              <button
+                onClick={() => setSubTab('direction')}
+                className={`flex items-center gap-2 py-2 px-3.5 rounded-xl font-bold text-xs whitespace-nowrap transition-all ${
+                  subTab === 'direction'
+                    ? 'bg-amber-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <Building2 className="w-3.5 h-3.5" /> Par Direction
+              </button>
+              <button
+                onClick={() => setSubTab('departement')}
+                className={`flex items-center gap-2 py-2 px-3.5 rounded-xl font-bold text-xs whitespace-nowrap transition-all ${
+                  subTab === 'departement'
+                    ? 'bg-purple-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <FolderGit2 className="w-3.5 h-3.5" /> Par Département
+              </button>
+              <button
+                onClick={() => setSubTab('service')}
+                className={`flex items-center gap-2 py-2 px-3.5 rounded-xl font-bold text-xs whitespace-nowrap transition-all ${
+                  subTab === 'service'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <Users2 className="w-3.5 h-3.5" /> Par Service
+              </button>
+            </div>
+
+            {subTab === 'global' && (
+              <button
+                onClick={() => setAnonymized(!anonymized)}
+                className="flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold shadow-sm transition-all"
+              >
+                {anonymized ? <Eye className="w-4 h-4 text-brand-600" /> : <EyeOff className="w-4 h-4 text-slate-400" />}
+                <span>{anonymized ? 'Noms visibles' : 'Anonymiser'}</span>
+              </button>
+            )}
+          </div>
+
+          {/* TAB 1: PALMARÈS & LAURÉATS */}
+          {subTab === 'palmares' && (
+            <div className="space-y-6 animate-fade-in">
+              {/* Super Lauréat Direction DSM Card */}
+              {majorGlobal ? (
+                <div className="bg-gradient-to-r from-amber-500/20 via-yellow-500/10 to-amber-500/25 border-2 border-[#D4AF37] rounded-3xl p-6 sm:p-8 shadow-xl relative overflow-hidden">
+                  <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10">
+                    <div className="flex items-center gap-5">
+                      <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#D4AF37] to-amber-600 text-[#002B49] font-black text-2xl flex items-center justify-center shadow-lg border-2 border-white">
+                        <Crown className="w-10 h-10 text-white drop-shadow" />
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[10px] font-black uppercase tracking-widest bg-[#002B49] text-[#D4AF37] px-3 py-0.5 rounded-full border border-[#D4AF37]/30 flex items-center gap-1">
+                            <Trophy className="w-3 h-3" /> Super Lauréat Direction DSM
+                          </span>
+                          <span className="text-xs font-bold text-amber-900">Palier 1</span>
+                        </div>
+                        <h3 className="text-2xl font-black text-slate-900">
+                          {anonymized ? `Agent ${majorGlobal.matricule}` : `${majorGlobal.prenom} ${majorGlobal.nom}`}
+                        </h3>
+                        <p className="text-xs text-slate-600 font-medium">
+                          Matricule: <span className="font-bold text-slate-800">{majorGlobal.matricule}</span> • {majorGlobal.service} ({majorGlobal.departement}) • {majorGlobal.direction}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 bg-white/80 backdrop-blur-md p-4 rounded-2xl border border-amber-200">
+                      <div className="text-left sm:text-right">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Score TAMIS Final</span>
+                        <span className="text-3xl font-black text-emerald-600">{majorGlobal.scoreTotal}%</span>
+                      </div>
+                      <div className="h-10 w-px bg-slate-200 hidden sm:block"></div>
+                      <div className="text-left">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-[#002B49] block">Dotation Officielle</span>
+                        <span className="text-xs font-black text-amber-900">
+                          {formData.prixDirection || formData.prixGlobal || '1 500 000 FCFA + Séjour'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Grid Majors Département */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Medal className="w-5 h-5 text-purple-600" />
+                    <h4 className="font-black text-slate-900 text-base">Meilleurs Agents par Département</h4>
+                    <span className="text-[10px] font-black bg-purple-100 text-purple-800 px-2.5 py-0.5 rounded-full">
+                      Palier 2 • {formData.prixDepartement || '1 000 000 FCFA'}
+                    </span>
+                  </div>
+                  <span className="text-xs font-bold text-slate-400">{majorsDepartement.length} lauréats</span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {majorsDepartement.map((md: any, idx: number) => (
+                    <div key={idx} className="bg-white rounded-2xl p-5 border border-purple-100 shadow-sm hover:shadow-md transition-all space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black text-purple-700 bg-purple-50 px-2.5 py-1 rounded-lg uppercase">
+                          {md.departementNom}
+                        </span>
+                        <span className="text-sm font-black text-emerald-600">{md.major.scoreTotal}%</span>
+                      </div>
+                      <div>
+                        <p className="font-black text-slate-900 text-sm">
+                          {anonymized ? `Agent ${md.major.matricule}` : `${md.major.prenom} ${md.major.nom}`}
+                        </p>
+                        <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                          {md.major.service} • Mat: {md.major.matricule}
+                        </p>
+                      </div>
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] font-bold text-slate-400">
+                        <span>Sur {md.totalAgents} agents</span>
+                        <span className="text-purple-700">1 000 000 FCFA</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Grid Majors Service */}
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Gift className="w-5 h-5 text-emerald-600" />
+                    <h4 className="font-black text-slate-900 text-base">Meilleurs Agents par Service / Cellule</h4>
+                    <span className="text-[10px] font-black bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full">
+                      Palier 3 • {formData.prixService || '500 000 FCFA'}
+                    </span>
+                  </div>
+                  <span className="text-xs font-bold text-slate-400">{majorsService.length} lauréats</span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {majorsService.map((ms: any, idx: number) => (
+                    <div key={idx} className="bg-white rounded-2xl p-5 border border-emerald-100 shadow-sm hover:shadow-md transition-all space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg uppercase truncate max-w-[180px]">
+                          {ms.serviceNom}
+                        </span>
+                        <span className="text-sm font-black text-emerald-600">{ms.major.scoreTotal}%</span>
+                      </div>
+                      <div>
+                        <p className="font-black text-slate-900 text-sm">
+                          {anonymized ? `Agent ${ms.major.matricule}` : `${ms.major.prenom} ${ms.major.nom}`}
+                        </p>
+                        <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                          {ms.departementNom} • Mat: {ms.major.matricule}
+                        </p>
+                      </div>
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] font-bold text-slate-400">
+                        <span>Sur {ms.totalAgents} agents</span>
+                        <span className="text-emerald-700">500 000 FCFA</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: CLASSEMENT GÉNÉRAL INTÉGRAL */}
+          {subTab === 'global' && (
+            <div className="space-y-4 animate-fade-in">
+              {/* Filtres de recherche */}
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap items-center gap-3">
+                <div className="relative flex-1 min-w-[200px]">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Rechercher par nom, matricule ou service..."
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-brand-500"
+                  />
+                </div>
+
+                {departements.length > 0 && (
+                  <select
+                    value={filterDepartement}
+                    onChange={e => setFilterDepartement(e.target.value)}
+                    className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none cursor-pointer"
+                  >
+                    <option value="ALL">Tous les départements</option>
+                    {departements.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                )}
+
+                {services.length > 0 && (
+                  <select
+                    value={filterService}
+                    onChange={e => setFilterService(e.target.value)}
+                    className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none cursor-pointer"
+                  >
+                    <option value="ALL">Tous les services</option>
+                    {services.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                )}
+              </div>
+
+              {/* Tableau des scores */}
+              <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-black text-[10px]">
+                      <tr>
+                        <th className="py-3.5 px-4 text-center w-16">Rang</th>
+                        <th className="py-3.5 px-4">Collaborateur</th>
+                        <th className="py-3.5 px-4">Entité / Service</th>
+                        <th className="py-3.5 px-3 text-center">Pairs ({formData.poidsCollegues}%)</th>
+                        <th className="py-3.5 px-3 text-center">Manager ({formData.poidsManager}%)</th>
+                        <th className="py-3.5 px-3 text-center">Client</th>
+                        <th className="py-3.5 px-4 text-center font-black text-slate-800">Score Final</th>
+                        <th className="py-3.5 px-4 text-center">Mention</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredScores.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} className="text-center py-12 text-slate-400 font-medium">
+                            Aucun collaborateur ne correspond aux filtres de recherche.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredScores.map((score: any, idx: number) => {
+                          const appInfo = getAppreciationInfo(score.scoreTotal)
+                          const rang = score.rangGlobal || idx + 1
+                          return (
+                            <tr key={score.utilisateurId || idx} className="hover:bg-slate-50/80 transition-colors">
+                              <td className="py-3.5 px-4 text-center font-black">
+                                {rang === 1 ? (
+                                  <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-100 text-amber-800 font-black text-xs border border-amber-300">
+                                    🥇
+                                  </span>
+                                ) : rang === 2 ? (
+                                  <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-200 text-slate-800 font-black text-xs">
+                                    🥈
+                                  </span>
+                                ) : rang === 3 ? (
+                                  <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-700/20 text-amber-900 font-black text-xs">
+                                    🥉
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-500 font-bold">#{rang}</span>
+                                )}
+                              </td>
+                              <td className="py-3.5 px-4">
+                                <p className="font-bold text-slate-900">
+                                  {anonymized ? `Agent ${score.matricule}` : `${score.prenom} ${score.nom}`}
+                                </p>
+                                <p className="text-[10px] text-slate-400 font-medium">Matricule: {score.matricule}</p>
+                              </td>
+                              <td className="py-3.5 px-4">
+                                <p className="font-bold text-slate-700">{score.service}</p>
+                                <p className="text-[10px] text-slate-400">{score.departement}</p>
+                              </td>
+                              <td className="py-3.5 px-3 text-center font-bold text-slate-700">
+                                {score.scoreCollegues}%
+                              </td>
+                              <td className="py-3.5 px-3 text-center font-bold text-slate-700">
+                                {score.scoreManager}%
+                              </td>
+                              <td className="py-3.5 px-3 text-center font-bold text-slate-500">
+                                {score.scoreClient > 0 ? `${score.scoreClient}%` : '—'}
+                              </td>
+                              <td className="py-3.5 px-4 text-center">
+                                <span className="text-sm font-black text-slate-900">{score.scoreTotal}%</span>
+                              </td>
+                              <td className="py-3.5 px-4 text-center">
+                                <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black border ${appInfo.colorBadge}`}>
+                                  {appInfo.appreciation}
+                                </span>
+                              </td>
+                            </tr>
+                          )
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: PAR DIRECTION */}
+          {subTab === 'direction' && (
+            <div className="space-y-4 animate-fade-in">
+              {groupesDirection.map((g: any, idx: number) => (
+                <div key={idx} className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div className="flex items-center gap-2.5">
+                      <Building2 className="w-5 h-5 text-amber-600" />
+                      <h4 className="font-black text-slate-900 text-base">{g.directionNom}</h4>
+                    </div>
+                    <span className="text-xs font-bold text-slate-400">{g.scores.length} collaborateurs</span>
+                  </div>
+                  {g.major && (
+                    <div className="bg-amber-50/60 border border-amber-200 rounded-2xl p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Crown className="w-6 h-6 text-amber-600" />
+                        <div>
+                          <span className="text-[10px] font-black text-amber-800 uppercase">Major Direction</span>
+                          <p className="font-black text-slate-900 text-sm">{g.major.prenom} {g.major.nom} ({g.major.service})</p>
+                        </div>
+                      </div>
+                      <span className="text-lg font-black text-emerald-600">{g.major.scoreTotal}%</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* TAB 4: PAR DÉPARTEMENT */}
+          {subTab === 'departement' && (
+            <div className="space-y-4 animate-fade-in">
+              {groupesDepartement.map((g: any, idx: number) => (
+                <div key={idx} className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div className="flex items-center gap-2.5">
+                      <FolderGit2 className="w-5 h-5 text-purple-600" />
+                      <div>
+                        <h4 className="font-black text-slate-900 text-base">{g.departementNom}</h4>
+                        <p className="text-[10px] text-slate-400 font-bold">{g.directionNom}</p>
+                      </div>
+                    </div>
+                    <span className="text-xs font-bold text-slate-400">{g.scores.length} collaborateurs</span>
+                  </div>
+                  {g.major && (
+                    <div className="bg-purple-50/60 border border-purple-200 rounded-2xl p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Medal className="w-6 h-6 text-purple-600" />
+                        <div>
+                          <span className="text-[10px] font-black text-purple-800 uppercase">Major Département</span>
+                          <p className="font-black text-slate-900 text-sm">{g.major.prenom} {g.major.nom} ({g.major.service})</p>
+                        </div>
+                      </div>
+                      <span className="text-lg font-black text-emerald-600">{g.major.scoreTotal}%</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* TAB 5: PAR SERVICE */}
+          {subTab === 'service' && (
+            <div className="space-y-4 animate-fade-in">
+              {groupesService.map((g: any, idx: number) => (
+                <div key={idx} className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div className="flex items-center gap-2.5">
+                      <Users2 className="w-5 h-5 text-emerald-600" />
+                      <div>
+                        <h4 className="font-black text-slate-900 text-base">{g.serviceNom}</h4>
+                        <p className="text-[10px] text-slate-400 font-bold">{g.departementNom}</p>
+                      </div>
+                    </div>
+                    <span className="text-xs font-bold text-slate-400">{g.scores.length} collaborateurs</span>
+                  </div>
+                  {g.major && (
+                    <div className="bg-emerald-50/60 border border-emerald-200 rounded-2xl p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Gift className="w-6 h-6 text-emerald-600" />
+                        <div>
+                          <span className="text-[10px] font-black text-emerald-800 uppercase">Major Service</span>
+                          <p className="font-black text-slate-900 text-sm">{g.major.prenom} {g.major.nom}</p>
+                        </div>
+                      </div>
+                      <span className="text-lg font-black text-emerald-600">{g.major.scoreTotal}%</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

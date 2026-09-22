@@ -62,13 +62,21 @@ export async function DELETE(
 
   try {
     const { id } = await params
+
+    // Dissocier les utilisateurs associés à ce site
+    await prisma.utilisateur.updateMany({
+      where: { siteId: id },
+      data: { siteId: null }
+    })
+
+    // Supprimer le site
     await prisma.site.delete({
       where: { id }
     })
 
     return NextResponse.json({ message: 'Site supprimé avec succès' })
-  } catch (error) {
-    console.error('Error:', error)
-    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
+  } catch (error: any) {
+    console.error('Error deleting site:', error)
+    return NextResponse.json({ error: 'Erreur lors de la suppression: ' + (error?.message || 'Erreur serveur') }, { status: 500 })
   }
 }

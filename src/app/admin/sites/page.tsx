@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Plus, Building2, MapPin, Users, ChevronRight } from 'lucide-react'
-import Sidebar from '@/components/Sidebar'
+import { Plus, Building2, MapPin, Users, ChevronRight, Trash2, Loader2 } from 'lucide-react'
 import AdminHeader from '@/components/AdminHeader'
 
 interface Site {
@@ -16,26 +15,49 @@ interface Site {
 export default function SitesPage() {
   const [sites, setSites] = useState<Site[]>([])
   const [loading, setLoading] = useState(true)
+  const [siteToDelete, setSiteToDelete] = useState<Site | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
-  useEffect(() => {
+  const loadSites = () => {
     fetch('/api/admin/sites')
       .then(res => res.json())
-      .then(data => setSites(data))
+      .then(data => setSites(Array.isArray(data) ? data : []))
       .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    loadSites()
   }, [])
+
+  const handleDelete = async () => {
+    if (!siteToDelete) return
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/admin/sites/${siteToDelete.id}`, { method: 'DELETE' })
+      if (res.ok) {
+        setSiteToDelete(null)
+        loadSites()
+      } else {
+        const data = await res.json()
+        alert(data.error || 'Erreur lors de la suppression')
+      }
+    } catch (err) {
+      alert('Erreur de connexion')
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="flex-1 flex items-center justify-center">
         <div className="h-12 w-12 rounded-full border-4 border-brand-100 border-t-brand-500 animate-spin"></div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
-      <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0">
+    <div className="flex-1 flex flex-col min-w-0">
         <AdminHeader title="Gestion des Sites" />
         
         <main className="flex-1 overflow-y-auto p-6">
@@ -87,12 +109,22 @@ export default function SitesPage() {
                           </div>
                         </td>
                         <td className="px-6 py-4 text-right">
-                          <Link 
-                            href={`/admin/sites/${site.id}`} 
-                            className="inline-flex items-center gap-1.5 text-brand-600 hover:text-brand-700 font-bold text-sm bg-brand-50 px-3 py-1.5 rounded-lg transition-colors"
-                          >
-                            Détails <ChevronRight className="w-4 h-4" />
-                          </Link>
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setSiteToDelete(site)}
+                              className="inline-flex items-center gap-1.5 text-red-600 hover:text-red-700 font-bold text-sm bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors border border-red-100"
+                              title="Supprimer ce site"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                            <Link 
+                              href={`/admin/sites/${site.id}`} 
+                              className="inline-flex items-center gap-1.5 text-brand-600 hover:text-brand-700 font-bold text-sm bg-brand-50 px-3 py-1.5 rounded-lg transition-colors"
+                            >
+                              Détails <ChevronRight className="w-4 h-4" />
+                            </Link>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -112,7 +144,43 @@ export default function SitesPage() {
             </div>
           </div>
         </main>
-      </div>
+
+        {/* Delete Confirmation Modal */}
+        {siteToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fade-in">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4 border border-slate-100">
+              <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              
+              <div className="text-center space-y-2">
+                <h3 className="text-lg font-bold text-slate-900">Confirmer la suppression</h3>
+                <p className="text-sm text-slate-500">
+                  Êtes-vous sûr de vouloir supprimer le site <strong className="text-slate-800">{siteToDelete.nom}</strong> ? Les collaborateurs affectés seront simplement dissociés sans être supprimés.
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setSiteToDelete(null)}
+                  disabled={deleting}
+                  className="flex-1 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition-colors"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold transition-colors disabled:opacity-50"
+                >
+                  {deleting ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Oui, supprimer'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
     </div>
   )
 }

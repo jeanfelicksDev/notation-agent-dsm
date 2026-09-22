@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Users, Building2, ClipboardList, Trophy, Plus, ArrowRight } from 'lucide-react'
-import Sidebar from '@/components/Sidebar'
+import { Users, Building2, ClipboardList, Trophy, Plus, ArrowRight, QrCode } from 'lucide-react'
 import AdminHeader from '@/components/AdminHeader'
 
 interface Stats {
@@ -38,16 +37,14 @@ export default function AdminDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="flex-1 flex items-center justify-center">
         <div className="h-12 w-12 rounded-full border-4 border-brand-100 border-t-brand-500 animate-spin"></div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
-      <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0">
+    <div className="flex-1 flex flex-col min-w-0">
         <AdminHeader />
         <div className="flex-1 overflow-y-auto p-6">
           <div className="max-w-7xl mx-auto space-y-8">
@@ -78,27 +75,34 @@ export default function AdminDashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <div className="lg:col-span-2 space-y-6 animate-fade-in" style={{ animationDelay: '400ms' }}>
                 <h3 className="text-xl font-display font-bold text-slate-800">Actions rapides</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <Link href="/admin/campagnes/new" className="group p-6 bg-white border border-slate-200 rounded-2xl hover:border-brand-500 transition-all card-hover">
-                    <div className="w-10 h-10 bg-brand-50 rounded-lg flex items-center justify-center mb-4 group-hover:bg-brand-500 group-hover:text-white transition-colors">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <Link href="/admin/campagnes/new" className="group p-5 bg-white border border-slate-200 rounded-2xl hover:border-brand-500 transition-all card-hover">
+                    <div className="w-10 h-10 bg-brand-50 rounded-lg flex items-center justify-center mb-3 group-hover:bg-brand-500 group-hover:text-white transition-colors">
                       <Plus className="w-5 h-5 text-brand-600 group-hover:text-white" />
                     </div>
-                    <span className="font-bold text-slate-800 block mb-1">Campagne</span>
+                    <span className="font-bold text-slate-800 block mb-0.5 text-sm">Campagne</span>
                     <span className="text-xs text-slate-500">Lancer une session</span>
                   </Link>
-                  <Link href="/admin/utilisateurs/new" className="group p-6 bg-white border border-slate-200 rounded-2xl hover:border-emerald-500 transition-all card-hover">
-                    <div className="w-10 h-10 bg-emerald-50 rounded-lg flex items-center justify-center mb-4 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
+                  <Link href="/admin/utilisateurs/new" className="group p-5 bg-white border border-slate-200 rounded-2xl hover:border-emerald-500 transition-all card-hover">
+                    <div className="w-10 h-10 bg-emerald-50 rounded-lg flex items-center justify-center mb-3 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
                       <Plus className="w-5 h-5 text-emerald-600 group-hover:text-white" />
                     </div>
-                    <span className="font-bold text-slate-800 block mb-1">Utilisateur</span>
+                    <span className="font-bold text-slate-800 block mb-0.5 text-sm">Utilisateur</span>
                     <span className="text-xs text-slate-500">Ajouter un agent</span>
                   </Link>
-                  <Link href="/admin/sites/new" className="group p-6 bg-white border border-slate-200 rounded-2xl hover:border-purple-500 transition-all card-hover">
-                    <div className="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center mb-4 group-hover:bg-purple-500 group-hover:text-white transition-colors">
+                  <Link href="/admin/sites/new" className="group p-5 bg-white border border-slate-200 rounded-2xl hover:border-purple-500 transition-all card-hover">
+                    <div className="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center mb-3 group-hover:bg-purple-500 group-hover:text-white transition-colors">
                       <Plus className="w-5 h-5 text-purple-600 group-hover:text-white" />
                     </div>
-                    <span className="font-bold text-slate-800 block mb-1">Site</span>
-                    <span className="text-xs text-slate-500">Nouvel emplacement</span>
+                    <span className="font-bold text-slate-800 block mb-0.5 text-sm">Site</span>
+                    <span className="text-xs text-slate-500">Emplacement</span>
+                  </Link>
+                  <Link href="/qr" target="_blank" className="group p-5 bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-2xl hover:border-amber-400 transition-all card-hover">
+                    <div className="w-10 h-10 bg-amber-400 text-white rounded-lg flex items-center justify-center mb-3 shadow-sm group-hover:scale-110 transition-transform">
+                      <QrCode className="w-5 h-5 text-white" />
+                    </div>
+                    <span className="font-bold text-slate-800 block mb-0.5 text-sm">QR Code Unique</span>
+                    <span className="text-xs text-amber-700">Portail clients</span>
                   </Link>
                 </div>
               </div>
@@ -124,7 +128,6 @@ export default function AdminDashboard() {
             </div>
           </div>
         </div>
-      </div>
     </div>
   )
 }

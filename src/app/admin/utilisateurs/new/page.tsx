@@ -3,8 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Save, AlertCircle, User, Mail, Shield, Building2, Briefcase, Loader2 } from 'lucide-react'
-import Sidebar from '@/components/Sidebar'
+import { ArrowLeft, Save, AlertCircle, User, Mail, Shield, Building2, Briefcase, Loader2, QrCode } from 'lucide-react'
 import AdminHeader from '@/components/AdminHeader'
 
 interface Site {
@@ -12,19 +11,11 @@ interface Site {
   nom: string
 }
 
-interface Manager {
-  id: string
-  nom: string
-  prenom: string
-}
-
 export default function NewUtilisateurPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [sites, setSites] = useState<Site[]>([])
-  const [managers, setManagers] = useState<Manager[]>([])
-
   const [formData, setFormData] = useState({
     matricule: '',
     nom: '',
@@ -34,17 +25,14 @@ export default function NewUtilisateurPage() {
     role: 'UTILISATEUR',
     service: '',
     siteId: '',
-    managerId: ''
+    qrcodeActif: false,
   })
 
   useEffect(() => {
-    Promise.all([
-      fetch('/api/admin/sites').then(res => res.json()),
-      fetch('/api/admin/utilisateurs').then(res => res.json())
-    ]).then(([sitesData, usersData]) => {
-      setSites(sitesData)
-      setManagers(usersData.filter((u: any) => u.role === 'MANAGER' || u.role === 'ADMIN'))
-    }).catch(err => console.error('Error fetching initial data:', err))
+    fetch('/api/admin/sites')
+      .then(res => res.json())
+      .then(sitesData => setSites(sitesData))
+      .catch(err => console.error('Error fetching initial data:', err))
   }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -74,9 +62,7 @@ export default function NewUtilisateurPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
-      <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0">
+    <div className="flex-1 flex flex-col min-w-0">
         <AdminHeader title="Nouvel Utilisateur" />
         
         <main className="flex-1 overflow-y-auto p-6">
@@ -202,22 +188,7 @@ export default function NewUtilisateurPage() {
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Manager Hiérarchique</label>
-                    <div className="relative">
-                      <select
-                        className="w-full px-5 py-3.5 pl-12 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-brand-100 focus:border-brand-500 transition-all outline-none font-bold appearance-none"
-                        value={formData.managerId}
-                        onChange={e => setFormData({ ...formData, managerId: e.target.value })}
-                      >
-                        <option value="">Aucun manager</option>
-                        {managers.map(manager => (
-                          <option key={manager.id} value={manager.id}>{manager.nom} {manager.prenom}</option>
-                        ))}
-                      </select>
-                      <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
-                    </div>
-                  </div>
+
 
                   <div className="md:col-span-2 space-y-2">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Mot de passe provisoire *</label>
@@ -229,6 +200,53 @@ export default function NewUtilisateurPage() {
                       onChange={e => setFormData({ ...formData, motDePasse: e.target.value })}
                       placeholder="••••••••"
                     />
+                  </div>
+
+                  {/* QR Code checkbox */}
+                  <div className="md:col-span-2">
+                    <label
+                      htmlFor="qrcode-actif"
+                      className={`flex items-center gap-4 p-4 rounded-2xl border-2 cursor-pointer transition-all select-none ${
+                        formData.qrcodeActif
+                          ? 'border-amber-400 bg-amber-50'
+                          : 'border-slate-200 bg-slate-50 hover:border-slate-300'
+                      }`}
+                    >
+                      <input
+                        id="qrcode-actif"
+                        type="checkbox"
+                        className="sr-only"
+                        checked={formData.qrcodeActif}
+                        onChange={e => setFormData({ ...formData, qrcodeActif: e.target.checked })}
+                      />
+                      {/* Custom checkbox */}
+                      <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                        formData.qrcodeActif
+                          ? 'bg-amber-400 border-amber-400'
+                          : 'bg-white border-slate-300'
+                      }`}>
+                        {formData.qrcodeActif && (
+                          <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                            <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                          formData.qrcodeActif ? 'bg-amber-400' : 'bg-slate-200'
+                        }`}>
+                          <QrCode className={`w-5 h-5 ${formData.qrcodeActif ? 'text-white' : 'text-slate-500'}`} />
+                        </div>
+                        <div>
+                          <p className={`font-bold text-sm ${
+                            formData.qrcodeActif ? 'text-amber-800' : 'text-slate-700'
+                          }`}>Inclure dans la notation par QR Code unique</p>
+                          <p className="text-xs text-slate-400 font-medium mt-0.5">
+                            Permet à cet agent de figurer dans la liste des agents sélectionnables lorsque les clients scannent le QR code unique.
+                          </p>
+                        </div>
+                      </div>
+                    </label>
                   </div>
                 </div>
 
@@ -252,7 +270,6 @@ export default function NewUtilisateurPage() {
             </div>
           </div>
         </main>
-      </div>
     </div>
   )
 }

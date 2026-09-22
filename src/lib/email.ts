@@ -69,7 +69,7 @@ function buildOtpEmailHtml(code: string, recipientName: string): string {
           <tr>
             <td style="padding:0 40px 24px 40px;color:#475569;font-size:15px;line-height:1.6;">
               Bonjour <strong>${escapeHtml(recipientName)}</strong>,<br><br>
-              Voici votre code de connexion à la plateforme d'évaluation 360°.
+              Voici votre code de connexion à la plateforme d'évaluation TAMIS.
             </td>
           </tr>
           <tr>

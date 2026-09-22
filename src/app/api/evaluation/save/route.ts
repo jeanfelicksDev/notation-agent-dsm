@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import prisma from '@/lib/prisma'
+import prisma, { Prisma } from '@/lib/prisma'
 import { getSessionUser } from '@/lib/auth'
 
 type IncomingNote = {
@@ -25,6 +25,14 @@ export async function POST(request: NextRequest) {
 
     if (!evalueId) {
       return NextResponse.json({ error: 'evalueId requis' }, { status: 400 })
+    }
+
+    // Interdire formellement l'auto-évaluation
+    if (evalueId === sessionUser.id) {
+      return NextResponse.json(
+        { error: "L'auto-évaluation est strictement interdite" },
+        { status: 403 }
+      )
     }
 
     const campagne = await prisma.campagne.findFirst({
@@ -60,43 +68,52 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    await prisma.$transaction(async (tx: any) => {
-      for (const note of notes) {
-        if (typeof note?.critereId !== 'string') continue
-        if (typeof note.valeur !== 'number' || note.valeur <= 0) continue
+    const existingNotes = await prisma.note.findMany({
+      where: {
+        evaluateurId: sessionUser.id,
+        evalueId,
+        campagneId: campagne.id,
+      },
+    })
+    const existingMap = new Map(existingNotes.map((n: any) => [n.critereId, n]))
 
-        const existing = await tx.note.findFirst({
+    const operations: Prisma.PrismaPromise<unknown>[] = []
+
+    for (const note of notes) {
+      if (typeof note?.critereId !== 'string') continue
+      if (typeof note.valeur !== 'number' || note.valeur <= 0) continue
+
+      const existing = existingMap.get(note.critereId) as any
+
+      // Upsert : idempotent même en cas de sauvegardes concurrentes
+      operations.push(
+        prisma.note.upsert({
           where: {
+            evaluateurId_evalueId_critereId_campagneId: {
+              evaluateurId: sessionUser.id,
+              evalueId,
+              critereId: note.critereId,
+              campagneId: campagne.id,
+            },
+          },
+          update: {
+            valeur: note.valeur,
+            commentaire: note.commentaire ?? null,
+          },
+          create: {
+            valeur: note.valeur,
+            commentaire: note.commentaire ?? null,
             evaluateurId: sessionUser.id,
             evalueId,
             critereId: note.critereId,
             campagneId: campagne.id,
           },
         })
+      )
+    }
 
-        if (existing) {
-          await tx.note.update({
-            where: { id: existing.id },
-            data: {
-              valeur: note.valeur,
-              commentaire: note.commentaire ?? null,
-            },
-          })
-        } else {
-          await tx.note.create({
-            data: {
-              valeur: note.valeur,
-              commentaire: note.commentaire ?? null,
-              evaluateurId: sessionUser.id,
-              evalueId,
-              critereId: note.critereId,
-              campagneId: campagne.id,
-            },
-          })
-        }
-      }
-
-      await tx.affectation.update({
+    operations.push(
+      prisma.affectation.update({
         where: {
           evaluateurId_evalueId_campagneId: {
             evaluateurId: sessionUser.id,
@@ -106,7 +123,9 @@ export async function POST(request: NextRequest) {
         },
         data: { statut: 'BROUILLON' },
       })
-    })
+    )
+
+    await prisma.$transaction(operations)
 
     return NextResponse.json({ success: true })
   } catch (error) {

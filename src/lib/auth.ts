@@ -1,5 +1,5 @@
 import { cookies } from 'next/headers'
-import { createHash, randomBytes } from 'node:crypto'
+import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto'
 import prisma from '@/lib/prisma'
 
 export const SESSION_COOKIE_NAME = 'eval_session'
@@ -17,15 +17,59 @@ export function hashCode(code: string): string {
   return createHash('sha256').update(code).digest('hex')
 }
 
+/**
+ * Hachage sécurisé de mot de passe basé sur scrypt avec sel aléatoire unique (64 octets)
+ */
 export function hashPassword(password: string): string {
-  return createHash('sha256').update(`salt_dsm_${password}`).digest('hex')
+  const salt = randomBytes(16).toString('hex')
+  const derivedKey = scryptSync(password, salt, 64).toString('hex')
+  return `scrypt:${salt}:${derivedKey}`
 }
 
-export function verifyPassword(password: string, hash: string): boolean {
-  if (!hash) return false
-  // Support à la fois le mot de passe hashé et le mot de passe en clair (pour la compatibilité)
-  if (hash === password) return true
-  return hashPassword(password) === hash
+/**
+ * Vérifie un mot de passe contre son hash stocké en base.
+ * Gère le format scrypt sécurisé ainsi que la migration transparente
+ * des anciens hashs legacy (SHA256 ou texte brut initial).
+ */
+export function verifyPassword(
+  password: string,
+  storedHash: string
+): { isValid: boolean; needsRehash: boolean } {
+  if (!storedHash || !password) {
+    return { isValid: false, needsRehash: false }
+  }
+
+  // 1. Format moderne scrypt:salt:derivedKey
+  if (storedHash.startsWith('scrypt:')) {
+    const parts = storedHash.split(':')
+    if (parts.length === 3) {
+      const [, salt, expectedHash] = parts
+      try {
+        const derivedKey = scryptSync(password, salt, 64).toString('hex')
+        const bufA = Buffer.from(derivedKey, 'hex')
+        const bufB = Buffer.from(expectedHash, 'hex')
+        if (bufA.length === bufB.length && timingSafeEqual(bufA, bufB)) {
+          return { isValid: true, needsRehash: false }
+        }
+      } catch {
+        return { isValid: false, needsRehash: false }
+      }
+    }
+    return { isValid: false, needsRehash: false }
+  }
+
+  // 2. Format legacy SHA256 (compatibilité avec anciens comptes)
+  const legacySha256 = createHash('sha256').update(`salt_dsm_${password}`).digest('hex')
+  if (storedHash === legacySha256) {
+    return { isValid: true, needsRehash: true }
+  }
+
+  // 3. Format texte brut initial (import seed sans hash préalable)
+  if (storedHash === password) {
+    return { isValid: true, needsRehash: true }
+  }
+
+  return { isValid: false, needsRehash: false }
 }
 
 export function generateSessionToken(): string {
@@ -175,7 +219,9 @@ export async function destroySession() {
 export async function requireAdmin(): Promise<SessionUser | null> {
   const user = await getSessionUser()
   if (!user) return null
-  if (user.role !== 'ADMIN' && user.role !== 'MANAGER') return null
+  // Accès à l'espace d'administration et à toutes les données : ADMIN UNIQUEMENT.
+  // Les comptes MANAGER et UTILISATEUR n'ont accès qu'à la page de notation (/evaluer).
+  if (user.role !== 'ADMIN') return null
   return user
 }
 
