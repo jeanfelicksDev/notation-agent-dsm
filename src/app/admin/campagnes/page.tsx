@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { Plus, Calendar, CheckCircle, Clock, XCircle, ChevronRight, BarChart3, Users2, ClipboardList, Trophy } from 'lucide-react'
 import AdminHeader from '@/components/AdminHeader'
@@ -19,6 +19,7 @@ interface Campagne {
 export default function CampagnesPage() {
   const [campagnes, setCampagnes] = useState<Campagne[]>([])
   const [loading, setLoading] = useState(true)
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
 
   useEffect(() => {
     fetch('/api/admin/campagnes')
@@ -45,6 +46,21 @@ export default function CampagnesPage() {
       .finally(() => setLoading(false))
   }, [])
 
+  const sortedYears = useMemo(() => {
+    const years = Array.from(new Set(campagnes
+      .map(c => c.dateDebut ? new Date(c.dateDebut).getFullYear() : null)
+      .filter((y): y is number => y !== null && !isNaN(y))
+    ))
+    return years.length > 0 ? years.sort((a, b) => b - a) : [new Date().getFullYear()]
+  }, [campagnes])
+
+  // Met à jour l'année par défaut quand les campagnes sont chargées
+  useEffect(() => {
+    if (sortedYears.length > 0 && !sortedYears.includes(selectedYear)) {
+      setSelectedYear(sortedYears[0])
+    }
+  }, [sortedYears, selectedYear])
+
   const getStatutBadge = (statut: string) => {
     switch (statut) {
       case 'OUVERTE':
@@ -70,40 +86,28 @@ export default function CampagnesPage() {
     }
   }
 
-  const formatDate = (date: string) => new Date(date).toLocaleDateString('fr-FR', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric'
-  })
+  const formatDate = (date: string) => {
+    try {
+      return new Date(date).toLocaleDateString('fr-FR', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+      })
+    } catch {
+      return date
+    }
+  }
 
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="h-12 w-12 rounded-full border-4 border-brand-100 border-t-brand-500 animate-spin"></div>
+      <div className="flex-1 flex flex-col min-w-0">
+        <AdminHeader title="Gestion des Campagnes" />
+        <div className="flex-1 flex items-center justify-center p-12">
+          <div className="h-12 w-12 rounded-full border-4 border-brand-100 border-t-brand-500 animate-spin"></div>
+        </div>
       </div>
     )
   }
-
-  const years = Array.from(new Set(campagnes
-    .map(c => c.dateDebut ? new Date(c.dateDebut).getFullYear() : null)
-    .filter((y): y is number => y !== null && !isNaN(y))
-  ))
-  const sortedYears = years.length > 0 ? years.sort((a, b) => b - a) : [new Date().getFullYear()]
-  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
-
-  // Met à jour l'année par défaut quand les campagnes sont chargées
-  useEffect(() => {
-    if (campagnes.length > 0) {
-      const availableYears = Array.from(new Set(campagnes
-        .map(c => c.dateDebut ? new Date(c.dateDebut).getFullYear() : null)
-        .filter((y): y is number => y !== null && !isNaN(y))
-      ))
-      const sorted = availableYears.sort((a, b) => b - a)
-      if (sorted.length > 0 && !availableYears.includes(selectedYear)) {
-        setSelectedYear(sorted[0])
-      }
-    }
-  }, [campagnes, selectedYear])
 
   return (
     <div className="flex-1 flex flex-col min-w-0">
@@ -168,11 +172,11 @@ export default function CampagnesPage() {
                         </div>
                         <div className="flex items-center gap-2 text-slate-500">
                           <BarChart3 className="w-4 h-4 text-slate-400" />
-                          <span className="text-sm font-medium">{campagne._count.criteres} critères d'évaluation</span>
+                          <span className="text-sm font-medium">{campagne._count?.criteres ?? 0} critères d'évaluation</span>
                         </div>
                         <div className="flex items-center gap-2 text-slate-500">
                           <Users2 className="w-4 h-4 text-slate-400" />
-                          <span className="text-sm font-medium">{campagne._count.affectations} agents concernés</span>
+                          <span className="text-sm font-medium">{campagne._count?.affectations ?? 0} agents concernés</span>
                         </div>
                       </div>
                     </div>
