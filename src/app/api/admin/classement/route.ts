@@ -227,173 +227,36 @@ async function calculateScoresForCampagne(campagneId: string) {
   }
 }
 
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
+export interface RawAgentScore {
+  utilisateurId: string
+  matricule: string
+  nom: string
+  prenom: string
+  direction: string
+  departement: string
+  service: string
+  siteNom: string
+  scoreTotal: number
+  scoreCollegues: number
+  scoreManager: number
+  scoreClient: number
+  hasCollegues: boolean
+  hasManager: boolean
+  hasClient: boolean
+  rangGlobal: number
+  rangDirection: number
+  rangDepartement: number
+  rangService: number
+  isMajorGlobal: boolean
+  isMajorDirection: boolean
+  isMajorDepartement: boolean
+  isMajorService: boolean
+  totalInDirection: number
+  totalInDepartement: number
+  totalInService: number
+}
 
-async function getFullClassementData(targetCampagneId?: string) {
-  const toutesLesCampagnes = await prisma.campagne.findMany({
-    select: {
-      id: true,
-      libelle: true,
-      statut: true,
-      dateDebut: true,
-      dateFin: true,
-    },
-    orderBy: { createdAt: 'desc' },
-  })
-
-  let campagne = null
-  if (targetCampagneId) {
-    campagne = await prisma.campagne.findUnique({
-      where: { id: targetCampagneId },
-      include: {
-        scores: {
-          include: {
-            utilisateur: {
-              include: { site: true },
-            },
-          },
-          orderBy: { scoreTotal: 'desc' },
-        },
-      },
-    })
-  }
-
-  // Si pas de campagne cible : Priorité absolue à la campagne en cours (OUVERTE)
-  if (!campagne) {
-    campagne = await prisma.campagne.findFirst({
-      where: { statut: 'OUVERTE' },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        scores: {
-          include: {
-            utilisateur: {
-              include: { site: true },
-            },
-          },
-          orderBy: { scoreTotal: 'desc' },
-        },
-      },
-    })
-  }
-
-  // Si pas de campagne OUVERTE, prendre la plus récente (tous statuts confondus)
-  if (!campagne) {
-    campagne = await prisma.campagne.findFirst({
-      orderBy: { createdAt: 'desc' },
-      include: {
-        scores: {
-          include: {
-            utilisateur: {
-              include: { site: true },
-            },
-          },
-          orderBy: { scoreTotal: 'desc' },
-        },
-      },
-    })
-  }
-
-  if (!campagne) {
-    return {
-      campagne: null,
-      toutesLesCampagnes,
-      laureats: {
-        majorGlobal: null,
-        majorsDirection: [],
-        majorsDepartement: [],
-        majorsService: [],
-      },
-      groupesDirection: [],
-      groupesDepartement: [],
-      groupesService: [],
-      tousLesScores: [],
-    }
-  }
-
-  // Calculer/Mettre à jour les scores automatiquement
-  await calculateScoresForCampagne(campagne.id)
-
-  const updatedCampagne = await prisma.campagne.findUnique({
-    where: { id: campagne.id },
-    include: {
-      scores: {
-        include: {
-          utilisateur: {
-            include: { site: true },
-          },
-        },
-        orderBy: { scoreTotal: 'desc' },
-      },
-    },
-  })
-
-  if (updatedCampagne) {
-    campagne = updatedCampagne
-  }
-
-  // 1. Extraire et normaliser les données de tous les agents évalués
-  interface RawAgentScore {
-    utilisateurId: string
-    matricule: string
-    nom: string
-    prenom: string
-    direction: string
-    departement: string
-    service: string
-    siteNom: string
-    scoreTotal: number
-    scoreCollegues: number
-    scoreManager: number
-    scoreClient: number
-    rangGlobal: number
-    rangDirection: number
-    rangDepartement: number
-    rangService: number
-    isMajorGlobal: boolean
-    isMajorDirection: boolean
-    isMajorDepartement: boolean
-    isMajorService: boolean
-    totalInDirection: number
-    totalInDepartement: number
-    totalInService: number
-  }
-
-  const rawList: RawAgentScore[] = (campagne.scores || [])
-    .filter((s) => s.utilisateur && s.utilisateur.role !== 'MANAGER' && s.utilisateur.role !== 'EXTERNE' && s.utilisateur.role !== 'ADMIN')
-    .map((s) => {
-      const dir = (s.utilisateur.direction && s.utilisateur.direction.trim()) || (s.utilisateur.site?.nom && s.utilisateur.site.nom.trim()) || 'Direction DSM'
-      const dep = (s.utilisateur.departement && s.utilisateur.departement.trim()) || dir || 'Département DSM'
-      const srv = (s.utilisateur.service && s.utilisateur.service.trim()) || dep || 'Service DSM'
-      const site = (s.utilisateur.site?.nom && s.utilisateur.site.nom.trim()) || dep || 'Siège DSM'
-
-      return {
-        utilisateurId: s.utilisateurId,
-        matricule: s.utilisateur.matricule,
-        nom: s.utilisateur.nom,
-        prenom: s.utilisateur.prenom,
-        direction: dir,
-        departement: dep,
-        service: srv,
-        siteNom: site,
-        scoreTotal: Math.round(s.scoreTotal * 10) / 10,
-        scoreCollegues: Math.round(s.scoreCollegues * 10) / 10,
-        scoreManager: Math.round(s.scoreManager * 10) / 10,
-        scoreClient: Math.round(s.scoreClient * 10) / 10,
-        rangGlobal: 0,
-        rangDirection: 0,
-        rangDepartement: 0,
-        rangService: 0,
-        isMajorGlobal: false,
-        isMajorDirection: false,
-        isMajorDepartement: false,
-        isMajorService: false,
-        totalInDirection: 0,
-        totalInDepartement: 0,
-        totalInService: 0,
-      }
-    })
-
+function computeRankings(rawList: RawAgentScore[]) {
   // 2. Calcul du Rang Global (sur toute la campagne)
   rawList.sort((a, b) => b.scoreTotal - a.scoreTotal || b.scoreManager - a.scoreManager || b.scoreCollegues - a.scoreCollegues)
   rawList.forEach((agent, idx) => {
@@ -529,7 +392,7 @@ async function getFullClassementData(targetCampagneId?: string) {
       major: g.major,
       totalAgents: g.scores.length,
     }))
-    .filter((m) => m.major !== null)
+    .filter((m): m is { directionNom: string; major: RawAgentScore; totalAgents: number } => m.major !== null)
 
   const majorsDepartement = groupesDepartement
     .map((g) => ({
@@ -538,7 +401,7 @@ async function getFullClassementData(targetCampagneId?: string) {
       major: g.major,
       totalAgents: g.scores.length,
     }))
-    .filter((m) => m.major !== null)
+    .filter((m): m is { departementNom: string; directionNom: string; major: RawAgentScore; totalAgents: number } => m.major !== null)
 
   const majorsService = groupesService
     .map((g) => ({
@@ -548,7 +411,281 @@ async function getFullClassementData(targetCampagneId?: string) {
       major: g.major,
       totalAgents: g.scores.length,
     }))
-    .filter((m) => m.major !== null)
+    .filter((m): m is { serviceNom: string; departementNom: string; directionNom: string; major: RawAgentScore; totalAgents: number } => m.major !== null)
+
+  return {
+    laureats: {
+      majorGlobal,
+      majorsDirection,
+      majorsDepartement,
+      majorsService,
+    },
+    groupesDirection,
+    groupesDepartement,
+    groupesService,
+  }
+}
+
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
+async function getFullClassementData(targetCampagneId?: string) {
+  const toutesLesCampagnes = await prisma.campagne.findMany({
+    select: {
+      id: true,
+      libelle: true,
+      statut: true,
+      dateDebut: true,
+      dateFin: true,
+    },
+    orderBy: { createdAt: 'desc' },
+  })
+
+  const years = new Set(toutesLesCampagnes.map((c) => new Date(c.dateDebut).getFullYear()))
+  const sortedYears = Array.from(years).sort((a, b) => b - a)
+  const annualCampagnes = sortedYears.map(year => ({
+    id: `ANNUEL_${year}`,
+    libelle: `🏆 Palmarès Annuel ${year} (Moyenne)`,
+    statut: 'TERMINÉE' as any,
+    dateDebut: new Date(`${year}-01-01`),
+    dateFin: new Date(`${year}-12-31`),
+  }))
+
+  const allCampagnesWithAnnual = [...annualCampagnes, ...toutesLesCampagnes]
+
+  const isAnnual = targetCampagneId?.startsWith('ANNUEL_')
+  const annualYear = isAnnual && targetCampagneId ? parseInt(targetCampagneId.split('_')[1]) : null
+
+  if (isAnnual && annualYear) {
+    const campagnesOfYear = await prisma.campagne.findMany({
+      where: {
+        dateDebut: {
+          gte: new Date(`${annualYear}-01-01`),
+          lte: new Date(`${annualYear}-12-31T23:59:59.999Z`)
+        }
+      },
+      select: { id: true }
+    })
+
+    const scoresFinales = await prisma.scoreFinal.findMany({
+      where: { campagneId: { in: campagnesOfYear.map(c => c.id) } },
+      include: {
+        utilisateur: {
+          include: { site: true }
+        }
+      }
+    })
+
+    const userMap = new Map<string, { scores: typeof scoresFinales, utilisateur: typeof scoresFinales[0]['utilisateur'] }>()
+    for (const sf of scoresFinales) {
+      if (!userMap.has(sf.utilisateurId)) {
+        userMap.set(sf.utilisateurId, { scores: [], utilisateur: sf.utilisateur })
+      }
+      userMap.get(sf.utilisateurId)!.scores.push(sf)
+    }
+
+    const rawList: RawAgentScore[] = []
+    for (const [userId, data] of userMap.entries()) {
+      const s = data.utilisateur
+      if (!s) continue
+      if (s.role === 'MANAGER' || s.role === 'EXTERNE' || s.role === 'ADMIN') continue
+
+      const count = data.scores.length
+      const sumTotal = data.scores.reduce((acc, curr) => acc + curr.scoreTotal, 0)
+      const sumCollegues = data.scores.reduce((acc, curr) => acc + curr.scoreCollegues, 0)
+      const sumManager = data.scores.reduce((acc, curr) => acc + curr.scoreManager, 0)
+      const sumClient = data.scores.reduce((acc, curr) => acc + curr.scoreClient, 0)
+
+      const dir = (s.direction && s.direction.trim()) || (s.site?.nom && s.site.nom.trim()) || 'Direction DSM'
+      const dep = (s.departement && s.departement.trim()) || dir || 'Département DSM'
+      const srv = (s.service && s.service.trim()) || dep || 'Service DSM'
+      const site = (s.site?.nom && s.site.nom.trim()) || dep || 'Siège DSM'
+
+      rawList.push({
+        utilisateurId: userId,
+        matricule: s.matricule,
+        nom: s.nom,
+        prenom: s.prenom,
+        direction: dir,
+        departement: dep,
+        service: srv,
+        siteNom: site,
+        scoreTotal: Math.round((sumTotal / count) * 10) / 10,
+        scoreCollegues: Math.round((sumCollegues / count) * 10) / 10,
+        scoreManager: Math.round((sumManager / count) * 10) / 10,
+        scoreClient: Math.round((sumClient / count) * 10) / 10,
+        hasCollegues: sumCollegues > 0,
+        hasManager: sumManager > 0,
+        hasClient: sumClient > 0,
+        rangGlobal: 0,
+        rangDirection: 0,
+        rangDepartement: 0,
+        rangService: 0,
+        isMajorGlobal: false,
+        isMajorDirection: false,
+        isMajorDepartement: false,
+        isMajorService: false,
+        totalInDirection: 0,
+        totalInDepartement: 0,
+        totalInService: 0,
+      })
+    }
+
+    const rankings = computeRankings(rawList)
+
+    return {
+      campagne: {
+        id: `ANNUEL_${annualYear}`,
+        libelle: `🏆 Palmarès Annuel ${annualYear}`,
+        statut: 'TERMINÉE',
+        poidsCollegues: 45,
+        poidsManager: 55,
+        prixGlobal: 'Super Lauréat Annuel (1 500 000 FCFA + Séjour)',
+        prixDirection: 'Super Lauréat Annuel (1 500 000 FCFA + Séjour)',
+        prixDepartement: 'Certificat de Mérite Annuel + Prime',
+        prixService: "Diplôme d'Honneur Annuel + Prime",
+      },
+      toutesLesCampagnes: allCampagnesWithAnnual as any,
+      laureats: rankings.laureats,
+      groupesDirection: rankings.groupesDirection,
+      groupesDepartement: rankings.groupesDepartement,
+      groupesService: rankings.groupesService,
+      tousLesScores: rawList,
+    }
+  }
+
+  let campagne = null
+  if (targetCampagneId) {
+    campagne = await prisma.campagne.findUnique({
+      where: { id: targetCampagneId },
+      include: {
+        scores: {
+          include: {
+            utilisateur: {
+              include: { site: true },
+            },
+          },
+          orderBy: { scoreTotal: 'desc' },
+        },
+      },
+    })
+  }
+
+  // Si pas de campagne cible : Priorité absolue à la campagne en cours (OUVERTE)
+  if (!campagne) {
+    campagne = await prisma.campagne.findFirst({
+      where: { statut: 'OUVERTE' },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        scores: {
+          include: {
+            utilisateur: {
+              include: { site: true },
+            },
+          },
+          orderBy: { scoreTotal: 'desc' },
+        },
+      },
+    })
+  }
+
+  // Si pas de campagne OUVERTE, prendre la plus récente (tous statuts confondus)
+  if (!campagne) {
+    campagne = await prisma.campagne.findFirst({
+      orderBy: { createdAt: 'desc' },
+      include: {
+        scores: {
+          include: {
+            utilisateur: {
+              include: { site: true },
+            },
+          },
+          orderBy: { scoreTotal: 'desc' },
+        },
+      },
+    })
+  }
+
+  if (!campagne) {
+    return {
+      campagne: null,
+      toutesLesCampagnes: allCampagnesWithAnnual as any,
+      laureats: {
+        majorGlobal: null,
+        majorsDirection: [],
+        majorsDepartement: [],
+        majorsService: [],
+      },
+      groupesDirection: [],
+      groupesDepartement: [],
+      groupesService: [],
+      tousLesScores: [],
+    }
+  }
+
+  // Calculer/Mettre à jour les scores automatiquement
+  await calculateScoresForCampagne(campagne.id)
+
+  const updatedCampagne = await prisma.campagne.findUnique({
+    where: { id: campagne.id },
+    include: {
+      scores: {
+        include: {
+          utilisateur: {
+            include: { site: true },
+          },
+        },
+        orderBy: { scoreTotal: 'desc' },
+      },
+    },
+  })
+
+  if (updatedCampagne) {
+    campagne = updatedCampagne
+  }
+
+  // 1. Extraire et normaliser les données de tous les agents évalués
+
+
+  const rawList: RawAgentScore[] = (campagne.scores || [])
+    .filter((s) => s.utilisateur && s.utilisateur.role !== 'MANAGER' && s.utilisateur.role !== 'EXTERNE' && s.utilisateur.role !== 'ADMIN')
+    .map((s) => {
+      const dir = (s.utilisateur.direction && s.utilisateur.direction.trim()) || (s.utilisateur.site?.nom && s.utilisateur.site.nom.trim()) || 'Direction DSM'
+      const dep = (s.utilisateur.departement && s.utilisateur.departement.trim()) || dir || 'Département DSM'
+      const srv = (s.utilisateur.service && s.utilisateur.service.trim()) || dep || 'Service DSM'
+      const site = (s.utilisateur.site?.nom && s.utilisateur.site.nom.trim()) || dep || 'Siège DSM'
+
+      return {
+        utilisateurId: s.utilisateurId,
+        matricule: s.utilisateur.matricule,
+        nom: s.utilisateur.nom,
+        prenom: s.utilisateur.prenom,
+        direction: dir,
+        departement: dep,
+        service: srv,
+        siteNom: site,
+        scoreTotal: Math.round(s.scoreTotal * 10) / 10,
+        scoreCollegues: Math.round(s.scoreCollegues * 10) / 10,
+        scoreManager: Math.round(s.scoreManager * 10) / 10,
+        scoreClient: Math.round(s.scoreClient * 10) / 10,
+        hasCollegues: s.scoreCollegues > 0,
+        hasManager: s.scoreManager > 0,
+        hasClient: s.scoreClient > 0,
+        rangGlobal: 0,
+        rangDirection: 0,
+        rangDepartement: 0,
+        rangService: 0,
+        isMajorGlobal: false,
+        isMajorDirection: false,
+        isMajorDepartement: false,
+        isMajorService: false,
+        totalInDirection: 0,
+        totalInDepartement: 0,
+        totalInService: 0,
+      }
+    })
+
+  const rankings = computeRankings(rawList)
 
   return {
     campagne: {
@@ -562,16 +699,11 @@ async function getFullClassementData(targetCampagneId?: string) {
       prixDepartement: campagne.prixDepartement || 'Certificat de Mérite + Prime (1 000 000 FCFA)',
       prixService: campagne.prixService || "Diplôme d'Honneur + Prime (500 000 FCFA)",
     },
-    laureats: {
-      majorGlobal,
-      majorsDirection,
-      majorsDepartement,
-      majorsService,
-    },
-    toutesLesCampagnes,
-    groupesDirection,
-    groupesDepartement,
-    groupesService,
+    laureats: rankings.laureats,
+    toutesLesCampagnes: allCampagnesWithAnnual as any,
+    groupesDirection: rankings.groupesDirection,
+    groupesDepartement: rankings.groupesDepartement,
+    groupesService: rankings.groupesService,
     tousLesScores: rawList,
   }
 }

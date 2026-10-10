@@ -551,50 +551,7 @@ export default function Home() {
               )}
             </button>
 
-            {/* Toggle link */}
-            <div className="pt-2 text-center text-sm font-medium text-slate-500">
-               {mode === 'register' ? (
-                <>
-                  Déjà inscrit ?{' '}
-                  <button
-                    type="button"
-                    onClick={() => switchMode('login')}
-                    className="text-[#075fac] font-bold hover:underline cursor-pointer ml-1"
-                  >
-                    Se connecter
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => switchMode('register')}
-                    className="text-[#075fac] font-bold hover:underline cursor-pointer ml-1"
-                  >
-                    Je n&apos;ai pas encore de compte
-                  </button>
-                </>
-              )}
-            </div>
           </form>
-
-          {/* Divider & Trust Badges */}
-          <div className="border-t border-slate-100 pt-6 mt-6">
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="flex flex-col items-center gap-1 text-[11px] text-slate-500 font-medium">
-                <ShieldCheck size={16} className="text-slate-400" />
-                <span className="leading-tight">Connexion sécurisée</span>
-              </div>
-              <div className="flex flex-col items-center gap-1 text-[11px] text-slate-500 font-medium border-x border-slate-100 px-1">
-                <Award size={16} className="text-slate-400" />
-                <span className="leading-tight">Données chiffrées</span>
-              </div>
-              <div className="flex flex-col items-center gap-1 text-[11px] text-slate-500 font-medium">
-                <CheckCircle2 size={16} className="text-slate-400" />
-                <span className="leading-tight">Anonymisation garantie</span>
-              </div>
-            </div>
-          </div>
 
         </div>
       </div>

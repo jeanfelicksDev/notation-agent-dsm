@@ -31,14 +31,24 @@ export async function POST(
 
   try {
     const { id } = await params
-    const { libelle, description, noteMaximale, typeEvaluateur } = await request.json()
+    const { libelle, description, noteMaximale, typeEvaluateur, typeEvaluateurs } = await request.json()
+
+    // Compatibility: if typeEvaluateurs is provided (checkboxes), use it.
+    // If not, fallback to legacy typeEvaluateur or ['COLLEGUE'].
+    const finalTypeEvaluateurs = typeEvaluateurs && typeEvaluateurs.length > 0 
+      ? typeEvaluateurs 
+      : (typeEvaluateur === 'TOUS' ? ['MANAGER', 'COLLEGUE', 'CLIENT', 'CLIENT_INTERNE'] : (typeEvaluateur ? [typeEvaluateur] : ['COLLEGUE']));
+    
+    // Pour typeEvaluateur classique on garde le premier par défaut
+    const legacyType = finalTypeEvaluateurs[0] || 'COLLEGUE';
 
     const critere = await prisma.critere.create({
       data: {
         libelle,
         description,
         noteMaximale: noteMaximale || 5,
-        typeEvaluateur: typeEvaluateur || 'COLLEGUE',
+        typeEvaluateur: legacyType,
+        typeEvaluateurs: finalTypeEvaluateurs,
         campagneId: id
       }
     })

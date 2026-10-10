@@ -159,15 +159,15 @@ export function getAppreciationInfo(scoreTotalPercent: number) {
     }
   } else if (scoreTotalPercent >= 50) {
     return {
-      appreciation: 'Insuffisant',
+      appreciation: 'À améliorer',
       interpretation: "Résultats en deçà des attentes, plan de progrès requis",
       colorBadge: 'bg-orange-100 text-orange-800 border-orange-200',
       badgeClass: 'bg-orange-500 text-white',
     }
   } else {
     return {
-      appreciation: 'Critique',
-      interpretation: 'Performance non conforme, accompagnement renforcé',
+      appreciation: 'Insuffisant',
+      interpretation: 'Performance insuffisante, accompagnement renforcé requis',
       colorBadge: 'bg-red-100 text-red-800 border-red-200',
       badgeClass: 'bg-red-500 text-white',
     }

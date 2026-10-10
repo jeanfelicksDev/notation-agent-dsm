@@ -35,7 +35,12 @@ export async function GET(
       id: true,
       libelle: true,
       criteres: {
-        where: { typeEvaluateur: 'TOUS' },
+        where: {
+          OR: [
+            { typeEvaluateur: { in: ['CLIENT', 'TOUS'] } },
+            { typeEvaluateurs: { hasSome: ['CLIENT', 'TOUS'] } }
+          ]
+        },
         select: { id: true, libelle: true, description: true, noteMaximale: true },
       },
     },

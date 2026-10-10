@@ -20,6 +20,7 @@ interface Critere {
   description: string | null
   noteMaximale: number
   typeEvaluateur: string
+  typeEvaluateurs?: string[]
 }
 
 interface User {
@@ -59,13 +60,14 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
   const [showCritereForm, setShowCritereForm] = useState(false)
   const [editingCritere, setEditingCritere] = useState<string | null>(null)
   const [critereSearch, setCritereSearch] = useState('')
-  const [critereFilter, setCritereFilter] = useState<'ALL' | 'TOUS' | 'COLLEGUE' | 'MANAGER' | 'CLIENT'>('ALL')
+  const [critereFilter, setCritereFilter] = useState<'ALL' | 'TOUS' | 'COLLEGUE' | 'MANAGER' | 'CLIENT' | 'CLIENT_INTERNE'>('ALL')
   const [seedingCriteres, setSeedingCriteres] = useState(false)
   const [critereForm, setCritereForm] = useState({
     libelle: '',
     description: '',
     noteMaximale: 5,
-    typeEvaluateur: 'COLLEGUE'
+    typeEvaluateur: 'COLLEGUE',
+    typeEvaluateurs: ['COLLEGUE'] as string[]
   })
 
   const [allUsers, setAllUsers] = useState<User[]>([])
@@ -125,10 +127,10 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
             poidsCollegues: data.poidsCollegues ?? 45,
             poidsManager: data.poidsManager ?? 55,
             statut: data.statut || 'OUVERTE',
-            prixGlobal: data.prixGlobal ?? 'Super Lauréat DSM TAMIS (1 500 000 FCFA + Séjour)',
-            prixDirection: data.prixDirection ?? "Trophée d'Excellence + Dotation Spéciale",
-            prixDepartement: data.prixDepartement ?? 'Certificat de Mérite + Prime (1 000 000 FCFA)',
-            prixService: data.prixService ?? "Diplôme d'Honneur + Prime (500 000 FCFA)"
+            prixGlobal: data.prixGlobal ?? 'Dotation Spéciale + Prime (250 000 FCFA)',
+            prixDirection: data.prixDirection ?? "Dotation Spéciale + Prime (250 000 FCFA)",
+            prixDepartement: data.prixDepartement ?? "Tableau d'honneur + Prime (100 000 FCFA)",
+            prixService: data.prixService ?? "Tableau d'honneur"
           })
         }
       })
@@ -263,7 +265,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
   }
 
   const resetCritereForm = () => {
-    setCritereForm({ libelle: '', description: '', noteMaximale: 5, typeEvaluateur: 'COLLEGUE' })
+    setCritereForm({ libelle: '', description: '', noteMaximale: 5, typeEvaluateur: 'COLLEGUE', typeEvaluateurs: ['COLLEGUE'] })
     setShowCritereForm(false)
     setEditingCritere(null)
   }
@@ -301,11 +303,20 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
   }
 
   const startEditCritere = (critere: Critere) => {
+    let initialTypeEvaluateurs = critere.typeEvaluateurs || [];
+    if (initialTypeEvaluateurs.length === 0 && critere.typeEvaluateur) {
+      if (critere.typeEvaluateur === 'TOUS') {
+        initialTypeEvaluateurs = ['MANAGER', 'COLLEGUE', 'CLIENT', 'CLIENT_INTERNE'];
+      } else {
+        initialTypeEvaluateurs = [critere.typeEvaluateur];
+      }
+    }
     setCritereForm({
       libelle: critere.libelle,
       description: critere.description || '',
       noteMaximale: critere.noteMaximale,
-      typeEvaluateur: critere.typeEvaluateur
+      typeEvaluateur: critere.typeEvaluateur,
+      typeEvaluateurs: initialTypeEvaluateurs
     })
     setEditingCritere(critere.id)
     setShowCritereForm(true)
@@ -323,6 +334,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
     COLLEGUE: 'Collègues',
     MANAGER: 'Managers',
     CLIENT: 'Clients externes (QR Code)',
+    CLIENT_INTERNE: 'Clients internes',
     TOUS: 'Tous'
   }
 
@@ -343,7 +355,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                 onClick={handleDelete}
                 className="flex items-center gap-2 text-red-500 hover:text-red-600 hover:bg-red-50 px-4 py-2 rounded-xl transition-all font-bold text-sm"
               >
-                <Trash2 className="w-5 h-5" /> Supprimer
+                <Trash2 className="w-5 h-5" /> Supprimer cette Campagne
               </button>
             </div>
 
@@ -647,8 +659,8 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                           </button>
                         </div>
                         
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <div className="md:col-span-2 space-y-2">
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+                          <div className="md:col-span-9 xl:col-span-10 space-y-2">
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Libellé du critère</label>
                             <input
                               type="text"
@@ -660,7 +672,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                             />
                           </div>
                           
-                          <div className="space-y-2">
+                          <div className="md:col-span-3 xl:col-span-2 space-y-2">
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Note maximale</label>
                             <input
                               type="number"
@@ -672,21 +684,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                             />
                           </div>
                           
-                          <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Évaluateur autorisé</label>
-                            <select
-                              className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-brand-100 focus:border-brand-500 outline-none font-bold"
-                              value={critereForm.typeEvaluateur}
-                              onChange={e => setCritereForm({ ...critereForm, typeEvaluateur: e.target.value })}
-                            >
-                              <option value="COLLEGUE">Uniquement Collègues</option>
-                              <option value="MANAGER">Uniquement Manager</option>
-                              <option value="CLIENT">Clients externes (QR Code)</option>
-                              <option value="TOUS">Tous les évaluateurs</option>
-                            </select>
-                          </div>
-                          
-                          <div className="md:col-span-2 space-y-2">
+                          <div className="md:col-span-12 space-y-2">
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Description détaillée</label>
                             <textarea
                               rows={3}
@@ -695,6 +693,36 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                               onChange={e => setCritereForm({ ...critereForm, description: e.target.value })}
                               placeholder="Décrivez ce que ce critère évalue précisément..."
                             />
+                          </div>
+                          
+                          <div className="md:col-span-12 space-y-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Évaluateurs autorisés</label>
+                            <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+                              {[
+                                { id: 'MANAGER', label: 'Managers' },
+                                { id: 'COLLEGUE', label: 'Collègues' },
+                                { id: 'CLIENT_INTERNE', label: 'Clients internes' },
+                                { id: 'CLIENT', label: 'Clients externes (QR)' }
+                              ].map(role => (
+                                <label key={role.id} className="flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition-colors">
+                                  <input 
+                                    type="checkbox"
+                                    className="w-4 h-4 text-brand-600 rounded focus:ring-brand-500"
+                                    checked={critereForm.typeEvaluateurs.includes(role.id)}
+                                    onChange={(e) => {
+                                      const checked = e.target.checked;
+                                      setCritereForm(prev => {
+                                        const newArr = checked 
+                                          ? [...prev.typeEvaluateurs, role.id]
+                                          : prev.typeEvaluateurs.filter(r => r !== role.id);
+                                        return { ...prev, typeEvaluateurs: newArr };
+                                      });
+                                    }}
+                                  />
+                                  <span className="text-sm font-bold text-slate-700">{role.label}</span>
+                                </label>
+                              ))}
+                            </div>
                           </div>
                         </div>
                         
@@ -780,6 +808,16 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                         }`}
                       >
                         Clients QR ({criteres.filter(c => c.typeEvaluateur === 'CLIENT').length})
+                      </button>
+                      <button
+                        onClick={() => setCritereFilter('CLIENT_INTERNE')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                          critereFilter === 'CLIENT_INTERNE'
+                            ? 'bg-pink-600 text-white shadow-sm'
+                            : 'bg-pink-50 text-pink-700 hover:bg-pink-100'
+                        }`}
+                      >
+                        Clients internes ({criteres.filter(c => c.typeEvaluateur === 'CLIENT_INTERNE').length})
                       </button>
                     </div>
                   </div>
@@ -881,22 +919,6 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                       <p className="text-slate-500 text-sm font-medium">Définissez les 3 paliers officiels de distinctions : Direction (Super Lauréat), Département et Service.</p>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const standardDirectionPrix = "Super Lauréat Direction DSM (1 500 000 FCFA + Séjour familial & Gala AGL)"
-                        setFormData(prev => ({
-                          ...prev,
-                          prixGlobal: standardDirectionPrix,
-                          prixDirection: standardDirectionPrix,
-                          prixDepartement: "Certificat de Mérite + Prime (1 000 000 FCFA)",
-                          prixService: "Diplôme d'Honneur + Prime (500 000 FCFA)"
-                        }))
-                      }}
-                      className="text-xs font-bold text-brand-600 hover:text-brand-700 bg-brand-50 hover:bg-brand-100 px-4 py-2.5 rounded-xl transition-all self-start sm:self-auto border border-brand-100"
-                    >
-                      Rétablir les dotations DSM standards
-                    </button>
                   </div>
 
                   {/* Summary preview cards (3 Paliers Officiels) */}
@@ -955,7 +977,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                               <h4 className="font-black text-slate-900 text-base">Super Lauréat de la Direction (Meilleur Agent Direction DSM)</h4>
                               <span className="text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full border border-amber-200">Palier 1</span>
                             </div>
-                            <p className="text-xs text-slate-500">Major de la Direction • Dotation de référence DSM (1 500 000 FCFA + Séjour familial & Gala AGL)</p>
+                            <p className="text-xs text-slate-500">Major de la Direction • Dotation de référence DSM (250 000 FCFA)</p>
                           </div>
                         </div>
                         <div className="space-y-1.5 pt-2">
@@ -963,7 +985,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                           <input
                             type="text"
                             className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-amber-100 focus:border-amber-500 focus:bg-white transition-all outline-none font-bold text-slate-800"
-                            placeholder="Ex: Super Lauréat Direction DSM (1 500 000 FCFA + Séjour familial & Gala AGL)"
+                            placeholder="Ex: Dotation Spéciale + Prime (250 000 FCFA)"
                             value={formData.prixDirection || formData.prixGlobal}
                             onChange={e => {
                               const val = e.target.value
@@ -985,7 +1007,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                                 <h4 className="font-bold text-slate-900 text-base">Meilleur Agent par Département</h4>
                                 <span className="text-[10px] font-black uppercase tracking-wider bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full">Palier 2</span>
                               </div>
-                              <p className="text-xs text-slate-500">Major de chaque Département (1 000 000 FCFA)</p>
+                              <p className="text-xs text-slate-500">Major de chaque Département (100 000 FCFA)</p>
                             </div>
                           </div>
                           <div className="space-y-1.5 pt-2">
@@ -993,7 +1015,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                             <input
                               type="text"
                               className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-purple-100 focus:border-purple-500 focus:bg-white transition-all outline-none font-bold text-slate-800"
-                              placeholder="Ex: Certificat de Mérite + Prime (1 000 000 FCFA)"
+                              placeholder="Ex: Tableau d'honneur + Prime (100 000 FCFA)"
                               value={formData.prixDepartement}
                               onChange={e => setFormData({ ...formData, prixDepartement: e.target.value })}
                             />
@@ -1011,7 +1033,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                                 <h4 className="font-bold text-slate-900 text-base">Meilleur Agent de Service / Cellule</h4>
                                 <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">Palier 3</span>
                               </div>
-                              <p className="text-xs text-slate-500">Major de chaque cellule de travail (500 000 FCFA)</p>
+                              <p className="text-xs text-slate-500">Major de chaque cellule de travail</p>
                             </div>
                           </div>
                           <div className="space-y-1.5 pt-2">
@@ -1019,7 +1041,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                             <input
                               type="text"
                               className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 focus:bg-white transition-all outline-none font-bold text-slate-800"
-                              placeholder="Ex: Diplôme d'Honneur + Prime (500 000 FCFA)"
+                              placeholder="Ex: Tableau d'honneur"
                               value={formData.prixService}
                               onChange={e => setFormData({ ...formData, prixService: e.target.value })}
                             />
@@ -2006,7 +2028,7 @@ function ClassementCampagneView({
         Service: mg.service,
         Département: mg.departement,
         'Score Total (%)': mg.scoreTotal,
-        Dotation: formData.prixDirection || formData.prixGlobal || '1 500 000 FCFA + Séjour familial & Gala AGL',
+        Dotation: formData.prixDirection || formData.prixGlobal || 'Dotation Spéciale + Prime (250 000 FCFA)',
       })
     }
     data.laureats?.majorsDepartement?.forEach((md: any) => {
@@ -2019,7 +2041,7 @@ function ClassementCampagneView({
         Service: md.major.service,
         Département: md.departementNom,
         'Score Total (%)': md.major.scoreTotal,
-        Dotation: formData.prixDepartement || '1 000 000 FCFA',
+        Dotation: formData.prixDepartement || "Tableau d'honneur + Prime (100 000 FCFA)",
       })
     })
     data.laureats?.majorsService?.forEach((ms: any) => {
@@ -2032,7 +2054,7 @@ function ClassementCampagneView({
         Service: ms.serviceNom,
         Département: ms.departementNom,
         'Score Total (%)': ms.major.scoreTotal,
-        Dotation: formData.prixService || '500 000 FCFA',
+        Dotation: formData.prixService || "Tableau d'honneur",
       })
     })
     const wsPalmares = XLSX.utils.json_to_sheet(palmaresData)
@@ -2284,7 +2306,7 @@ function ClassementCampagneView({
                       <div className="text-left">
                         <span className="text-[10px] font-black uppercase tracking-wider text-[#002B49] block">Dotation Officielle</span>
                         <span className="text-xs font-black text-amber-900">
-                          {formData.prixDirection || formData.prixGlobal || '1 500 000 FCFA + Séjour'}
+                          {formData.prixDirection || formData.prixGlobal || 'Dotation Spéciale + Prime (250 000 FCFA)'}
                         </span>
                       </div>
                     </div>
@@ -2299,7 +2321,7 @@ function ClassementCampagneView({
                     <Medal className="w-5 h-5 text-purple-600" />
                     <h4 className="font-black text-slate-900 text-base">Meilleurs Agents par Département</h4>
                     <span className="text-[10px] font-black bg-purple-100 text-purple-800 px-2.5 py-0.5 rounded-full">
-                      Palier 2 • {formData.prixDepartement || '1 000 000 FCFA'}
+                      Palier 2 • {formData.prixDepartement || "Tableau d'honneur + Prime (100 000 FCFA)"}
                     </span>
                   </div>
                   <span className="text-xs font-bold text-slate-400">{majorsDepartement.length} lauréats</span>
@@ -2363,7 +2385,7 @@ function ClassementCampagneView({
                       </div>
                       <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] font-bold text-slate-400">
                         <span>Sur {ms.totalAgents} agents</span>
-                        <span className="text-emerald-700">500 000 FCFA</span>
+                        <span className="text-emerald-700 font-bold truncate max-w-[120px]" title={formData.prixService || "Tableau d'honneur"}>{formData.prixService || "Tableau d'honneur"}</span>
                       </div>
                     </div>
                   ))}

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import prisma, { Prisma } from '@/lib/prisma'
+import prisma from '@/lib/prisma'
 import { getSessionUser } from '@/lib/auth'
 
 type IncomingNote = {
@@ -71,71 +71,54 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const existingNotes = await prisma.note.findMany({
-      where: {
-        evaluateurId: sessionUser.id,
-        campagneId: campagne.id,
-        evalueId: { in: evalueIds },
-      },
-    })
-    const existingMap = new Map(
-      existingNotes.map((n) => [`${n.evalueId}_${n.critereId}`, n])
-    )
+    await prisma.$transaction(
+      async (tx) => {
+        for (const note of notes) {
+          if (typeof note?.critereId !== 'string' || typeof note?.evalueId !== 'string') {
+            continue
+          }
+          if (typeof note.valeur !== 'number' || note.valeur <= 0) continue
 
-    const operations: Prisma.PrismaPromise<unknown>[] = []
-
-    for (const note of notes) {
-      if (typeof note?.critereId !== 'string' || typeof note?.evalueId !== 'string') {
-        continue
-      }
-      if (typeof note.valeur !== 'number' || note.valeur <= 0) continue
-
-      const key = `${note.evalueId}_${note.critereId}`
-      const existing = existingMap.get(key)
-
-      // Upsert : idempotent en cas de double-soumission ou condition de course
-      operations.push(
-        prisma.note.upsert({
-          where: {
-            evaluateurId_evalueId_critereId_campagneId: {
+          // Upsert : idempotent en cas de double-soumission ou condition de course
+          await tx.note.upsert({
+            where: {
+              evaluateurId_evalueId_critereId_campagneId: {
+                evaluateurId: sessionUser.id,
+                evalueId: note.evalueId,
+                critereId: note.critereId,
+                campagneId: campagne.id,
+              },
+            },
+            update: {
+              valeur: note.valeur,
+              commentaire: note.commentaire ?? null,
+            },
+            create: {
+              valeur: note.valeur,
+              commentaire: note.commentaire ?? null,
               evaluateurId: sessionUser.id,
               evalueId: note.evalueId,
               critereId: note.critereId,
               campagneId: campagne.id,
             },
-          },
-          update: {
-            valeur: note.valeur,
-            commentaire: note.commentaire ?? null,
-          },
-          create: {
-            valeur: note.valeur,
-            commentaire: note.commentaire ?? null,
-            evaluateurId: sessionUser.id,
-            evalueId: note.evalueId,
-            critereId: note.critereId,
-            campagneId: campagne.id,
-          },
-        })
-      )
-    }
+          })
+        }
 
-    for (const evalueId of evalueIds) {
-      operations.push(
-        prisma.affectation.update({
-          where: {
-            evaluateurId_evalueId_campagneId: {
-              evaluateurId: sessionUser.id,
-              evalueId,
-              campagneId: campagne.id,
+        for (const evalueId of evalueIds) {
+          await tx.affectation.update({
+            where: {
+              evaluateurId_evalueId_campagneId: {
+                evaluateurId: sessionUser.id,
+                evalueId,
+                campagneId: campagne.id,
+              },
             },
-          },
-          data: { statut: 'TERMINEE' },
-        })
-      )
-    }
-
-    await prisma.$transaction(operations)
+            data: { statut: 'TERMINEE' },
+          })
+        }
+      },
+      { timeout: 15000 } // 15s pour gérer les soumissions volumineuses
+    )
 
     return NextResponse.json({ success: true })
   } catch (error) {

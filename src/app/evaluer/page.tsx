@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   User,
+  Loader2,
   ChevronRight,
   CheckCircle,
   CheckCircle2,
@@ -27,6 +28,7 @@ interface Critere {
   description: string | null
   noteMaximale: number
   typeEvaluateur: string
+  typeEvaluateurs?: string[]
 }
 
 interface Affectation {
@@ -75,6 +77,21 @@ export default function EvaluerPage() {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [currentCritereIndex, setCurrentCritereIndex] = useState(0)
   const [notes, setNotes] = useState<NotesMap>({})
+
+  const getActiveCriteresForEvalue = (aff: Affectation | undefined) => {
+    if (!aff || !evaluateur) return []
+    return criteres.filter(c => {
+      const types = c.typeEvaluateurs && c.typeEvaluateurs.length > 0 ? c.typeEvaluateurs : [c.typeEvaluateur]
+      if (types.includes('TOUS')) return true
+      if (isManager && types.includes('MANAGER')) return true
+      if (!isManager) {
+        if (types.includes('COLLEGUE') && aff.evalue.service === evaluateur.service) return true
+        if (types.includes('CLIENT_INTERNE') && aff.evalue.service !== evaluateur.service) return true
+      }
+      return false
+    })
+  }
+
   const [transitionToast, setTransitionToast] = useState<{
     prevNom: string
     nextNom?: string
@@ -189,9 +206,10 @@ export default function EvaluerPage() {
     const target = affectations[targetIdx]
 
     if (current && target) {
+      const currentCriteres = getActiveCriteresForEvalue(current)
       const isCompleted =
-        criteres.length > 0 &&
-        criteres.every((c) => (notes[current.evalueId]?.[c.id]?.valeur || 0) > 0)
+        currentCriteres.length > 0 &&
+        currentCriteres.every((c) => (notes[current.evalueId]?.[c.id]?.valeur || 0) > 0)
       if (isCompleted) {
         setTransitionToast({
           prevNom: `${current.evalue.prenom} ${current.evalue.nom}`,
@@ -221,16 +239,17 @@ export default function EvaluerPage() {
 
       // Détecter si on vient de terminer le dernier critère du dernier collaborateur
       const isLastCollaborator = currentIndex === affectations.length - 1
-      const isLastCritere = currentCritereIndex === criteres.length - 1
+      const currentAffCriteres = getActiveCriteresForEvalue(affectations[currentIndex])
+      const isLastCritere = currentCritereIndex === currentAffCriteres.length - 1
       if (isLastCollaborator && isLastCritere) {
         const currentAff = affectations[currentIndex]
-        const allThisAffDone = criteres.every(
+        const allThisAffDone = currentAffCriteres.every(
           (c) => (c.id === critereId ? valeur > 0 : (updated[evalueId]?.[c.id]?.valeur || 0) > 0)
         )
         const allOthersDone = affectations.every(
           (a) =>
             a.evalueId === evalueId ||
-            criteres.every((c) => (updated[a.evalueId]?.[c.id]?.valeur || 0) > 0)
+            getActiveCriteresForEvalue(a).every((c) => (updated[a.evalueId]?.[c.id]?.valeur || 0) > 0)
         )
         if (allThisAffDone && allOthersDone) {
           setTransitionToast({
@@ -307,7 +326,8 @@ export default function EvaluerPage() {
   const handleSubmitAll = () => {
     // Toutes les notes doivent être > 0 pour tous les critères de tous les évalués
     for (const aff of affectations) {
-      for (const crit of criteres) {
+      const affCriteres = getActiveCriteresForEvalue(aff)
+      for (const crit of affCriteres) {
         const val = notes[aff.evalueId]?.[crit.id]?.valeur || 0
         if (val === 0) {
           const idx = affectations.findIndex((a) => a.id === aff.id)
@@ -376,20 +396,22 @@ export default function EvaluerPage() {
   const completionCount = useMemo(() => {
     let done = 0
     for (const aff of affectations) {
-      const all = criteres.every((c) => (notes[aff.evalueId]?.[c.id]?.valeur || 0) > 0)
-      if (all && criteres.length > 0) done++
+      const affCriteres = getActiveCriteresForEvalue(aff)
+      const all = affCriteres.every((c) => (notes[aff.evalueId]?.[c.id]?.valeur || 0) > 0)
+      if (all && affCriteres.length > 0) done++
     }
     return done
-  }, [affectations, criteres, notes])
+  }, [affectations, criteres, notes, evaluateur, isManager])
 
   const currentEvalue = affectations[currentIndex]
+  const currentAffCriteres = useMemo(() => getActiveCriteresForEvalue(currentEvalue), [currentEvalue, criteres, evaluateur, isManager])
   const currentScoreSubtotal = useMemo(() => {
     if (!currentEvalue) return 0
-    return criteres.reduce(
+    return currentAffCriteres.reduce(
       (sum, c) => sum + (notes[currentEvalue.evalueId]?.[c.id]?.valeur || 0),
       0
     )
-  }, [criteres, notes, currentEvalue])
+  }, [currentAffCriteres, notes, currentEvalue])
 
   const maxSubtotal = useMemo(
     () => criteres.reduce((sum, c) => sum + c.noteMaximale, 0),
@@ -398,40 +420,22 @@ export default function EvaluerPage() {
 
   if (submitted) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6" style={{ background: 'linear-gradient(135deg, #00182f 0%, #002d50 100%)', fontFamily: 'var(--font-outfit), sans-serif' }}>
-        <div className="bg-white rounded-3xl shadow-2xl p-10 sm:p-14 text-center max-w-lg w-full animate-fade-in">
-          {/* Animated success icon */}
-          <div className="relative w-24 h-24 rounded-full mx-auto mb-8 flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.15) 0%, rgba(5,150,105,0.08) 100%)' }}>
-            <div className="absolute inset-0 rounded-full animate-ping opacity-20" style={{ background: 'rgba(16,185,129,0.3)' }} />
-            <CheckCircle className="w-12 h-12 text-emerald-600" />
+      <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50 font-[var(--font-inter)]">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-10 text-center max-w-md w-full animate-fade-in">
+          <div className="w-16 h-16 rounded-full mx-auto mb-6 flex items-center justify-center bg-emerald-50 text-emerald-600">
+            <CheckCircle className="w-8 h-8" />
           </div>
-
-          <h2 className="text-3xl font-black mb-4" style={{ color: '#00182f', fontFamily: 'var(--font-outfit)' }}>
-            Évaluations soumises avec succès
+          <h2 className="text-2xl font-bold mb-3 text-[#002B49] font-[var(--font-outfit)]">
+            Évaluations terminées
           </h2>
-          <p className="text-base mb-3" style={{ color: '#5a6880', fontFamily: 'var(--font-inter)' }}>
-            Merci ! Vos notes ont été enregistrées et <strong>définitivement verrouillées</strong>.
+          <p className="text-slate-600 mb-8">
+            Vos notes ont été enregistrées et verrouillées. Merci de votre participation.
           </p>
-          <p className="text-sm mb-2" style={{ color: '#5a6880', fontFamily: 'var(--font-inter)' }}>
-            Il n'est plus possible de modifier ou d'accéder à ces évaluations.
-          </p>
-
-          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl px-5 py-4 mb-8 mt-6">
-            <div className="flex items-center justify-center gap-2 text-emerald-700 font-bold text-sm">
-              <CheckCircle className="w-4 h-4" />
-              {affectations.length} évaluation{affectations.length > 1 ? 's' : ''} clôturée{affectations.length > 1 ? 's' : ''}
-            </div>
-          </div>
-
-          <p className="text-xs mb-8 font-mono tracking-wider" style={{ color: '#adb8c9' }}>
-            DSM TAMIS • Direction des Solutions Maritimes
-          </p>
-
           <button
             onClick={handleLogout}
-            className="w-full px-6 py-4 bg-[#002B49] hover:bg-[#001829] text-white rounded-2xl font-bold text-base shadow-lg shadow-slate-200 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+            className="w-full px-4 py-3 bg-[#002B49] hover:bg-[#001829] text-white rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
           >
-            <LogOut className="w-5 h-5" />
+            <LogOut className="w-4 h-4" />
             Se déconnecter
           </button>
         </div>
@@ -441,9 +445,8 @@ export default function EvaluerPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4" style={{ background: '#f9f9f9', fontFamily: 'Inter, sans-serif' }}>
-        <div className="w-12 h-12 rounded-full border-4 border-t-transparent animate-spin" style={{ borderColor: '#e2e8f0', borderTopColor: '#075fac' }} />
-        <p className="text-sm font-medium" style={{ color: '#5a6880' }}>Chargement de votre session…</p>
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <Loader2 className="w-8 h-8 text-[#002B49] animate-spin" />
       </div>
     )
   }
@@ -451,33 +454,33 @@ export default function EvaluerPage() {
   if (error) {
     const isUserAdmin = evaluateur?.role === 'ADMIN'
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-        <div className="bg-white rounded-3xl shadow-2xl p-10 max-w-md w-full">
+      <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50 font-[var(--font-inter)]">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-10 max-w-md w-full text-center">
           <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-slate-800 mb-2 text-center">
-            Impossible de charger
+          <h2 className="text-xl font-bold text-slate-900 mb-2 font-[var(--font-outfit)]">
+            Erreur de chargement
           </h2>
-          <p className="text-slate-600 text-center mb-6">{error}</p>
-
+          <p className="text-slate-600 mb-8">{error}</p>
+          
           {isUserAdmin && (
             <button
               onClick={() => router.push('/admin')}
-              className="w-full mb-4 bg-brand-500 hover:bg-brand-600 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-brand-200 transition-all flex items-center justify-center gap-2"
+              className="w-full mb-3 px-4 py-3 bg-[#D4AF37] text-[#002B49] rounded-lg font-bold hover:bg-[#C5A059] transition-colors"
             >
-              Accéder à l'Espace Administration
+              Accéder à l'administration
             </button>
           )}
-
+          
           <div className="flex gap-3">
             <button
               onClick={handleLogout}
-              className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-3 rounded-xl"
+              className="flex-1 px-4 py-3 bg-slate-100 text-slate-700 rounded-lg font-semibold hover:bg-slate-200 transition-colors"
             >
-              Se déconnecter
+              Quitter
             </button>
             <button
               onClick={() => loadData()}
-              className="flex-1 bg-brand-600 hover:bg-brand-700 text-white font-semibold py-3 rounded-xl"
+              className="flex-1 px-4 py-3 bg-[#002B49] text-white rounded-lg font-semibold hover:bg-[#001829] transition-colors"
             >
               Réessayer
             </button>
@@ -491,537 +494,315 @@ export default function EvaluerPage() {
     affectations.length === 0 ? 0 : Math.round((completionCount / affectations.length) * 100)
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col" style={{ fontFamily: 'var(--font-inter), sans-serif' }}>
-      {/* Header */}
-      <header className="sticky top-0 z-40 bg-[#002B49] border-b border-[#D4AF37]/40 shadow-lg text-[#D4AF37]">
-        <div className="max-w-[1728px] mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-9 h-9 bg-[#D4AF37] rounded-xl flex items-center justify-center shadow-md shadow-[#D4AF37]/20 flex-shrink-0">
-              <Award className="w-5 h-5 text-[#002B49]" />
+    <div className="min-h-screen bg-slate-50 flex flex-col font-[var(--font-inter)] text-slate-900">
+      
+      {/* ================= STICKY HEADER & TABS ================= */}
+      <div className="sticky top-0 z-40 flex flex-col shadow-sm">
+        {/* Top Header */}
+        <header className="bg-[#002B49] text-white">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-8 h-8 rounded-full bg-[#D4AF37] flex items-center justify-center text-[#002B49]">
+                <User className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold font-[var(--font-outfit)] leading-none">
+                  {evaluateur?.prenom} {evaluateur?.nom}
+                </p>
+                <p className="text-xs text-white/70 mt-1">
+                  Session Notant
+                </p>
+              </div>
             </div>
-            <div className="min-w-0">
-              <p className="text-[11px] font-black text-[#D4AF37] uppercase tracking-widest leading-none mb-1 opacity-90 flex items-center gap-1.5">
-                <span>Session Notant :</span>
-                <span className="font-mono text-[10px] bg-[#001829] text-[#D4AF37] px-2 py-0.5 rounded-md border border-[#D4AF37]/30">
-                  {evaluateur?.matricule ? `#${evaluateur.matricule}` : 'N/A'}
-                </span>
-              </p>
-              <p className="font-extrabold text-white text-base truncate">
-                {evaluateur?.prenom} {evaluateur?.nom}
-                {evaluateur?.service && (
-                  <span className="font-semibold text-[#D4AF37]/80 ml-1.5 text-xs">· {evaluateur.service}</span>
-                )}
-              </p>
-            </div>
+            <button
+              onClick={handleLogout}
+              className="text-white/70 hover:text-white transition-colors p-2"
+              title="Se déconnecter"
+            >
+              <LogOut className="w-5 h-5" />
+            </button>
           </div>
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-[#D4AF37] hover:bg-[#D4AF37] hover:text-[#002B49] bg-[#001d33] border border-[#D4AF37]/40 px-3.5 py-2 rounded-xl transition-all shadow-sm"
-          >
-            <LogOut className="w-4 h-4" />
-            <span className="hidden sm:inline">Déconnexion</span>
-          </button>
-        </div>
-
-        {/* Progress bar */}
-        <div className="max-w-[1728px] mx-auto px-4 sm:px-6 pb-3">
-          <div className="flex items-center justify-between text-xs font-bold text-[#D4AF37] mb-1.5">
-            <span>
-              {completionCount} / {affectations.length} collègue
-              {affectations.length > 1 ? 's' : ''} noté{completionCount > 1 ? 's' : ''}
-            </span>
-            {campagne && (
-              <span className="text-[#D4AF37]/80 font-medium">
-                Pondération : collègues {campagne.poidsCollegues} / manager {campagne.poidsManager}
-              </span>
-            )}
-          </div>
-          <div className="h-2 w-full bg-[#001829] rounded-full overflow-hidden border border-[#D4AF37]/30">
+          {/* Progress bar */}
+          <div className="h-1 w-full bg-[#001829]">
             <div
-              className="h-full bg-gradient-to-r from-[#C5A059] via-[#D4AF37] to-[#F5E6AB] transition-all duration-500 shadow-sm"
+              className="h-full bg-[#D4AF37] transition-all duration-500 ease-out"
               style={{ width: `${progressPct}%` }}
             />
           </div>
-        </div>
-      </header>
+        </header>
 
-      {/* Toast Transition Collaborateur */}
-      {transitionToast && (
-        <div className="fixed top-20 right-4 sm:right-8 z-50 max-w-md w-[calc(100vw-2rem)] sm:w-auto shadow-2xl rounded-2xl bg-white border-2 border-emerald-500/40 p-4 sm:p-5 text-slate-800 backdrop-blur-xl animate-fade-in ring-4 ring-emerald-500/10">
-          <div className="flex items-start gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shrink-0 text-white shadow-md shadow-emerald-500/30">
-              <CheckCircle2 className="w-6 h-6 stroke-[2.5]" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                <p className="text-[11px] font-black uppercase tracking-wider text-emerald-700">
-                  {transitionToast.isFinal ? 'Toutes les notations terminées !' : 'Notation enregistrée'}
+        {/* Global Progress & Colleague Tabs */}
+        <div className="bg-slate-50/95 backdrop-blur-md pt-6 pb-2 border-b border-slate-200/80">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 w-full">
+            {/* Global Progress & Info */}
+            <div className="mb-4 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+              <div>
+                <h1 className="text-2xl font-bold text-[#002B49] font-[var(--font-outfit)] mb-1">
+                  Évaluation des collaborateurs
+                </h1>
+                <p className="text-sm text-slate-600">
+                  {completionCount} sur {affectations.length} évalué{affectations.length > 1 ? 's' : ''}
+                  {campagne && ` • Pondération : collègues ${campagne.poidsCollegues} / manager ${campagne.poidsManager}`}
                 </p>
               </div>
-              <p className="text-sm font-bold text-slate-900 leading-snug">
-                Évaluation de <span className="text-[#002B49] font-black underline decoration-emerald-400 decoration-2">{transitionToast.prevNom}</span> complétée avec succès !
-              </p>
-              {transitionToast.nextNom ? (
-                <div className="flex items-center gap-2 mt-2.5 pt-2.5 border-t border-slate-100 text-xs font-semibold text-slate-600">
-                  <span>Passage à :</span>
-                  <span className="px-2.5 py-1 rounded-lg bg-[#002B49] text-white font-black text-xs shadow-sm flex items-center gap-1.5">
-                    <User className="w-3.5 h-3.5 text-[#D4AF37]" />
-                    {transitionToast.nextNom}
-                  </span>
-                  <ChevronRight className="w-4 h-4 text-emerald-600 ml-auto shrink-0" />
-                </div>
-              ) : transitionToast.isFinal ? (
-                <p className="text-xs font-medium text-emerald-700 mt-1.5">
-                  ✨ Tous les collaborateurs ont été évalués. Vous pouvez soumettre définitivement vos notes.
-                </p>
-              ) : null}
+              
+              {/* Action buttons */}
+              <div className="flex gap-3">
+                <button
+                  onClick={handleSave}
+                  disabled={savingDraft || currentEvalue?.statut === 'TERMINEE'}
+                  className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm"
+                >
+                  {savingDraft ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 text-slate-500" />}
+                  Brouillon
+                </button>
+                <button
+                  onClick={() => setShowConfirmModal(true)}
+                  disabled={submitting || completionCount !== affectations.length}
+                  className="px-4 py-2 text-sm font-medium text-[#002B49] bg-[#D4AF37] rounded-lg hover:bg-[#C5A059] transition-colors disabled:opacity-50 disabled:bg-slate-200 disabled:text-slate-400 flex items-center gap-2 shadow-sm"
+                >
+                  <Send className="w-4 h-4" />
+                  Soumettre
+                </button>
+              </div>
             </div>
-            <button
-              type="button"
-              onClick={() => setTransitionToast(null)}
-              className="text-slate-400 hover:text-slate-700 p-1.5 rounded-xl hover:bg-slate-100 transition-colors shrink-0"
-              aria-label="Fermer la notification"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      )}
 
-      {/* Feedback */}
-      {feedback && (
-        <div className="max-w-[1728px] mx-auto w-full px-4 sm:px-6 pt-3">
-          <div
-            className={`rounded-xl px-4 py-3 text-sm font-semibold ${
-              feedback.type === 'success'
-                ? 'bg-emerald-50 border border-emerald-100 text-emerald-700'
-                : 'bg-red-50 border border-red-100 text-red-600'
-            }`}
-          >
-            {feedback.msg}
-          </div>
-        </div>
-      )}
+            {feedback && (
+              <div className={`mb-4 p-3 rounded-lg text-sm flex items-start gap-3 ${
+                feedback.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
+              }`}>
+                {feedback.type === 'success' ? <CheckCircle className="w-5 h-5 shrink-0" /> : <AlertCircle className="w-5 h-5 shrink-0" />}
+                <p>{feedback.msg}</p>
+              </div>
+            )}
 
-      <main className="max-w-[1728px] mx-auto px-4 sm:px-6 py-4 w-full flex-1">
-        {/* Current colleague card */}
-        {currentEvalue && (
-          <>
-            <div className="sm:sticky sm:top-[60px] sm:z-20 bg-slate-50/95 backdrop-blur-sm pt-1 pb-1 -mx-2 px-2">
-
-            {/* Barre de Défilement / Sélection Directe des Agents à Noter */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 mb-2 dsm-horizontal-scrollbar scroll-smooth">
+            {/* Colleague Tabs */}
+            <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
               {affectations.map((aff, idx) => {
-                const isCompleted = criteres.every((c) => (notes[aff.evalueId]?.[c.id]?.valeur || 0) > 0)
+                const affCriteres = getActiveCriteresForEvalue(aff)
+                const isCompleted = affCriteres.length > 0 && affCriteres.every((c) => (notes[aff.evalueId]?.[c.id]?.valeur || 0) > 0)
                 const isActive = idx === currentIndex
-                const isUnlocked = idx === 0 || affectations.slice(0, idx).every(prevAff => criteres.every(c => (notes[prevAff.evalueId]?.[c.id]?.valeur || 0) > 0))
+                const isUnlocked = idx === 0 || affectations.slice(0, idx).every(prevAff => getActiveCriteresForEvalue(prevAff).every(c => (notes[prevAff.evalueId]?.[c.id]?.valeur || 0) > 0))
+                
                 return (
                   <button
                     key={aff.id}
-                    type="button"
+                    onClick={() => isUnlocked && navigateToCollaborator(idx)}
                     disabled={!isUnlocked}
-                    onClick={() => {
-                      if (isUnlocked) navigateToCollaborator(idx)
-                    }}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 border ${
-                      isActive
-                        ? 'bg-[#002B49] text-white border-[#D4AF37] shadow-md shadow-[#002B49]/20 font-black'
+                    className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium transition-colors border ${
+                      isActive 
+                        ? 'border-[#002B49] bg-[#002B49] text-white shadow-sm'
                         : isCompleted
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
-                        : isUnlocked
-                        ? 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:shadow-sm'
-                        : 'bg-slate-100 text-slate-400 border-slate-200 opacity-50 cursor-not-allowed'
+                          ? 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                          : isUnlocked
+                            ? 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                            : 'border-slate-100 bg-slate-50 text-slate-400 cursor-not-allowed opacity-60'
                     }`}
                   >
-                    <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black ${
-                      isActive ? 'bg-[#D4AF37] text-[#002B49]' : 'bg-slate-100 text-slate-700'
-                    }`}>
-                      {idx + 1}
-                    </span>
-                    <span>{aff.evalue.prenom} {aff.evalue.nom}</span>
-                    {isCompleted && (
-                      <span className="w-3.5 h-3.5 rounded-full bg-emerald-500 flex items-center justify-center text-white text-[8px] font-bold">✓</span>
-                    )}
+                    {isCompleted && !isActive && <CheckCircle className="w-4 h-4 text-emerald-600" />}
+                    {!isCompleted && !isActive && <span className="w-1.5 h-1.5 rounded-full bg-slate-300" />}
+                    {aff.evalue.prenom} {aff.evalue.nom}
                   </button>
                 )
               })}
             </div>
-
-            {/* Jauge Horizontale de Progression des Critères & Navigation par Puces (Même ligne que Critère X/Y) */}
-            {criteres.length > 0 && (
-              <div className="bg-[#002B49] rounded-2xl p-3 sm:p-4 border border-[#D4AF37]/30 shadow-md mb-3 space-y-2 animate-fade-in text-[#D4AF37]">
-                <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
-                  <span className="px-2.5 py-1 bg-[#D4AF37] text-[#002B49] rounded-lg text-xs font-black shadow-sm shrink-0">
-                    Critère {currentCritereIndex + 1} / {criteres.length}
-                  </span>
-
-                  {/* Boutons puces horizontaux centrés dans la zone bleue (colonne du milieu) */}
-                  <div className="flex items-center gap-1.5 overflow-x-auto sm:justify-center dsm-horizontal-scrollbar py-0.5 min-w-0">
-                    {criteres.map((c, idx) => {
-                        const isNoted = (notes[currentEvalue.evalueId]?.[c.id]?.valeur || 0) > 0
-                        const isCurrent = idx === currentCritereIndex
-                        // Règle chronologique stricte : le critère N est débloqué SEULEMENT si tous les critères 0..N-1 ont une note > 0
-                        const isUnlocked = idx === 0 || criteres.slice(0, idx).every((prevC) => (notes[currentEvalue.evalueId]?.[prevC.id]?.valeur || 0) > 0)
-
-                        return (
-                          <button
-                            key={c.id}
-                            type="button"
-                            disabled={!isUnlocked}
-                            onClick={() => {
-                              if (isUnlocked) setCurrentCritereIndex(idx)
-                            }}
-                            className={`w-8 h-8 rounded-full text-xs font-black transition-all shrink-0 flex items-center justify-center border ${
-                              isCurrent
-                                ? 'bg-[#D4AF37] text-[#002B49] shadow-md shadow-[#D4AF37]/40 ring-2 ring-[#F5E6AB] scale-105 border-[#F5E6AB]'
-                                : isNoted
-                                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50 hover:bg-emerald-500/30'
-                                : isUnlocked
-                                ? 'bg-[#001D33] text-white border-white/30 hover:bg-[#003860]'
-                                : 'bg-[#001829] text-white/40 border-white/10 opacity-40 cursor-not-allowed'
-                            }`}
-                            title={isUnlocked ? `Critère ${idx + 1}: ${c.libelle}` : `Répondez aux critères précédents d'abord`}
-                          >
-                            {isNoted && !isCurrent ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : idx + 1}
-                          </button>
-                        )
-                      })}
-                  </div>
-
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-[#D4AF37]/80 font-medium text-xs hidden md:inline">
-                      {criteres.filter(c => (notes[currentEvalue.evalueId]?.[c.id]?.valeur || 0) > 0).length} / {criteres.length} rempli(s)
-                    </span>
-                    <span className="font-black text-[#D4AF37] text-xs sm:text-sm">
-                      {Math.round(((currentCritereIndex + 1) / criteres.length) * 100)}%
-                    </span>
-                  </div>
-                </div>
-
-                {/* Barre de progression horizontale animée */}
-                <div className="h-1.5 w-full bg-[#001829] rounded-full overflow-hidden border border-[#D4AF37]/30 shadow-inner">
-                  <div
-                    className="h-full bg-gradient-to-r from-[#C5A059] via-[#D4AF37] to-[#F5E6AB] rounded-full transition-all duration-500 shadow-sm"
-                    style={{ width: `${Math.round(((currentCritereIndex + 1) / criteres.length) * 100)}%` }}
-                  />
-                </div>
-              </div>
-            )}
           </div>
+        </div>
+      </div>
+      {/* ========================================================= */}
 
-            {/* Fiche Défilante du Critère Actif */}
-            {criteres.length > 0 && (() => {
-              const critere = criteres[currentCritereIndex] || criteres[0]
-              const critIdx = currentCritereIndex
-              const noteValue = notes[currentEvalue.evalueId]?.[critere.id]?.valeur || 0
-              const options = getAppreciationOptions(critere.noteMaximale)
+      {/* Main Content (Scrollable below sticky header) */}
+      <main className="flex-1 w-full flex flex-col pt-8">
+        <div className="max-w-4xl mx-auto w-full px-4 sm:px-6 mb-12">
+          {currentEvalue && (
+            <div className="space-y-6 animate-fade-in">
+              {currentAffCriteres.length > 0 && currentAffCriteres.map((critere, critIdx) => {
+                const noteValue = notes[currentEvalue.evalueId]?.[critere.id]?.valeur || 0
+                const options = getAppreciationOptions(critere.noteMaximale)
+                const isUnlocked = critIdx === 0 || currentAffCriteres.slice(0, critIdx).every((prevC) => (notes[currentEvalue.evalueId]?.[prevC.id]?.valeur || 0) > 0)
 
-              return (
-                <div key={critere.id} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-5 mb-3 animate-fade-in space-y-4">
-                  {/* Entête du critère */}
-                  <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-100">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-black text-lg sm:text-xl text-[#002B49] tracking-tight" style={{ color: '#002B49', fontFamily: 'var(--font-outfit), sans-serif' }}>{critere.libelle}</h3>
+                return (
+                  <div 
+                    key={critere.id} 
+                    className={`bg-white rounded-2xl border p-6 sm:p-8 transition-all duration-300 ${
+                      isUnlocked ? 'border-slate-200 shadow-sm opacity-100' : 'border-slate-100 opacity-40 pointer-events-none select-none'
+                    }`}
+                  >
+                    <div className="mb-6">
+                      <div className="flex items-center gap-3 mb-2">
+                        <span className="flex items-center justify-center w-7 h-7 rounded-lg bg-[#002B49]/5 text-[#002B49] font-bold text-sm">
+                          {critIdx + 1}
+                        </span>
+                        <h2 className="text-lg font-bold text-[#002B49] font-[var(--font-outfit)]">
+                          {critere.libelle}
+                        </h2>
                       </div>
                       {critere.description && (
-                        <p
-                          className="font-medium leading-snug text-[#965A00] text-sm"
-                          style={{ color: '#965A00' }}
-                        >
+                        <p className="text-sm text-slate-600 ml-10">
                           {critere.description}
                         </p>
                       )}
                     </div>
-                    <div className="text-right shrink-0">
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 rounded-full text-xs font-black text-slate-700 shadow-sm">
-                        <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                        {noteValue > 0 ? `${noteValue} / ${critere.noteMaximale} pts` : `Échelle sur ${critere.noteMaximale} pts`}
-                      </span>
-                    </div>
-                  </div>
 
-                  {/* Grille des Appréciations / Barème */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    {options.map((opt, optIdx) => {
-                      const isSelected = noteValue === opt.note
-                      return (
-                        <button
-                          key={opt.note}
-                          type="button"
-                          disabled={currentEvalue.statut === 'TERMINEE'}
-                          onClick={() => {
-                            handleNoteChange(currentEvalue.evalueId, critere.id, opt.note)
-                          }}
-                          className={`w-full text-left p-3 rounded-xl border-2 transition-all flex items-center justify-between gap-3 active:scale-[0.99] ${
-                            isSelected
-                              ? 'border-slate-800 bg-slate-100/90 shadow-sm ring-2 ring-slate-400'
-                              : 'border-slate-100 bg-slate-50/50 hover:bg-white hover:border-slate-300'
-                          } disabled:opacity-50 disabled:cursor-not-allowed`}
-                        >
-                          <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <div className="min-w-0 flex-1">
-                              <span
-                                className="font-bold block leading-tight text-slate-800 text-sm sm:text-base"
-                                style={{ fontFamily: 'var(--font-outfit), sans-serif' }}
-                              >
-                                {optIdx + 1} - {opt.appreciation}
-                              </span>
-                              <span
-                                className="font-semibold block text-[#002B49] leading-tight mt-0.5 text-xs"
-                                style={{ color: '#002B49' }}
-                              >
-                                {opt.description}
-                              </span>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 ml-0 sm:ml-10">
+                      {options.map((opt) => {
+                        const isSelected = noteValue === opt.note
+                        return (
+                          <button
+                            key={opt.note}
+                            onClick={() => handleNoteChange(currentEvalue.evalueId, critere.id, opt.note)}
+                            disabled={currentEvalue.statut === 'TERMINEE'}
+                            className={`text-left p-4 rounded-xl border transition-all flex gap-3 ${
+                              isSelected
+                                ? 'border-[#002B49] bg-[#002B49]/5 ring-1 ring-[#002B49]'
+                                : 'border-slate-200 hover:border-slate-300 bg-white'
+                            } disabled:opacity-60 disabled:cursor-not-allowed`}
+                          >
+                            <div className={`mt-0.5 w-4 h-4 shrink-0 rounded-full border flex items-center justify-center ${
+                              isSelected ? 'border-[#002B49] bg-[#002B49]' : 'border-slate-300'
+                            }`}>
+                              {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
                             </div>
-                          </div>
-
-                          <div className="shrink-0">
-                            {isSelected ? (
-                              <div className="w-5 h-5 rounded-full bg-slate-800 text-white flex items-center justify-center shadow-sm">
-                                <Check className="w-3.5 h-3.5 stroke-[3]" />
-                              </div>
-                            ) : (
-                              <div className="w-5 h-5 rounded-full border-2 border-slate-200 bg-white" />
-                            )}
-                          </div>
-                        </button>
-                      )
-                    })}
-                  </div>
-
-                  {/* Commentaire optionnel */}
-                  <div className="pt-1">
-                    <textarea
-                      placeholder="Commentaire ou justification (optionnel)..."
-                      value={notes[currentEvalue.evalueId]?.[critere.id]?.commentaire || ''}
-                      onChange={(e) =>
-                        handleCommentaireChange(
-                          currentEvalue.evalueId,
-                          critere.id,
-                          e.target.value
+                            <div>
+                              <div className="font-semibold text-slate-900 text-sm mb-1">{opt.appreciation}</div>
+                              <div className="text-xs text-slate-500 leading-relaxed">{opt.description}</div>
+                            </div>
+                          </button>
                         )
-                      }
-                      disabled={currentEvalue.statut === 'TERMINEE'}
-                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs resize-none focus:ring-2 focus:ring-brand-100 focus:border-brand-400 outline-none disabled:bg-slate-50 bg-slate-50/40 font-medium text-slate-700"
-                      rows={1}
-                    />
-                  </div>
-
-                  {/* Boutons de Défilement des Critères (Précédent / Suivant) */}
-                  <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setCurrentCritereIndex(Math.max(0, currentCritereIndex - 1))}
-                      disabled={currentCritereIndex === 0}
-                      className="w-full sm:w-auto px-4 py-2 border border-slate-200 rounded-xl font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 text-xs sm:text-sm transition-all"
-                    >
-                      <ChevronLeft className="w-4 h-4" /> Critère précédent
-                    </button>
-
-                    <div className="text-xs font-bold text-slate-500">
-                      Total : <span className="font-black text-slate-800 text-sm">{currentScoreSubtotal}</span> / {maxSubtotal} pts
+                      })}
                     </div>
 
-                    {currentCritereIndex < criteres.length - 1 ? (
-                      <button
-                        type="button"
-                        onClick={() => setCurrentCritereIndex(currentCritereIndex + 1)}
-                        disabled={noteValue === 0}
-                        className="w-full sm:w-auto px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-bold flex items-center justify-center gap-1.5 text-xs sm:text-sm shadow-md shadow-slate-200 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                        title={noteValue === 0 ? "Veuillez attribuer une note à ce critère avant de continuer" : ""}
-                      >
-                        Critère suivant <ChevronRight className="w-4 h-4" />
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (currentIndex < affectations.length - 1) {
-                            navigateToCollaborator(currentIndex + 1)
-                          }
-                        }}
-                        disabled={currentIndex >= affectations.length - 1 || noteValue === 0}
-                        className="w-full sm:w-auto px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold flex items-center justify-center gap-1.5 text-xs sm:text-sm shadow-md shadow-emerald-100 active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                      >
-                        Collaborateur suivant <ChevronRight className="w-4 h-4" />
-                      </button>
-                    )}
+                    <div className="mt-6 ml-0 sm:ml-10">
+                      <label className="block text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider">
+                        Commentaire (optionnel)
+                      </label>
+                      <textarea
+                        placeholder="Ajouter une précision..."
+                        value={notes[currentEvalue.evalueId]?.[critere.id]?.commentaire || ''}
+                        onChange={(e) => handleCommentaireChange(currentEvalue.evalueId, critere.id, e.target.value)}
+                        disabled={currentEvalue.statut === 'TERMINEE'}
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#002B49]/20 focus:border-[#002B49] transition-colors resize-none disabled:bg-slate-100"
+                        rows={2}
+                      />
+                    </div>
                   </div>
-                </div>
-              );
-            })()}
-
-            {/* Barre de navigation globale & Sauvegarde Brouillon */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => navigateToCollaborator(currentIndex - 1)}
-                disabled={currentIndex === 0}
-                className="flex items-center gap-1.5 text-xs sm:text-sm text-slate-600 hover:text-slate-900 font-bold disabled:opacity-30 disabled:cursor-not-allowed bg-white border border-slate-200 px-4 py-2.5 rounded-xl shadow-sm transition-colors"
-              >
-                <ChevronLeft className="w-4 h-4" /> Collaborateur précédent
-              </button>
-
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={savingDraft || currentEvalue.statut === 'TERMINEE'}
-                className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold text-xs sm:text-sm px-5 py-2.5 rounded-xl shadow-sm disabled:opacity-50 transition-colors"
-              >
-                {savingDraft ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-slate-700" />
-                    Sauvegarde...
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4 text-brand-600" />
-                    Sauvegarder le brouillon
-                  </>
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => navigateToCollaborator(currentIndex + 1)}
-                disabled={currentIndex === affectations.length - 1}
-                className="flex items-center gap-1.5 text-xs sm:text-sm text-slate-600 hover:text-slate-900 font-bold disabled:opacity-30 disabled:cursor-not-allowed bg-white border border-slate-200 px-4 py-2.5 rounded-xl shadow-sm transition-colors"
-              >
-                Collaborateur suivant <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* ═══════════════════════════════════════════════════════════ */}
-            {/* BOUTON DE SOUMISSION FINALE — Toujours visible en bas     */}
-            {/* ═══════════════════════════════════════════════════════════ */}
-            <div className="mt-8 mb-2">
-              <div className="bg-gradient-to-br from-[#002B49] to-[#001829] rounded-3xl p-6 sm:p-8 border border-[#D4AF37]/30 shadow-xl">
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div className="text-center sm:text-left">
-                    <h3 className="text-lg font-black text-white mb-1" style={{ fontFamily: 'var(--font-outfit)' }}>
-                      Clôturer définitivement les évaluations
-                    </h3>
-                    <p className="text-sm text-[#D4AF37]/80" style={{ fontFamily: 'var(--font-inter)' }}>
-                      {completionCount} / {affectations.length} collègue{affectations.length > 1 ? 's' : ''} noté{completionCount > 1 ? 's' : ''} —{' '}
-                      {completionCount === affectations.length ? (
-                        <span className="text-emerald-400 font-bold">Toutes les évaluations sont complètes ✓</span>
-                      ) : (
-                        <span className="text-amber-400 font-bold">Évaluations incomplètes</span>
-                      )}
-                    </p>
+                )
+              })}
+              
+              {/* Validation Button */}
+              {(() => {
+                const isCurrentCompleted = currentAffCriteres.length > 0 && currentAffCriteres.every((c) => (notes[currentEvalue.evalueId]?.[c.id]?.valeur || 0) > 0)
+                
+                return (
+                  <div className="pt-6 flex justify-end mt-4">
+                    <button
+                      onClick={() => {
+                        if (currentIndex < affectations.length - 1) {
+                          navigateToCollaborator(currentIndex + 1)
+                        } else {
+                          setShowConfirmModal(true)
+                        }
+                      }}
+                      disabled={!isCurrentCompleted || currentEvalue.statut === 'TERMINEE'}
+                      className="px-6 py-3.5 text-sm font-bold text-white bg-[#002B49] rounded-xl hover:bg-[#001829] transition-all disabled:opacity-50 disabled:bg-slate-200 disabled:text-slate-400 flex items-center gap-2 shadow-sm font-[var(--font-outfit)]"
+                    >
+                      Valider pour {currentEvalue.evalue.prenom} {currentEvalue.evalue.nom}
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleSubmitAll}
-                    disabled={submitting}
-                    className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-2xl font-black flex items-center justify-center gap-3 text-base shadow-lg shadow-emerald-900/30 active:scale-[0.97] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    style={{ fontFamily: 'var(--font-outfit)' }}
-                  >
-                    {submitting ? (
-                      <>
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
-                        Envoi en cours…
-                      </>
-                    ) : (
-                      <>
-                        <Send className="w-5 h-5" />
-                        Soumettre toutes les évaluations
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
+                )
+              })()}
             </div>
-          </>
-        )}
+          )}
+        </div>
       </main>
 
-      {/* ══════════════════════════════════════════════════════════════ */}
-      {/* MODAL DE VALIDATION (critère manquant)                       */}
-      {/* ══════════════════════════════════════════════════════════════ */}
+      {/* Validation Modal */}
       {validationError && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" style={{ background: 'rgba(0,24,47,0.65)', backdropFilter: 'blur(6px)' }}>
-          <div className="bg-white rounded-3xl shadow-2xl p-8 sm:p-10 max-w-md w-full animate-fade-in text-center">
-            <div className="w-16 h-16 rounded-full mx-auto mb-6 flex items-center justify-center bg-amber-50 border-2 border-amber-200">
-              <AlertTriangle className="w-8 h-8 text-amber-500" />
-            </div>
-            <h3 className="text-xl font-black text-slate-900 mb-3" style={{ fontFamily: 'var(--font-outfit)' }}>
-              Formulaire incomplet
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-xl p-8 max-w-sm w-full text-center">
+            <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
+            <h3 className="text-lg font-bold text-slate-900 mb-2 font-[var(--font-outfit)]">
+              Évaluation incomplète
             </h3>
-            <p className="text-sm text-slate-600 mb-6" style={{ fontFamily: 'var(--font-inter)' }}>
+            <p className="text-sm text-slate-600 mb-6">
               {validationError}
             </p>
             <button
-              type="button"
               onClick={() => setValidationError(null)}
-              className="w-full px-6 py-3.5 bg-[#002B49] hover:bg-[#001829] text-white rounded-2xl font-bold text-sm transition-all active:scale-[0.98] shadow-lg"
+              className="w-full px-4 py-3 bg-slate-900 text-white rounded-lg font-medium hover:bg-slate-800 transition-colors"
             >
-              Compris, corriger maintenant
+              Continuer
             </button>
           </div>
         </div>
       )}
 
-      {/* ══════════════════════════════════════════════════════════════ */}
-      {/* MODAL DE CONFIRMATION FINALE                                 */}
-      {/* ══════════════════════════════════════════════════════════════ */}
+      {/* Confirmation Modal */}
       {showConfirmModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" style={{ background: 'rgba(0,24,47,0.70)', backdropFilter: 'blur(8px)' }}>
-          <div className="bg-white rounded-3xl shadow-2xl p-8 sm:p-10 max-w-lg w-full animate-fade-in">
-            <div className="text-center">
-              <div className="w-16 h-16 rounded-full mx-auto mb-6 flex items-center justify-center bg-orange-50 border-2 border-orange-200">
-                <ShieldAlert className="w-8 h-8 text-orange-500" />
-              </div>
-              <h3 className="text-xl font-black text-slate-900 mb-3" style={{ fontFamily: 'var(--font-outfit)' }}>
-                Confirmer la soumission définitive
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full">
+            <div className="flex justify-between items-start mb-4">
+              <h3 className="text-xl font-bold text-[#002B49] font-[var(--font-outfit)]">
+                Clôture des évaluations
               </h3>
-              <p className="text-sm text-slate-600 mb-2" style={{ fontFamily: 'var(--font-inter)' }}>
-                Vous êtes sur le point de soumettre <strong>{affectations.length} évaluation{affectations.length > 1 ? 's' : ''}</strong> de manière <strong>définitive et irréversible</strong>.
-              </p>
-              <div className="bg-orange-50 border border-orange-200 rounded-2xl px-5 py-4 my-6 text-left">
-                <div className="flex items-start gap-3">
-                  <AlertTriangle className="w-5 h-5 text-orange-500 mt-0.5 shrink-0" />
-                  <div className="text-sm text-orange-700" style={{ fontFamily: 'var(--font-inter)' }}>
-                    <p className="font-bold mb-1">Cette action est irréversible :</p>
-                    <ul className="list-disc list-inside space-y-1 text-xs">
-                      <li>Vos notes seront enregistrées et verrouillées</li>
-                      <li>Vous ne pourrez plus modifier ces évaluations</li>
-                      <li>L'accès à cette page d'évaluation sera définitivement fermé</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
+              <button onClick={() => setShowConfirmModal(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
             </div>
-            <div className="flex flex-col sm:flex-row gap-3">
+            
+            <p className="text-sm text-slate-600 mb-6 leading-relaxed">
+              Vous êtes sur le point de soumettre définitivement les évaluations pour <strong>{affectations.length} collaborateur{affectations.length > 1 ? 's' : ''}</strong>. 
+              Cette action est <span className="font-semibold text-slate-900">irréversible</span>. Vos notes seront verrouillées et vous ne pourrez plus les modifier.
+            </p>
+            
+            <div className="flex gap-3 justify-end">
               <button
-                type="button"
                 onClick={() => setShowConfirmModal(false)}
-                className="flex-1 px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-bold text-sm transition-all"
+                className="px-5 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
               >
                 Annuler
               </button>
               <button
-                type="button"
                 onClick={executeSubmit}
                 disabled={submitting}
-                className="flex-1 px-6 py-3.5 bg-orange-600 hover:bg-orange-700 text-white rounded-2xl font-black text-sm transition-all active:scale-[0.98] shadow-lg shadow-orange-200 flex items-center justify-center gap-2 disabled:opacity-50"
+                className="px-5 py-2.5 text-sm font-medium text-white bg-[#002B49] rounded-lg hover:bg-[#001829] transition-colors disabled:opacity-50 flex items-center gap-2 shadow-sm"
               >
-                {submitting ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                    Envoi en cours…
-                  </>
-                ) : (
-                  <>
-                    <Send className="w-4 h-4" />
-                    Oui, soumettre définitivement
-                  </>
-                )}
+                {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                Soumettre définitivement
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Toast Transition Collaborateur */}
+      {transitionToast && (
+        <div className="fixed bottom-6 right-6 z-50 max-w-sm bg-[#002B49] text-white p-4 rounded-xl shadow-lg flex items-start gap-4 animate-fade-in">
+          <div className="mt-0.5">
+            <CheckCircle className="w-5 h-5 text-emerald-400" />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-medium mb-1 font-[var(--font-outfit)]">
+              Évaluation enregistrée
+            </p>
+            <p className="text-xs text-white/70">
+              {transitionToast.prevNom} a été évalué avec succès.
+            </p>
+            {transitionToast.nextNom && (
+              <p className="text-xs text-[#D4AF37] mt-2 flex items-center gap-1 font-medium">
+                Passage à {transitionToast.nextNom} <ChevronRight className="w-3 h-3" />
+              </p>
+            )}
+            {transitionToast.isFinal && (
+              <p className="text-xs text-emerald-300 mt-2 font-medium">
+                Toutes les évaluations sont prêtes à être soumises.
+              </p>
+            )}
+          </div>
+          <button onClick={() => setTransitionToast(null)} className="text-white/50 hover:text-white transition-colors">
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
     </div>

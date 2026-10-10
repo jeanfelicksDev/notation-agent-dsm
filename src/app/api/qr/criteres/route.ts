@@ -22,7 +22,10 @@ export async function GET() {
 
     // Look for criteria of type CLIENT
     let clientCriteres = campagne.criteres.filter(
-      (c) => c.typeEvaluateur === 'CLIENT'
+      (c) => {
+        const types = c.typeEvaluateurs && c.typeEvaluateurs.length > 0 ? c.typeEvaluateurs : [c.typeEvaluateur];
+        return types.includes('CLIENT') || types.includes('TOUS');
+      }
     )
 
     // If not found in database for this campaign, auto-create the 3 official client criteria

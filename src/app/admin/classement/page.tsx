@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -14,6 +14,7 @@ import {
   FileSpreadsheet,
   Printer,
   X,
+  XCircle,
   Eye,
   EyeOff,
   Search,
@@ -29,6 +30,8 @@ import {
   Check,
   ListOrdered,
   Lock,
+  Loader2,
+  ClipboardList,
 } from 'lucide-react'
 import { getAppreciationInfo } from '@/lib/default-criteres'
 
@@ -45,6 +48,9 @@ interface ScoreItem {
   scoreCollegues: number
   scoreManager: number
   scoreClient: number
+  hasCollegues: boolean
+  hasManager: boolean
+  hasClient: boolean
   rangGlobal: number
   rangDirection: number
   rangDepartement: number
@@ -93,6 +99,32 @@ interface ClassementData {
   tousLesScores: ScoreItem[]
 }
 
+interface DetailedNote {
+  critereId: string
+  critereLibelle: string
+  noteMaximale: number
+  valeur: number
+  commentaire: string | null
+  typeEvaluateur?: string
+}
+
+interface EvaluateurNotes {
+  evaluateur: { id: string; nom: string; prenom: string; matricule: string; role: string; service: string | null }
+  notes: DetailedNote[]
+}
+
+interface ClientNotes {
+  clientLabel: string
+  notes: DetailedNote[]
+}
+
+interface DetailedNotesData {
+  campagneLibelle: string
+  criteres: Array<{ id: string; libelle: string; noteMaximale: number; typeEvaluateur: string }>
+  evaluateursNotes: EvaluateurNotes[]
+  clientsNotes: ClientNotes[]
+}
+
 type TabType = 'palmares' | 'direction' | 'departement' | 'service' | 'global'
 
 export default function ClassementPage() {
@@ -109,6 +141,30 @@ export default function ClassementPage() {
   const [filterService, setFilterService] = useState<string>('ALL')
   const [selectedScore, setSelectedScore] = useState<ScoreItem | null>(null)
   const [selectedCampagneId, setSelectedCampagneId] = useState<string>('')
+  const [detailedNotes, setDetailedNotes] = useState<DetailedNotesData | null>(null)
+  const [loadingNotes, setLoadingNotes] = useState(false)
+
+  const loadDetailedNotes = useCallback(async (userId: string, campagneId?: string) => {
+    setLoadingNotes(true)
+    setDetailedNotes(null)
+    try {
+      const params = campagneId ? `?campagneId=${encodeURIComponent(campagneId)}` : ''
+      const res = await fetch(`/api/admin/classement/notes/${encodeURIComponent(userId)}${params}`)
+      if (res.ok) {
+        const data = await res.json()
+        setDetailedNotes(data)
+      }
+    } catch {
+      // Silently fail — modal still shows score summary
+    } finally {
+      setLoadingNotes(false)
+    }
+  }, [])
+
+  const handleSelectScore = useCallback((s: ScoreItem) => {
+    setSelectedScore(s)
+    loadDetailedNotes(s.utilisateurId, selectedCampagneId || undefined)
+  }, [loadDetailedNotes, selectedCampagneId])
 
   const loadScores = async (campagneId?: string) => {
     setLoading(true)
@@ -418,7 +474,7 @@ export default function ClassementPage() {
     <div className="flex-1 flex flex-col min-w-0 overflow-y-auto bg-slate-50 font-sans">
       {/* Header Sticky */}
       <header className="bg-white shadow-sm border-b sticky top-0 z-20">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+        <div className="max-w-[96rem] mx-auto px-6 py-4 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <Link href="/admin" className="text-slate-600 hover:text-slate-900 transition-colors p-2 rounded-xl hover:bg-slate-100">
               <ArrowLeft className="w-5 h-5" />
@@ -468,20 +524,22 @@ export default function ClassementPage() {
               <span>Exporter Excel (5 feuilles)</span>
             </button>
 
-            <button
-              onClick={handleRecalculate}
-              disabled={calculating}
-              className="flex items-center gap-2 px-4 py-2 bg-[#002B49] hover:bg-[#001D33] text-[#D4AF37] border border-[#D4AF37]/40 rounded-xl text-xs font-bold shadow-sm transition-all disabled:opacity-50"
-            >
-              <RefreshCw className={`w-4 h-4 ${calculating ? 'animate-spin' : ''}`} />
-              <span>{calculating ? 'Calcul en cours...' : 'Recalculer'}</span>
-            </button>
+            {!(selectedCampagneId || data?.campagne?.id)?.startsWith('ANNUEL_') && (
+              <button
+                onClick={handleRecalculate}
+                disabled={calculating}
+                className="flex items-center gap-2 px-4 py-2 bg-[#002B49] hover:bg-[#001D33] text-[#D4AF37] border border-[#D4AF37]/40 rounded-xl text-xs font-bold shadow-sm transition-all disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 ${calculating ? 'animate-spin' : ''}`} />
+                <span>{calculating ? 'Calcul en cours...' : 'Recalculer'}</span>
+              </button>
+            )}
           </div>
         </div>
       </header>
 
       {toastMessage && (
-        <div className="max-w-7xl mx-auto px-6 pt-4 animate-fade-in">
+        <div className="max-w-[96rem] mx-auto px-6 pt-4 animate-fade-in">
           <div className="bg-emerald-50 border border-emerald-300 text-emerald-900 px-4 py-3 rounded-2xl flex items-center justify-between shadow-sm">
             <div className="flex items-center gap-2.5 font-bold text-xs">
               <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
@@ -494,7 +552,7 @@ export default function ClassementPage() {
         </div>
       )}
 
-      <main className="max-w-7xl mx-auto p-6 space-y-6">
+      <main className="max-w-[96rem] mx-auto p-6 space-y-6">
         {/* Sélecteur de Campagne & Statut Actuel */}
         <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-slate-200/80 flex flex-col md:flex-row md:items-center justify-between gap-4 animate-fade-in">
           <div className="flex items-center gap-3.5">
@@ -986,7 +1044,7 @@ export default function ClassementPage() {
                       scores={groupe.scores}
                       rankKey="rangDirection"
                       anonymized={anonymized}
-                      onSelectScore={(s) => setSelectedScore(s)}
+                      onSelectScore={handleSelectScore}
                     />
                   </div>
                 ))}
@@ -1033,7 +1091,7 @@ export default function ClassementPage() {
                       scores={groupe.scores}
                       rankKey="rangDepartement"
                       anonymized={anonymized}
-                      onSelectScore={(s) => setSelectedScore(s)}
+                      onSelectScore={handleSelectScore}
                     />
                   </div>
                 ))}
@@ -1080,7 +1138,7 @@ export default function ClassementPage() {
                       scores={groupe.scores}
                       rankKey="rangService"
                       anonymized={anonymized}
-                      onSelectScore={(s) => setSelectedScore(s)}
+                      onSelectScore={handleSelectScore}
                     />
                   </div>
                 ))}
@@ -1176,7 +1234,7 @@ export default function ClassementPage() {
                     rankKey="rangGlobal"
                     showStructureTags
                     anonymized={anonymized}
-                    onSelectScore={(s) => setSelectedScore(s)}
+                    onSelectScore={handleSelectScore}
                   />
                 </div>
               </div>
@@ -1188,7 +1246,7 @@ export default function ClassementPage() {
       {/* MODALE FICHE BILAN INDIVIDUELLE */}
       {selectedScore && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 sm:p-8 space-y-6">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto p-6 sm:p-8 space-y-6">
             <div className="flex items-center justify-between border-b pb-4">
               <div>
                 <span className="text-xs font-extrabold uppercase text-brand-600 tracking-wider">
@@ -1364,6 +1422,231 @@ export default function ClassementPage() {
               )
             })()}
 
+            {/* Détail des Notes par Évaluateur */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <ClipboardList className="w-5 h-5 text-brand-600" />
+                <h3 className="text-sm font-black uppercase text-slate-700 tracking-wider">Détail des notes reçues</h3>
+              </div>
+
+              {loadingNotes ? (
+                <div className="flex items-center justify-center py-10 gap-3 text-slate-400">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span className="text-sm font-semibold">Chargement des notes…</span>
+                </div>
+              ) : detailedNotes ? (
+                <>
+                  {/* Notes Collègues */}
+                  {(() => {
+                    const colleguesEvals = detailedNotes.evaluateursNotes.filter(
+                      (e) => e.evaluateur.role !== 'MANAGER' && e.notes.some((n) => n.typeEvaluateur === 'COLLEGUE' || n.typeEvaluateur === 'TOUS')
+                    )
+                    const colleguesCriteres = detailedNotes.criteres.filter(
+                      (c) => c.typeEvaluateur === 'COLLEGUE' || c.typeEvaluateur === 'TOUS'
+                    )
+                    if (colleguesEvals.length === 0) return null
+                    return (
+                      <div className="bg-blue-50/50 border border-blue-100 rounded-2xl overflow-hidden">
+                        <div className="bg-blue-600 px-4 py-2.5 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-2">
+                          <Users2 className="w-4 h-4" />
+                          Notes des Collègues ({colleguesEvals.length} évaluateur{colleguesEvals.length > 1 ? 's' : ''})
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs">
+                            <thead className="bg-blue-50 border-b border-blue-100">
+                              <tr>
+                                <th className="px-3 py-2.5 text-left font-bold text-blue-800 whitespace-nowrap">Évaluateur</th>
+                                {colleguesCriteres.map((c) => (
+                                  <th key={c.id} className="px-3 py-2.5 text-center font-bold text-blue-800 whitespace-nowrap" title={c.libelle}>
+                                    {c.libelle.length > 20 ? c.libelle.slice(0, 18) + '…' : c.libelle}
+                                    <div className="text-[10px] font-normal text-blue-500">/{c.noteMaximale}</div>
+                                  </th>
+                                ))}
+                                <th className="px-3 py-2.5 text-center font-black text-blue-900 whitespace-nowrap">Total</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-blue-50">
+                              {colleguesEvals.map((ev) => {
+                                const filteredNotes = ev.notes.filter((n) => n.typeEvaluateur === 'COLLEGUE' || n.typeEvaluateur === 'TOUS')
+                                const total = filteredNotes.reduce((s, n) => s + n.valeur, 0)
+                                const maxTotal = colleguesCriteres.reduce((s, c) => s + c.noteMaximale, 0)
+                                return (
+                                  <tr key={ev.evaluateur.id} className="hover:bg-blue-50/50 transition-colors">
+                                    <td className="px-3 py-2.5 whitespace-nowrap">
+                                      <div className="font-bold text-slate-800">
+                                        {anonymized ? 'Évaluateur Anonyme' : `${ev.evaluateur.prenom} ${ev.evaluateur.nom}`}
+                                      </div>
+                                      <div className="text-[10px] text-slate-400">{anonymized ? 'Service Anonymisé' : (ev.evaluateur.service || '-')}</div>
+                                    </td>
+                                    {colleguesCriteres.map((c) => {
+                                      const note = filteredNotes.find((n) => n.critereId === c.id)
+                                      return (
+                                        <td key={c.id} className="px-3 py-2.5 text-center">
+                                          {note ? (
+                                            <span className={`font-bold ${note.valeur >= c.noteMaximale * 0.8 ? 'text-emerald-600' : note.valeur >= c.noteMaximale * 0.5 ? 'text-amber-600' : 'text-red-500'}`}>
+                                              {note.valeur}
+                                            </span>
+                                          ) : (
+                                            <span className="text-slate-300">-</span>
+                                          )}
+                                        </td>
+                                      )
+                                    })}
+                                    <td className="px-3 py-2.5 text-center font-black text-slate-900">
+                                      {total}<span className="text-slate-400 font-normal">/{maxTotal}</span>
+                                    </td>
+                                  </tr>
+                                )
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )
+                  })()}
+
+                  {/* Notes Clients */}
+                  {detailedNotes.clientsNotes.length > 0 && (() => {
+                    const clientCriteres = detailedNotes.criteres.filter((c) => c.typeEvaluateur === 'CLIENT')
+                    return (
+                      <div className="bg-amber-50/50 border border-amber-100 rounded-2xl overflow-hidden">
+                        <div className="bg-amber-500 px-4 py-2.5 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-2">
+                          <Globe2 className="w-4 h-4" />
+                          Notes des Clients Externes ({detailedNotes.clientsNotes.length} client{detailedNotes.clientsNotes.length > 1 ? 's' : ''})
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs">
+                            <thead className="bg-amber-50 border-b border-amber-100">
+                              <tr>
+                                <th className="px-3 py-2.5 text-left font-bold text-amber-800 whitespace-nowrap">Client</th>
+                                {clientCriteres.map((c) => (
+                                  <th key={c.id} className="px-3 py-2.5 text-center font-bold text-amber-800 whitespace-nowrap" title={c.libelle}>
+                                    {c.libelle.length > 20 ? c.libelle.slice(0, 18) + '…' : c.libelle}
+                                    <div className="text-[10px] font-normal text-amber-500">/{c.noteMaximale}</div>
+                                  </th>
+                                ))}
+                                <th className="px-3 py-2.5 text-center font-black text-amber-900 whitespace-nowrap">Total</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-amber-50">
+                              {detailedNotes.clientsNotes.map((cl, idx) => {
+                                const total = cl.notes.reduce((s, n) => s + n.valeur, 0)
+                                const maxTotal = clientCriteres.reduce((s, c) => s + c.noteMaximale, 0)
+                                return (
+                                  <tr key={idx} className="hover:bg-amber-50/50 transition-colors">
+                                    <td className="px-3 py-2.5 whitespace-nowrap font-bold text-slate-800">{cl.clientLabel}</td>
+                                    {clientCriteres.map((c) => {
+                                      const note = cl.notes.find((n) => n.critereId === c.id)
+                                      return (
+                                        <td key={c.id} className="px-3 py-2.5 text-center">
+                                          {note ? (
+                                            <span className={`font-bold ${note.valeur >= c.noteMaximale * 0.8 ? 'text-emerald-600' : note.valeur >= c.noteMaximale * 0.5 ? 'text-amber-600' : 'text-red-500'}`}>
+                                              {note.valeur}
+                                            </span>
+                                          ) : (
+                                            <span className="text-slate-300">-</span>
+                                          )}
+                                        </td>
+                                      )
+                                    })}
+                                    <td className="px-3 py-2.5 text-center font-black text-slate-900">
+                                      {total}<span className="text-slate-400 font-normal">/{maxTotal}</span>
+                                    </td>
+                                  </tr>
+                                )
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )
+                  })()}
+
+                  {/* Notes Manager */}
+                  {(() => {
+                    const managerEvals = detailedNotes.evaluateursNotes.filter(
+                      (e) => e.notes.some((n) => n.typeEvaluateur === 'MANAGER')
+                    )
+                    const managerCriteres = detailedNotes.criteres.filter((c) => c.typeEvaluateur === 'MANAGER')
+                    if (managerEvals.length === 0) return null
+                    return (
+                      <div className="bg-indigo-50/50 border border-indigo-100 rounded-2xl overflow-hidden">
+                        <div className="bg-indigo-600 px-4 py-2.5 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-2">
+                          <Crown className="w-4 h-4" />
+                          Notes du Manager ({managerEvals.length})
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs">
+                            <thead className="bg-indigo-50 border-b border-indigo-100">
+                              <tr>
+                                <th className="px-3 py-2.5 text-left font-bold text-indigo-800 whitespace-nowrap">Manager</th>
+                                {managerCriteres.map((c) => (
+                                  <th key={c.id} className="px-3 py-2.5 text-center font-bold text-indigo-800 whitespace-nowrap" title={c.libelle}>
+                                    {c.libelle.length > 20 ? c.libelle.slice(0, 18) + '…' : c.libelle}
+                                    <div className="text-[10px] font-normal text-indigo-500">/{c.noteMaximale}</div>
+                                  </th>
+                                ))}
+                                <th className="px-3 py-2.5 text-center font-black text-indigo-900 whitespace-nowrap">Total</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-indigo-50">
+                              {managerEvals.map((ev) => {
+                                const managerNotes = ev.notes.filter((n) => n.typeEvaluateur === 'MANAGER')
+                                const total = managerNotes.reduce((s, n) => s + n.valeur, 0)
+                                const maxTotal = managerCriteres.reduce((s, c) => s + c.noteMaximale, 0)
+                                return (
+                                  <tr key={ev.evaluateur.id} className="hover:bg-indigo-50/50 transition-colors">
+                                    <td className="px-3 py-2.5 whitespace-nowrap">
+                                      <div className="font-bold text-slate-800">
+                                        {anonymized ? 'Manager Anonyme' : `${ev.evaluateur.prenom} ${ev.evaluateur.nom}`}
+                                      </div>
+                                      <div className="text-[10px] text-slate-400">{anonymized ? 'Service Anonymisé' : (ev.evaluateur.service || '-')}</div>
+                                    </td>
+                                    {managerCriteres.map((c) => {
+                                      const note = managerNotes.find((n) => n.critereId === c.id)
+                                      return (
+                                        <td key={c.id} className="px-3 py-2.5 text-center">
+                                          {note ? (
+                                            <span className={`font-bold ${note.valeur >= c.noteMaximale * 0.8 ? 'text-emerald-600' : note.valeur >= c.noteMaximale * 0.5 ? 'text-amber-600' : 'text-red-500'}`}>
+                                              {note.valeur}
+                                            </span>
+                                          ) : (
+                                            <span className="text-slate-300">-</span>
+                                          )}
+                                        </td>
+                                      )
+                                    })}
+                                    <td className="px-3 py-2.5 text-center font-black text-slate-900">
+                                      {total}<span className="text-slate-400 font-normal">/{maxTotal}</span>
+                                    </td>
+                                  </tr>
+                                )
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )
+                  })()}
+
+                  {detailedNotes.evaluateursNotes.length === 0 && detailedNotes.clientsNotes.length === 0 && (
+                    <div className="text-center py-8 text-slate-400">
+                      <XCircle className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                      <p className="text-sm font-semibold">Aucune note individuelle disponible</p>
+                    </div>
+                  )}
+                </>
+              ) : (selectedCampagneId || data?.campagne?.id)?.startsWith('ANNUEL_') ? (
+                <div className="text-center py-6 text-slate-400 text-sm">
+                  Les détails individuels ne sont pas disponibles pour le palmarès annuel (Moyenne globale).
+                </div>
+              ) : (
+                <div className="text-center py-6 text-slate-400 text-sm">
+                  Impossible de charger les notes détaillées
+                </div>
+              )}
+            </div>
+
             {/* Actions Modal */}
             <div className="flex items-center justify-end gap-3 pt-4 border-t">
               <button
@@ -1520,23 +1803,53 @@ function ScoreTable({
                   </div>
                 </td>
 
-                <td className="px-4 py-4 text-right text-slate-600 font-medium">
-                  <span className="font-bold text-slate-800">{partCollegues}</span> / 18
-                  <span className="text-[10px] text-slate-400 block font-normal">
-                    ({score.scoreCollegues.toFixed(0)}%)
-                  </span>
+                <td className="px-4 py-4 text-right">
+                  {score.hasCollegues ? (
+                    <>
+                      <span className="font-bold text-slate-800">{partCollegues}</span>
+                      <span className="text-slate-500"> / 18</span>
+                      <span className="text-[10px] text-slate-400 block font-normal">
+                        ({score.scoreCollegues.toFixed(0)}%)
+                      </span>
+                    </>
+                  ) : (
+                    <div className="flex items-center justify-end gap-1.5" title="Aucune note reçue">
+                      <XCircle className="w-5 h-5 text-red-400" />
+                      <span className="text-xs font-semibold text-red-400">Non noté</span>
+                    </div>
+                  )}
                 </td>
-                <td className="px-4 py-4 text-right text-slate-600 font-medium">
-                  <span className="font-bold text-slate-800">{partClients}</span> / 27
-                  <span className="text-[10px] text-slate-400 block font-normal">
-                    ({clientVal.toFixed(0)}%)
-                  </span>
+                <td className="px-4 py-4 text-right">
+                  {score.hasClient ? (
+                    <>
+                      <span className="font-bold text-slate-800">{partClients}</span>
+                      <span className="text-slate-500"> / 27</span>
+                      <span className="text-[10px] text-slate-400 block font-normal">
+                        ({clientVal.toFixed(0)}%)
+                      </span>
+                    </>
+                  ) : (
+                    <div className="flex items-center justify-end gap-1.5" title="Aucune note client reçue">
+                      <XCircle className="w-5 h-5 text-red-400" />
+                      <span className="text-xs font-semibold text-red-400">Non noté</span>
+                    </div>
+                  )}
                 </td>
-                <td className="px-4 py-4 text-right text-slate-600 font-medium">
-                  <span className="font-bold text-slate-800">{partManager}</span> / 55
-                  <span className="text-[10px] text-slate-400 block font-normal">
-                    ({score.scoreManager.toFixed(0)}%)
-                  </span>
+                <td className="px-4 py-4 text-right">
+                  {score.hasManager ? (
+                    <>
+                      <span className="font-bold text-slate-800">{partManager}</span>
+                      <span className="text-slate-500"> / 55</span>
+                      <span className="text-[10px] text-slate-400 block font-normal">
+                        ({score.scoreManager.toFixed(0)}%)
+                      </span>
+                    </>
+                  ) : (
+                    <div className="flex items-center justify-end gap-1.5" title="Aucune note manager reçue">
+                      <XCircle className="w-5 h-5 text-red-400" />
+                      <span className="text-xs font-semibold text-red-400">Non noté</span>
+                    </div>
+                  )}
                 </td>
                 <td className="px-4 py-4 text-right">
                   <span

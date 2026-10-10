@@ -11,16 +11,29 @@ export async function PATCH(
 
   try {
     const { critereId } = await params
-    const { libelle, description, noteMaximale, typeEvaluateur } = await request.json()
+    const { libelle, description, noteMaximale, typeEvaluateur, typeEvaluateurs } = await request.json()
+
+    // Compatibility for update
+    const finalTypeEvaluateurs = typeEvaluateurs && typeEvaluateurs.length > 0 
+      ? typeEvaluateurs 
+      : (typeEvaluateur === 'TOUS' ? ['MANAGER', 'COLLEGUE', 'CLIENT', 'CLIENT_INTERNE'] : (typeEvaluateur ? [typeEvaluateur] : undefined));
+    
+    const dataToUpdate: any = {
+      libelle,
+      description,
+      noteMaximale,
+    };
+    if (typeEvaluateur && !typeEvaluateurs) {
+      dataToUpdate.typeEvaluateur = typeEvaluateur;
+    }
+    if (finalTypeEvaluateurs) {
+      dataToUpdate.typeEvaluateurs = finalTypeEvaluateurs;
+      dataToUpdate.typeEvaluateur = finalTypeEvaluateurs[0] || 'COLLEGUE';
+    }
 
     const critere = await prisma.critere.update({
       where: { id: critereId },
-      data: {
-        libelle,
-        description,
-        noteMaximale,
-        typeEvaluateur
-      }
+      data: dataToUpdate
     })
 
     return NextResponse.json(critere)

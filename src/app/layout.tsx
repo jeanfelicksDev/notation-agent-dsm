@@ -1,25 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Outfit, Merriweather } from "next/font/google";
 import "./globals.css";
-
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-  display: "swap",
-});
-
-const outfit = Outfit({
-  variable: "--font-outfit",
-  subsets: ["latin"],
-  display: "swap",
-});
-
-const merriweather = Merriweather({
-  variable: "--font-merriweather",
-  weight: ["300", "400", "700", "900"],
-  subsets: ["latin"],
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: "DSM - Système de Notation & Performance",
@@ -34,9 +14,15 @@ export default function RootLayout({
   return (
     <html
       lang="fr"
-      className={`${inter.variable} ${outfit.variable} ${merriweather.variable} h-full antialiased`}
+      className={`h-full antialiased`}
     >
-      <body className="min-h-full font-sans bg-slate-50 text-slate-900 selection:bg-blue-100 selection:text-blue-900">
+      <head>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=Merriweather:wght@300;400;700;900&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body className="min-h-full font-sans bg-slate-50 text-slate-900 selection:bg-blue-100 selection:text-blue-900" style={{ fontFamily: '"Inter", sans-serif' }}>
         {children}
       </body>
     </html>

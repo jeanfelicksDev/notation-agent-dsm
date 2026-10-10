@@ -142,10 +142,13 @@ export async function GET() {
     const isManager = evaluateur.role === 'MANAGER' || evaluateur.role === 'ADMIN'
 
     const filteredCriteres = campagne.criteres.filter(
-      (c: { typeEvaluateur: string }) =>
-        c.typeEvaluateur === 'TOUS' ||
-        (isManager && c.typeEvaluateur === 'MANAGER') ||
-        (!isManager && c.typeEvaluateur === 'COLLEGUE')
+      (c: { typeEvaluateur: string, typeEvaluateurs?: string[] }) => {
+        const types = c.typeEvaluateurs && c.typeEvaluateurs.length > 0 ? c.typeEvaluateurs : [c.typeEvaluateur];
+        return types.includes('TOUS') ||
+          (isManager && types.includes('MANAGER')) ||
+          (!isManager && types.includes('COLLEGUE')) ||
+          (!isManager && types.includes('CLIENT_INTERNE'));
+      }
     )
 
     return NextResponse.json({
