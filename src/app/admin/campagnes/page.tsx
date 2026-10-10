@@ -22,8 +22,26 @@ export default function CampagnesPage() {
 
   useEffect(() => {
     fetch('/api/admin/campagnes')
-      .then(res => res.json())
-      .then(data => setCampagnes(data))
+      .then(res => {
+        if (res.status === 401) {
+          window.location.href = '/api/auth/login'
+          return null
+        }
+        return res.json()
+      })
+      .then(data => {
+        if (!data) return
+        if (Array.isArray(data)) {
+          setCampagnes(data)
+        } else {
+          console.error("API Error:", data)
+          setCampagnes([])
+        }
+      })
+      .catch(err => {
+        console.error("Fetch error:", err)
+        setCampagnes([])
+      })
       .finally(() => setLoading(false))
   }, [])
 
@@ -66,16 +84,22 @@ export default function CampagnesPage() {
     )
   }
 
-  const years = Array.from(new Set(campagnes.map(c => new Date(c.dateDebut).getFullYear())))
+  const years = Array.from(new Set(campagnes
+    .map(c => c.dateDebut ? new Date(c.dateDebut).getFullYear() : null)
+    .filter((y): y is number => y !== null && !isNaN(y))
+  ))
   const sortedYears = years.length > 0 ? years.sort((a, b) => b - a) : [new Date().getFullYear()]
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
 
   // Met à jour l'année par défaut quand les campagnes sont chargées
   useEffect(() => {
     if (campagnes.length > 0) {
-      const availableYears = Array.from(new Set(campagnes.map(c => new Date(c.dateDebut).getFullYear())))
+      const availableYears = Array.from(new Set(campagnes
+        .map(c => c.dateDebut ? new Date(c.dateDebut).getFullYear() : null)
+        .filter((y): y is number => y !== null && !isNaN(y))
+      ))
       const sorted = availableYears.sort((a, b) => b - a)
-      if (!availableYears.includes(selectedYear)) {
+      if (sorted.length > 0 && !availableYears.includes(selectedYear)) {
         setSelectedYear(sorted[0])
       }
     }
