@@ -66,6 +66,21 @@ export default function CampagnesPage() {
     )
   }
 
+  const years = Array.from(new Set(campagnes.map(c => new Date(c.dateDebut).getFullYear())))
+  const sortedYears = years.length > 0 ? years.sort((a, b) => b - a) : [new Date().getFullYear()]
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
+
+  // Met à jour l'année par défaut quand les campagnes sont chargées
+  useEffect(() => {
+    if (campagnes.length > 0) {
+      const availableYears = Array.from(new Set(campagnes.map(c => new Date(c.dateDebut).getFullYear())))
+      const sorted = availableYears.sort((a, b) => b - a)
+      if (!availableYears.includes(selectedYear)) {
+        setSelectedYear(sorted[0])
+      }
+    }
+  }, [campagnes, selectedYear])
+
   return (
     <div className="flex-1 flex flex-col min-w-0">
         <AdminHeader title="Gestion des Campagnes" />
@@ -77,12 +92,25 @@ export default function CampagnesPage() {
                 <p className="text-slate-500 font-medium">Suivez et configurez vos sessions d'évaluation.</p>
               </div>
               <div className="flex flex-wrap items-center gap-3">
-                <Link 
-                  href={`/admin/classement?campagneId=ANNUEL_${new Date().getFullYear()}`}
-                  className="inline-flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-amber-200 transition-all active:scale-95"
-                >
-                  <Trophy className="w-5 h-5" /> Palmarès Annuel {new Date().getFullYear()}
-                </Link>
+                <div className="flex items-center bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                  <select 
+                    value={selectedYear}
+                    onChange={(e) => setSelectedYear(Number(e.target.value))}
+                    className="px-4 py-2.5 bg-transparent text-sm font-bold text-slate-700 outline-none cursor-pointer border-r border-slate-200 hover:bg-slate-50"
+                  >
+                    {sortedYears.map(year => (
+                      <option key={year} value={year}>{year}</option>
+                    ))}
+                  </select>
+                  <Link 
+                    href={`/admin/classement?campagneId=ANNUEL_${selectedYear}`}
+                    className="inline-flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-4 py-2.5 font-bold transition-all active:scale-95"
+                    title="Générer le palmarès annuel"
+                  >
+                    <Trophy className="w-4 h-4" /> 
+                    <span className="hidden sm:inline">Palmarès Annuel</span>
+                  </Link>
+                </div>
                 <Link 
                   href="/admin/campagnes/new" 
                   className="inline-flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-brand-100 transition-all active:scale-95"
