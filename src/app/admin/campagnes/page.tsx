@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Plus, Calendar, CheckCircle, Clock, XCircle, ChevronRight, BarChart3, Users2, ClipboardList } from 'lucide-react'
+import { Plus, Calendar, CheckCircle, Clock, XCircle, ChevronRight, BarChart3, Users2, ClipboardList, Trophy } from 'lucide-react'
 import AdminHeader from '@/components/AdminHeader'
 
 interface Campagne {
@@ -76,12 +76,20 @@ export default function CampagnesPage() {
               <div>
                 <p className="text-slate-500 font-medium">Suivez et configurez vos sessions d'évaluation.</p>
               </div>
-              <Link 
-                href="/admin/campagnes/new" 
-                className="inline-flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-brand-100 transition-all active:scale-95"
-              >
-                <Plus className="w-5 h-5" /> Nouvelle campagne
-              </Link>
+              <div className="flex flex-wrap items-center gap-3">
+                <Link 
+                  href={`/admin/classement?campagneId=ANNUEL_${new Date().getFullYear()}`}
+                  className="inline-flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-amber-200 transition-all active:scale-95"
+                >
+                  <Trophy className="w-5 h-5" /> Palmarès Annuel {new Date().getFullYear()}
+                </Link>
+                <Link 
+                  href="/admin/campagnes/new" 
+                  className="inline-flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-brand-100 transition-all active:scale-95"
+                >
+                  <Plus className="w-5 h-5" /> Nouvelle campagne
+                </Link>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 gap-6">
