@@ -500,7 +500,7 @@ export default function EvaluerPage() {
       <div className="sticky top-0 z-40 flex flex-col shadow-sm">
         {/* Top Header */}
         <header className="bg-[#002B49] text-white">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+          <div className="max-w-[1344px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="w-8 h-8 rounded-full bg-[#D4AF37] flex items-center justify-center text-[#002B49]">
                 <User className="w-4 h-4" />
@@ -533,7 +533,7 @@ export default function EvaluerPage() {
 
         {/* Global Progress & Colleague Tabs */}
         <div className="bg-slate-50/95 backdrop-blur-md pt-6 pb-2 border-b border-slate-200/80">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 w-full">
+          <div className="max-w-[1344px] mx-auto px-4 sm:px-6 w-full">
             {/* Global Progress & Info */}
             <div className="mb-4 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
               <div>
@@ -613,7 +613,7 @@ export default function EvaluerPage() {
 
       {/* Main Content (Scrollable below sticky header) */}
       <main className="flex-1 w-full flex flex-col pt-8">
-        <div className="max-w-4xl mx-auto w-full px-4 sm:px-6 mb-12">
+        <div className="max-w-[1344px] mx-auto w-full px-4 sm:px-6 mb-12">
           {currentEvalue && (
             <div className="space-y-6 animate-fade-in">
               {currentAffCriteres.length > 0 && currentAffCriteres.map((critere, critIdx) => {
