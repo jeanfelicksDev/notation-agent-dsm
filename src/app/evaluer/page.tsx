@@ -494,10 +494,10 @@ export default function EvaluerPage() {
     affectations.length === 0 ? 0 : Math.round((completionCount / affectations.length) * 100)
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-[var(--font-inter)] text-slate-900">
+    <div className="h-screen flex flex-col bg-slate-50 overflow-hidden font-[var(--font-inter)] text-slate-900">
       
-      {/* ================= STICKY HEADER & TABS ================= */}
-      <div className="sticky top-0 z-40 flex flex-col shadow-sm">
+      {/* ================= HEADER & TABS (FIGÉ / NON-SCROLLABLE) ================= */}
+      <div className="shrink-0 z-40 flex flex-col shadow-sm bg-white">
         {/* Top Header */}
         <header className="bg-[#002B49] text-white">
           <div className="max-w-[1344px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
@@ -611,8 +611,8 @@ export default function EvaluerPage() {
       </div>
       {/* ========================================================= */}
 
-      {/* Main Content (Scrollable below sticky header) */}
-      <main className="flex-1 w-full flex flex-col pt-8">
+      {/* Main Content (Scrollable independently below frozen header) */}
+      <main className="flex-1 w-full overflow-y-auto flex flex-col pt-6 pb-20 custom-scrollbar">
         <div className="max-w-[1344px] mx-auto w-full px-4 sm:px-6 mb-12">
           {currentEvalue && (
             <div className="space-y-6 animate-fade-in">
