@@ -13,10 +13,16 @@ async function calculateScoresForCampagne(campagneId: string) {
   if (!campagne) return
 
   // 1. Récupérer toutes les notes internes et notes clients en parallèle
+  // 1. Récupérer toutes les notes internes et notes clients en parallèle
   const [allNotes, allNotesClients] = await Promise.all([
     prisma.note.findMany({
       where: { campagneId: campagne.id },
-      include: { critere: true },
+      include: {
+        critere: true,
+        evaluateur: {
+          select: { id: true, role: true, service: true },
+        },
+      },
     }),
     prisma.noteClient.findMany({
       where: { campagneId: campagne.id },
@@ -60,40 +66,73 @@ async function calculateScoresForCampagne(campagneId: string) {
     const notesRecues = notesByEvalue.get(evalueId) || []
     const clientNotes = clientNotesByAgent.get(evalueId) || []
 
-    const notesCollegues = notesRecues.filter(
-      (n) => n.critere.typeEvaluateur === 'COLLEGUE' || n.critere.typeEvaluateur === 'TOUS'
-    )
-    const notesManager = notesRecues.filter(
-      (n) => n.critere.typeEvaluateur === 'MANAGER'
-    )
+    // 1. Notes attribuées par le/les Manager(s)
+    const notesManager = notesRecues.filter((n) => {
+      const isMgr = n.evaluateur?.role === 'MANAGER' || n.evaluateur?.role === 'ADMIN'
+      const types = n.critere.typeEvaluateurs && n.critere.typeEvaluateurs.length > 0
+        ? n.critere.typeEvaluateurs
+        : [n.critere.typeEvaluateur]
+      return isMgr || (types.includes('MANAGER') && !types.includes('COLLEGUE'))
+    })
 
-    // 2.1 Calculer les notes des collègues internes (base 100)
+    // 2. Notes attribuées par les Collègues et Clients Internes (non-managers)
+    const notesCollegues = notesRecues.filter((n) => {
+      const isMgr = n.evaluateur?.role === 'MANAGER' || n.evaluateur?.role === 'ADMIN'
+      const types = n.critere.typeEvaluateurs && n.critere.typeEvaluateurs.length > 0
+        ? n.critere.typeEvaluateurs
+        : [n.critere.typeEvaluateur]
+      return !isMgr && (types.includes('COLLEGUE') || types.includes('CLIENT_INTERNE') || types.includes('TOUS'))
+    })
+
+    // 2.1 Calcul de la note Manager normalisée (sur base 100, destinée à peser sur 55 pts)
+    let scoreManagerBase100 = 0
+    let hasNotesManager = false
+    if (notesManager.length > 0) {
+      const notesParMgr: Record<string, number> = {}
+      const maxParMgr: Record<string, number> = {}
+      for (const note of notesManager) {
+        notesParMgr[note.evaluateurId] = (notesParMgr[note.evaluateurId] || 0) + note.valeur
+        maxParMgr[note.evaluateurId] = (maxParMgr[note.evaluateurId] || 0) + (note.critere.noteMaximale || 5)
+      }
+
+      const mgrRatios: number[] = []
+      for (const id of Object.keys(notesParMgr)) {
+        const val = notesParMgr[id]
+        const max = maxParMgr[id] || 1
+        mgrRatios.push(val / max)
+      }
+
+      if (mgrRatios.length > 0) {
+        scoreManagerBase100 = (mgrRatios.reduce((sum, r) => sum + r, 0) / mgrRatios.length) * 100
+        hasNotesManager = true
+      }
+    }
+
+    // 2.2 Calcul des notes Collègues & Clients Internes normalisées (base 100)
     let scoreColleguesBase100 = 0
     let hasNotesCollegues = false
     if (notesCollegues.length > 0) {
-      const notesParEvaluateur: Record<string, number> = {}
-      const maxPtsParEvaluateur: Record<string, number> = {}
+      const notesParEval: Record<string, number> = {}
+      const maxParEval: Record<string, number> = {}
       for (const note of notesCollegues) {
-        notesParEvaluateur[note.evaluateurId] =
-          (notesParEvaluateur[note.evaluateurId] || 0) + note.valeur
-        maxPtsParEvaluateur[note.evaluateurId] =
-          (maxPtsParEvaluateur[note.evaluateurId] || 0) + (note.critere.noteMaximale || 5)
+        notesParEval[note.evaluateurId] = (notesParEval[note.evaluateurId] || 0) + note.valeur
+        maxParEval[note.evaluateurId] = (maxParEval[note.evaluateurId] || 0) + (note.critere.noteMaximale || 5)
       }
 
-      const ratios: number[] = []
-      for (const evalId of Object.keys(notesParEvaluateur)) {
-        const val = notesParEvaluateur[evalId]
-        const max = maxPtsParEvaluateur[evalId] || 1
-        ratios.push(val / max)
+      const peerRatios: number[] = []
+      for (const id of Object.keys(notesParEval)) {
+        const val = notesParEval[id]
+        const max = maxParEval[id] || 1
+        peerRatios.push(val / max)
       }
 
-      if (ratios.length > 0) {
-        scoreColleguesBase100 = (ratios.reduce((sum, r) => sum + r, 0) / ratios.length) * 100
+      if (peerRatios.length > 0) {
+        scoreColleguesBase100 = (peerRatios.reduce((sum, r) => sum + r, 0) / peerRatios.length) * 100
         hasNotesCollegues = true
       }
     }
 
-    // 2.2 Calculer les notes des clients externes (3 critères notés sur 5 pts) (base 100)
+    // 2.3 Calcul des notes Clients QR normalisées (base 100)
     let scoreClientBase100 = 0
     let hasNotesClients = false
     if (clientNotes.length > 0) {
@@ -110,50 +149,44 @@ async function calculateScoresForCampagne(campagneId: string) {
         .map((c) => c.val / c.max)
 
       if (clientRatios.length > 0) {
-        scoreClientBase100 =
-          (clientRatios.reduce((sum, r) => sum + r, 0) / clientRatios.length) * 100
+        scoreClientBase100 = (clientRatios.reduce((sum, r) => sum + r, 0) / clientRatios.length) * 100
         hasNotesClients = true
       }
     }
 
-    // 2.3 Pondération des 45% alloués aux notes agents :
-    // - 60% pour les Clients Externes
-    // - 40% pour les Collègues Internes
-    let scoreComposanteAgentsBase100 = 0
+    // 2.4 LE TOTAL DES NOTES COLLÈGUES + CLIENT INTERNE + CLIENT QR EST SUR 45 POINTS
+    // (Collègues: 20 pts, Clients QR: 25 pts)
+    // ET CELUI DES MANAGERS SUR 55 POINTS, QUELQUE SOIT LE NOMBRE DE CRITÈRES SOUMIS
+    let scoreNonManagerBase100 = 0
     if (hasNotesCollegues && hasNotesClients) {
-      scoreComposanteAgentsBase100 = scoreColleguesBase100 * 0.4 + scoreClientBase100 * 0.6
+      // Si l'agent a à la fois des collègues internes et des clients QR :
+      // Répartition : pairs internes (20 pts) + clients QR (25 pts) = 45 points au total
+      scoreNonManagerBase100 = (scoreColleguesBase100 * 20 + scoreClientBase100 * 25) / 45
     } else if (hasNotesCollegues) {
-      scoreComposanteAgentsBase100 = scoreColleguesBase100
+      // Uniquement des collègues / clients internes : 100% de la note attribuée sur les 45 points
+      scoreNonManagerBase100 = scoreColleguesBase100
     } else if (hasNotesClients) {
-      scoreComposanteAgentsBase100 = scoreClientBase100
+      // Uniquement des clients QR : 100% de la note attribuée sur les 45 points
+      scoreNonManagerBase100 = scoreClientBase100
     }
 
     const poidsColleguesTotal = campagne.poidsCollegues || 45
-    const scoreAgentsPondere = (scoreComposanteAgentsBase100 * poidsColleguesTotal) / 100
-
-    // 2.4 Calculer la note Manager (55%)
-    let scoreManagerBase100 = 0
-    let hasNotesManager = false
-    if (notesManager.length > 0) {
-      const valTotal = notesManager.reduce((sum, n) => sum + n.valeur, 0)
-      const maxTotal = notesManager.reduce((sum, n) => sum + (n.critere.noteMaximale || 5), 0)
-      if (maxTotal > 0) {
-        scoreManagerBase100 = (valTotal / maxTotal) * 100
-        hasNotesManager = true
-      }
-    }
-
     const poidsManagerTotal = campagne.poidsManager || 55
-    const scoreManagerPondere = (scoreManagerBase100 * poidsManagerTotal) / 100
 
-    // 2.5 Score global final
+    // Part globale Collègues + Client Interne + Client QR sur 45 points
+    const partNonManagerSur45 = (scoreNonManagerBase100 * poidsColleguesTotal) / 100
+
+    // Part globale Manager sur 55 points
+    const partManagerSur55 = (scoreManagerBase100 * poidsManagerTotal) / 100
+
+    // 2.5 Score total final sur 100 points
     let scoreTotal = 0
     if (hasNotesManager && (hasNotesCollegues || hasNotesClients)) {
-      scoreTotal = Math.round((scoreAgentsPondere + scoreManagerPondere) * 100) / 100
+      scoreTotal = Math.round((partNonManagerSur45 + partManagerSur55) * 100) / 100
     } else if (hasNotesManager) {
       scoreTotal = Math.round(scoreManagerBase100 * 100) / 100
     } else if (hasNotesCollegues || hasNotesClients) {
-      scoreTotal = Math.round(scoreComposanteAgentsBase100 * 100) / 100
+      scoreTotal = Math.round(scoreNonManagerBase100 * 100) / 100
     }
 
     scoresToUpsert.push({

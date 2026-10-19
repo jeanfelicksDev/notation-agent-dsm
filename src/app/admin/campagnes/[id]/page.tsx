@@ -2061,20 +2061,41 @@ function ClassementCampagneView({
     XLSX.utils.book_append_sheet(wb, wsPalmares, 'Palmarès & Lauréats')
 
     // 2. Feuille Tous les scores
-    const allData = data.tousLesScores.map((s: any, idx: number) => ({
-      Rang: s.rangGlobal || idx + 1,
-      Matricule: s.matricule,
-      Nom: s.nom,
-      Prénom: s.prenom,
-      Direction: s.direction,
-      Département: s.departement,
-      Service: s.service,
-      'Score Collègues (%)': s.scoreCollegues,
-      'Score Manager (%)': s.scoreManager,
-      'Score Client (%)': s.scoreClient,
-      'Score Total (%)': s.scoreTotal,
-      Appréciation: getAppreciationInfo(s.scoreTotal).appreciation,
-    }))
+    const allData = data.tousLesScores.map((s: any, idx: number) => {
+      const hasColl = s.hasCollegues ?? (s.scoreCollegues > 0)
+      const hasCli = s.hasClient ?? (s.scoreClient > 0)
+      const clientVal = s.scoreClient || 0
+      const partManager = Math.round(s.scoreManager * 0.55 * 10) / 10
+      const partCollegues = hasColl && hasCli
+        ? Math.round(s.scoreCollegues * 0.20 * 10) / 10
+        : hasColl
+        ? Math.round(s.scoreCollegues * 0.45 * 10) / 10
+        : 0
+      const maxCollegues = hasColl && hasCli ? 20 : 45
+      const partClients = hasColl && hasCli
+        ? Math.round(clientVal * 0.25 * 10) / 10
+        : hasCli
+        ? Math.round(clientVal * 0.45 * 10) / 10
+        : 0
+      const maxClients = hasColl && hasCli ? 25 : 45
+      const partNonManager = Math.round((partCollegues + partClients) * 10) / 10
+
+      return {
+        Rang: s.rangGlobal || idx + 1,
+        Matricule: s.matricule,
+        Nom: s.nom,
+        Prénom: s.prenom,
+        Direction: s.direction,
+        Département: s.departement,
+        Service: s.service,
+        'Part Collègues (pts)': `${partCollegues}/${maxCollegues}`,
+        'Part Clients QR (pts)': hasCli ? `${partClients}/${maxClients}` : 'Non concerné',
+        'Total Collègues & Clients (45 pts)': `${partNonManager}/45`,
+        'Part Manager (55 pts)': `${partManager}/55`,
+        'Score Total (/100)': s.scoreTotal,
+        Appréciation: getAppreciationInfo(s.scoreTotal).appreciation,
+      }
+    })
     const wsAll = XLSX.utils.json_to_sheet(allData)
     XLSX.utils.book_append_sheet(wb, wsAll, 'Classement Général')
 
@@ -2442,10 +2463,10 @@ function ClassementCampagneView({
                         <th className="py-3.5 px-4 text-center w-16">Rang</th>
                         <th className="py-3.5 px-4">Collaborateur</th>
                         <th className="py-3.5 px-4">Entité / Service</th>
-                        <th className="py-3.5 px-3 text-center">Pairs ({formData.poidsCollegues}%)</th>
-                        <th className="py-3.5 px-3 text-center">Manager ({formData.poidsManager}%)</th>
-                        <th className="py-3.5 px-3 text-center">Client</th>
-                        <th className="py-3.5 px-4 text-center font-black text-slate-800">Score Final</th>
+                        <th className="py-3.5 px-3 text-center">Collègues & Pairs</th>
+                        <th className="py-3.5 px-3 text-center">Manager (55 pts)</th>
+                        <th className="py-3.5 px-3 text-center">Client QR</th>
+                        <th className="py-3.5 px-4 text-center font-black text-slate-800">Score Total (/100)</th>
                         <th className="py-3.5 px-4 text-center">Mention</th>
                       </tr>
                     </thead>
@@ -2460,6 +2481,23 @@ function ClassementCampagneView({
                         filteredScores.map((score: any, idx: number) => {
                           const appInfo = getAppreciationInfo(score.scoreTotal)
                           const rang = score.rangGlobal || idx + 1
+                          const hasColl = score.hasCollegues ?? (score.scoreCollegues > 0)
+                          const hasCli = score.hasClient ?? (score.scoreClient > 0)
+                          const clientVal = score.scoreClient || 0
+                          const partManager = Math.round(score.scoreManager * 0.55 * 10) / 10
+                          const partCollegues = hasColl && hasCli
+                            ? Math.round(score.scoreCollegues * 0.20 * 10) / 10
+                            : hasColl
+                            ? Math.round(score.scoreCollegues * 0.45 * 10) / 10
+                            : 0
+                          const maxCollegues = hasColl && hasCli ? 20 : 45
+                          const partClients = hasColl && hasCli
+                            ? Math.round(clientVal * 0.25 * 10) / 10
+                            : hasCli
+                            ? Math.round(clientVal * 0.45 * 10) / 10
+                            : 0
+                          const maxClients = hasColl && hasCli ? 25 : 45
+
                           return (
                             <tr key={score.utilisateurId || idx} className="hover:bg-slate-50/80 transition-colors">
                               <td className="py-3.5 px-4 text-center font-black">
@@ -2489,17 +2527,41 @@ function ClassementCampagneView({
                                 <p className="font-bold text-slate-700">{score.service}</p>
                                 <p className="text-[10px] text-slate-400">{score.departement}</p>
                               </td>
-                              <td className="py-3.5 px-3 text-center font-bold text-slate-700">
-                                {score.scoreCollegues}%
+                              <td className="py-3.5 px-3 text-center">
+                                {hasColl ? (
+                                  <div>
+                                    <span className="font-bold text-slate-800">{partCollegues}</span>
+                                    <span className="text-[10px] text-slate-400">/{maxCollegues} pts</span>
+                                    <span className="text-[10px] text-blue-600 block font-normal">({score.scoreCollegues.toFixed(0)}%)</span>
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-400 text-xs">Non noté</span>
+                                )}
                               </td>
-                              <td className="py-3.5 px-3 text-center font-bold text-slate-700">
-                                {score.scoreManager}%
+                              <td className="py-3.5 px-3 text-center">
+                                {score.hasManager || score.scoreManager > 0 ? (
+                                  <div>
+                                    <span className="font-bold text-slate-800">{partManager}</span>
+                                    <span className="text-[10px] text-slate-400">/55 pts</span>
+                                    <span className="text-[10px] text-indigo-600 block font-normal">({score.scoreManager.toFixed(0)}%)</span>
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-400 text-xs">Non noté</span>
+                                )}
                               </td>
-                              <td className="py-3.5 px-3 text-center font-bold text-slate-500">
-                                {score.scoreClient > 0 ? `${score.scoreClient}%` : '—'}
+                              <td className="py-3.5 px-3 text-center">
+                                {hasCli ? (
+                                  <div>
+                                    <span className="font-bold text-slate-800">{partClients}</span>
+                                    <span className="text-[10px] text-slate-400">/{maxClients} pts</span>
+                                    <span className="text-[10px] text-amber-600 block font-normal">({clientVal.toFixed(0)}%)</span>
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-400 text-xs font-medium">Non concerné</span>
+                                )}
                               </td>
                               <td className="py-3.5 px-4 text-center">
-                                <span className="text-sm font-black text-slate-900">{score.scoreTotal}%</span>
+                                <span className="text-sm font-black text-slate-900">{score.scoreTotal.toFixed(1)} / 100</span>
                               </td>
                               <td className="py-3.5 px-4 text-center">
                                 <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black border ${appInfo.colorBadge}`}>

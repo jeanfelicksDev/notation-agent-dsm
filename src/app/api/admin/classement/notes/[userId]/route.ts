@@ -43,7 +43,7 @@ export async function GET(
           select: { id: true, nom: true, prenom: true, matricule: true, role: true, service: true },
         },
         critere: {
-          select: { id: true, libelle: true, noteMaximale: true, typeEvaluateur: true },
+          select: { id: true, libelle: true, noteMaximale: true, typeEvaluateur: true, typeEvaluateurs: true },
         },
       },
       orderBy: [{ critere: { typeEvaluateur: 'asc' } }, { evaluateur: { nom: 'asc' } }],
@@ -54,7 +54,7 @@ export async function GET(
       where: { agentId: userId, campagneId: campagne.id },
       include: {
         critere: {
-          select: { id: true, libelle: true, noteMaximale: true },
+          select: { id: true, libelle: true, noteMaximale: true, typeEvaluateur: true, typeEvaluateurs: true },
         },
       },
       orderBy: { createdAt: 'asc' },
@@ -71,7 +71,7 @@ export async function GET(
       string,
       {
         evaluateur: { id: string; nom: string; prenom: string; matricule: string; role: string; service: string | null }
-        notes: Array<{ critereId: string; critereLibelle: string; noteMaximale: number; valeur: number; commentaire: string | null; typeEvaluateur: string }>
+        notes: Array<{ critereId: string; critereLibelle: string; noteMaximale: number; valeur: number; commentaire: string | null; typeEvaluateur: string; typeEvaluateurs?: string[] }>
       }
     >()
 
@@ -87,6 +87,7 @@ export async function GET(
         valeur: note.valeur,
         commentaire: note.commentaire,
         typeEvaluateur: note.critere.typeEvaluateur,
+        typeEvaluateurs: note.critere.typeEvaluateurs,
       })
     }
 
@@ -119,7 +120,13 @@ export async function GET(
 
     return NextResponse.json({
       campagneLibelle: campagne.libelle,
-      criteres: criteres.map((c) => ({ id: c.id, libelle: c.libelle, noteMaximale: c.noteMaximale, typeEvaluateur: c.typeEvaluateur })),
+      criteres: criteres.map((c) => ({
+        id: c.id,
+        libelle: c.libelle,
+        noteMaximale: c.noteMaximale,
+        typeEvaluateur: c.typeEvaluateur,
+        typeEvaluateurs: c.typeEvaluateurs,
+      })),
       evaluateursNotes,
       clientsNotes,
     })

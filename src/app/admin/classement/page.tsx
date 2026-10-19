@@ -106,6 +106,7 @@ interface DetailedNote {
   valeur: number
   commentaire: string | null
   typeEvaluateur?: string
+  typeEvaluateurs?: string[]
 }
 
 interface EvaluateurNotes {
@@ -120,7 +121,7 @@ interface ClientNotes {
 
 interface DetailedNotesData {
   campagneLibelle: string
-  criteres: Array<{ id: string; libelle: string; noteMaximale: number; typeEvaluateur: string }>
+  criteres: Array<{ id: string; libelle: string; noteMaximale: number; typeEvaluateur: string; typeEvaluateurs?: string[] }>
   evaluateursNotes: EvaluateurNotes[]
   clientsNotes: ClientNotes[]
 }
@@ -289,10 +290,9 @@ export default function ClassementPage() {
           Matricule: s.matricule,
           Nom: s.nom,
           Prénom: s.prenom,
-          'Score Collègues (18 pts)': Math.round(s.scoreCollegues * 0.18 * 10) / 10,
-          'Score Clients (27 pts)': Math.round(s.scoreClient * 0.27 * 10) / 10,
+          'Score Collègues & Clients (45 pts)': Math.round((s.hasClient && s.hasCollegues ? (s.scoreCollegues * 0.20 + s.scoreClient * 0.25) : (s.hasCollegues ? s.scoreCollegues * 0.45 : s.scoreClient * 0.45)) * 10) / 10,
           'Score Manager (55 pts)': Math.round(s.scoreManager * 0.55 * 10) / 10,
-          'Score Total (%)': s.scoreTotal,
+          'Score Total (/100)': s.scoreTotal,
           Appréciation: app.appreciation,
           Titre: s.isMajorDirection ? '🏆 Major Direction' : '',
         })
@@ -361,12 +361,11 @@ export default function ClassementPage() {
         Nom: s.nom,
         Prénom: s.prenom,
         'Score Collègues (/100)': s.scoreCollegues,
-        'Score Clients (/100)': s.scoreClient,
+        'Score Clients QR (/100)': s.scoreClient,
         'Score Manager (/100)': s.scoreManager,
-        'Part Collègues (18 pts)': Math.round(s.scoreCollegues * 0.18 * 10) / 10,
-        'Part Clients (27 pts)': Math.round(s.scoreClient * 0.27 * 10) / 10,
+        'Part Collègues & Clients (45 pts)': Math.round((s.hasClient && s.hasCollegues ? (s.scoreCollegues * 0.20 + s.scoreClient * 0.25) : (s.hasCollegues ? s.scoreCollegues * 0.45 : s.scoreClient * 0.45)) * 10) / 10,
         'Part Manager (55 pts)': Math.round(s.scoreManager * 0.55 * 10) / 10,
-        'Score Total (%)': s.scoreTotal,
+        'Score Total (/100)': s.scoreTotal,
         Appréciation: app.appreciation,
         Interprétation: app.interpretation,
       }
@@ -828,9 +827,7 @@ export default function ClassementPage() {
                     <div className="mt-6 pt-4 border-t border-white/20 flex flex-wrap items-center justify-between gap-4 text-xs font-semibold text-amber-100">
                       <div>🎁 Dotation : 1 500 000 FCFA + Séjour familial & Gala AGL</div>
                       <div className="flex items-center gap-3">
-                        <span>Collègues : {Math.round(data.laureats.majorGlobal.scoreCollegues * 0.18 * 10) / 10}/18 pts</span>
-                        <span>•</span>
-                        <span>Clients : {Math.round(data.laureats.majorGlobal.scoreClient * 0.27 * 10) / 10}/27 pts</span>
+                        <span>Collègues & Clients : {Math.round((data.laureats.majorGlobal.hasClient && data.laureats.majorGlobal.hasCollegues ? data.laureats.majorGlobal.scoreCollegues * 0.20 + data.laureats.majorGlobal.scoreClient * 0.25 : data.laureats.majorGlobal.hasCollegues ? data.laureats.majorGlobal.scoreCollegues * 0.45 : data.laureats.majorGlobal.scoreClient * 0.45) * 10) / 10}/45 pts</span>
                         <span>•</span>
                         <span>Manager : {Math.round(data.laureats.majorGlobal.scoreManager * 0.55 * 10) / 10}/55 pts</span>
                       </div>
@@ -985,7 +982,7 @@ export default function ClassementPage() {
                     <div>
                       <h4 className="text-base font-black text-white">Classement Complet de l'Ensemble des Notés</h4>
                       <p className="text-xs text-blue-200 mt-0.5">
-                        Accédez au tableau exhaustif des {allScoresCount} agents évalués avec leurs rangs et le détail de chaque note (Collègues 18 pts, Clients 27 pts, Manager 55 pts).
+                        Accédez au tableau exhaustif des {allScoresCount} agents évalués avec leurs rangs et le détail de chaque note (Collègues & Clients 45 pts, Manager 55 pts).
                       </p>
                     </div>
                   </div>
@@ -1315,9 +1312,33 @@ export default function ClassementPage() {
             {/* Score Global Card */}
             {(() => {
               const app = getAppreciationInfo(selectedScore.scoreTotal)
-              const partCollegues = Math.round(selectedScore.scoreCollegues * 0.18 * 10) / 10
+              const hasColl = selectedScore.hasCollegues
+              const hasCli = selectedScore.hasClient
               const clientVal = selectedScore.scoreClient !== undefined ? selectedScore.scoreClient : 0
-              const partClients = Math.round(clientVal * 0.27 * 10) / 10
+
+              // Règle DSM TAMIS : Collègues + Client Interne + Client QR sur 45 pts, Manager sur 55 pts
+              const partCollegues = hasColl && hasCli
+                ? Math.round(selectedScore.scoreCollegues * 0.20 * 10) / 10
+                : hasColl
+                ? Math.round(selectedScore.scoreCollegues * 0.45 * 10) / 10
+                : 0
+              const maxCollegues = hasColl && hasCli ? 20 : 45
+
+              const partClients = hasColl && hasCli
+                ? Math.round(clientVal * 0.25 * 10) / 10
+                : hasCli
+                ? Math.round(clientVal * 0.45 * 10) / 10
+                : 0
+              const maxClients = hasColl && hasCli ? 25 : 45
+
+              const partNonManager = Math.round(
+                (hasColl && hasCli
+                  ? partCollegues + partClients
+                  : hasColl
+                  ? partCollegues
+                  : partClients) * 10
+              ) / 10
+
               const partManager = Math.round(selectedScore.scoreManager * 0.55 * 10) / 10
 
               return (
@@ -1354,18 +1375,23 @@ export default function ClassementPage() {
                     </div>
                   </div>
 
-                  {/* Détails des 3 Pôles */}
+                  {/* Détails des Composantes */}
                   <div className="space-y-3">
-                    <div className="text-xs font-black uppercase text-slate-400 tracking-wider">
-                      Répartition des 3 composantes d'évaluation
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs font-black uppercase text-slate-400 tracking-wider">
+                        Répartition des composantes d'évaluation
+                      </div>
+                      <div className="text-xs font-bold text-slate-600">
+                        Collègues & Clients ({partNonManager} / 45 pts) • Manager ({partManager} / 55 pts)
+                      </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       {/* Collègues */}
                       <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/80 flex flex-col justify-between">
                         <div>
-                          <div className="text-[11px] font-bold text-slate-500 uppercase">Collègues (18 pts)</div>
+                          <div className="text-[11px] font-bold text-slate-500 uppercase">Collègues & Pairs ({maxCollegues} pts)</div>
                           <div className="text-xl font-black text-slate-900 mt-1">
-                            {partCollegues} <span className="text-xs font-medium text-slate-500">/ 18 pts</span>
+                            {partCollegues} <span className="text-xs font-medium text-slate-500">/ {maxCollegues} pts</span>
                           </div>
                           <div className="text-[11px] text-blue-600 font-semibold mt-0.5">
                             Note : {selectedScore.scoreCollegues.toFixed(1)}%
@@ -1374,7 +1400,7 @@ export default function ClassementPage() {
                         <div className="w-full bg-slate-200 h-1.5 rounded-full mt-3 overflow-hidden">
                           <div
                             className="bg-blue-600 h-full rounded-full"
-                            style={{ width: `${Math.min(100, (partCollegues / 18) * 100)}%` }}
+                            style={{ width: `${maxCollegues > 0 ? Math.min(100, (partCollegues / maxCollegues) * 100) : 0}%` }}
                           ></div>
                         </div>
                       </div>
@@ -1382,18 +1408,24 @@ export default function ClassementPage() {
                       {/* Clients Externes */}
                       <div className="bg-amber-50/50 rounded-2xl p-4 border border-amber-200/80 flex flex-col justify-between">
                         <div>
-                          <div className="text-[11px] font-bold text-amber-800 uppercase">Clients Ext. (27 pts)</div>
+                          <div className="text-[11px] font-bold text-amber-800 uppercase">Clients QR ({hasCli ? `${maxClients} pts` : 'Non noté'})</div>
                           <div className="text-xl font-black text-amber-900 mt-1">
-                            {partClients} <span className="text-xs font-medium text-amber-700">/ 27 pts</span>
+                            {hasCli ? (
+                              <>
+                                {partClients} <span className="text-xs font-medium text-amber-700">/ {maxClients} pts</span>
+                              </>
+                            ) : (
+                              <span className="text-sm font-semibold text-slate-400">Non concerné</span>
+                            )}
                           </div>
                           <div className="text-[11px] text-amber-700 font-semibold mt-0.5">
-                            Note : {clientVal.toFixed(1)}%
+                            {hasCli ? `Note : ${clientVal.toFixed(1)}%` : 'Pondéré sur collègues'}
                           </div>
                         </div>
                         <div className="w-full bg-amber-200 h-1.5 rounded-full mt-3 overflow-hidden">
                           <div
                             className="bg-amber-500 h-full rounded-full"
-                            style={{ width: `${Math.min(100, (partClients / 27) * 100)}%` }}
+                            style={{ width: `${hasCli && maxClients > 0 ? Math.min(100, (partClients / maxClients) * 100) : 0}%` }}
                           ></div>
                         </div>
                       </div>
@@ -1436,20 +1468,24 @@ export default function ClassementPage() {
                 </div>
               ) : detailedNotes ? (
                 <>
-                  {/* Notes Collègues */}
+                  {/* Notes Collègues & Clients Internes */}
                   {(() => {
                     const colleguesEvals = detailedNotes.evaluateursNotes.filter(
-                      (e) => e.evaluateur.role !== 'MANAGER' && e.notes.some((n) => n.typeEvaluateur === 'COLLEGUE' || n.typeEvaluateur === 'TOUS')
+                      (e) => e.evaluateur.role !== 'MANAGER' && e.evaluateur.role !== 'ADMIN'
                     )
-                    const colleguesCriteres = detailedNotes.criteres.filter(
-                      (c) => c.typeEvaluateur === 'COLLEGUE' || c.typeEvaluateur === 'TOUS'
-                    )
+                    const colleguesCriteres = detailedNotes.criteres.filter((c) => {
+                      const types = (c as any).typeEvaluateurs && (c as any).typeEvaluateurs.length > 0 ? (c as any).typeEvaluateurs : [c.typeEvaluateur]
+                      return types.includes('COLLEGUE') || types.includes('CLIENT_INTERNE') || types.includes('TOUS')
+                    })
                     if (colleguesEvals.length === 0) return null
                     return (
                       <div className="bg-blue-50/50 border border-blue-100 rounded-2xl overflow-hidden">
-                        <div className="bg-blue-600 px-4 py-2.5 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-2">
-                          <Users2 className="w-4 h-4" />
-                          Notes des Collègues ({colleguesEvals.length} évaluateur{colleguesEvals.length > 1 ? 's' : ''})
+                        <div className="bg-blue-600 px-4 py-2.5 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Users2 className="w-4 h-4" />
+                            <span>Notes des Collègues & Clients Internes ({colleguesEvals.length} évaluateur{colleguesEvals.length > 1 ? 's' : ''})</span>
+                          </div>
+                          <span className="text-[11px] font-black bg-white/20 px-2 py-0.5 rounded">Barème normalisé sur 45 pts</span>
                         </div>
                         <div className="overflow-x-auto">
                           <table className="w-full text-xs">
@@ -1462,14 +1498,19 @@ export default function ClassementPage() {
                                     <div className="text-[10px] font-normal text-blue-500">/{c.noteMaximale}</div>
                                   </th>
                                 ))}
-                                <th className="px-3 py-2.5 text-center font-black text-blue-900 whitespace-nowrap">Total</th>
+                                <th className="px-3 py-2.5 text-center font-bold text-blue-900 whitespace-nowrap">Total Brut</th>
+                                <th className="px-3 py-2.5 text-center font-black text-blue-950 whitespace-nowrap bg-blue-100/60">Sur 45 pts</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-blue-50">
                               {colleguesEvals.map((ev) => {
-                                const filteredNotes = ev.notes.filter((n) => n.typeEvaluateur === 'COLLEGUE' || n.typeEvaluateur === 'TOUS')
+                                const filteredNotes = ev.notes.filter((n) => {
+                                  const types = (n as any).typeEvaluateurs && (n as any).typeEvaluateurs.length > 0 ? (n as any).typeEvaluateurs : [n.typeEvaluateur]
+                                  return types.includes('COLLEGUE') || types.includes('CLIENT_INTERNE') || types.includes('TOUS')
+                                })
                                 const total = filteredNotes.reduce((s, n) => s + n.valeur, 0)
-                                const maxTotal = colleguesCriteres.reduce((s, c) => s + c.noteMaximale, 0)
+                                const maxTotal = filteredNotes.reduce((s, n) => s + n.noteMaximale, 0)
+                                const scoreSur45 = maxTotal > 0 ? Math.round((total / maxTotal) * 45 * 10) / 10 : 0
                                 return (
                                   <tr key={ev.evaluateur.id} className="hover:bg-blue-50/50 transition-colors">
                                     <td className="px-3 py-2.5 whitespace-nowrap">
@@ -1492,8 +1533,11 @@ export default function ClassementPage() {
                                         </td>
                                       )
                                     })}
-                                    <td className="px-3 py-2.5 text-center font-black text-slate-900">
+                                    <td className="px-3 py-2.5 text-center font-bold text-slate-700">
                                       {total}<span className="text-slate-400 font-normal">/{maxTotal}</span>
+                                    </td>
+                                    <td className="px-3 py-2.5 text-center font-black text-blue-700 bg-blue-50/80">
+                                      {scoreSur45} <span className="text-[10px] text-blue-500 font-normal">/ 45</span>
                                     </td>
                                   </tr>
                                 )
@@ -1505,14 +1549,17 @@ export default function ClassementPage() {
                     )
                   })()}
 
-                  {/* Notes Clients */}
+                  {/* Notes Clients Externes QR */}
                   {detailedNotes.clientsNotes.length > 0 && (() => {
                     const clientCriteres = detailedNotes.criteres.filter((c) => c.typeEvaluateur === 'CLIENT')
                     return (
                       <div className="bg-amber-50/50 border border-amber-100 rounded-2xl overflow-hidden">
-                        <div className="bg-amber-500 px-4 py-2.5 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-2">
-                          <Globe2 className="w-4 h-4" />
-                          Notes des Clients Externes ({detailedNotes.clientsNotes.length} client{detailedNotes.clientsNotes.length > 1 ? 's' : ''})
+                        <div className="bg-amber-500 px-4 py-2.5 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Globe2 className="w-4 h-4" />
+                            <span>Notes des Clients Externes QR ({detailedNotes.clientsNotes.length} avis)</span>
+                          </div>
+                          <span className="text-[11px] font-black bg-white/20 px-2 py-0.5 rounded">Barème normalisé sur 45 pts</span>
                         </div>
                         <div className="overflow-x-auto">
                           <table className="w-full text-xs">
@@ -1525,13 +1572,15 @@ export default function ClassementPage() {
                                     <div className="text-[10px] font-normal text-amber-500">/{c.noteMaximale}</div>
                                   </th>
                                 ))}
-                                <th className="px-3 py-2.5 text-center font-black text-amber-900 whitespace-nowrap">Total</th>
+                                <th className="px-3 py-2.5 text-center font-bold text-amber-900 whitespace-nowrap">Total Brut</th>
+                                <th className="px-3 py-2.5 text-center font-black text-amber-950 whitespace-nowrap bg-amber-100/60">Sur 45 pts</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-amber-50">
                               {detailedNotes.clientsNotes.map((cl, idx) => {
                                 const total = cl.notes.reduce((s, n) => s + n.valeur, 0)
-                                const maxTotal = clientCriteres.reduce((s, c) => s + c.noteMaximale, 0)
+                                const maxTotal = cl.notes.reduce((s, n) => s + n.noteMaximale, 0)
+                                const scoreSur45 = maxTotal > 0 ? Math.round((total / maxTotal) * 45 * 10) / 10 : 0
                                 return (
                                   <tr key={idx} className="hover:bg-amber-50/50 transition-colors">
                                     <td className="px-3 py-2.5 whitespace-nowrap font-bold text-slate-800">{cl.clientLabel}</td>
@@ -1549,8 +1598,11 @@ export default function ClassementPage() {
                                         </td>
                                       )
                                     })}
-                                    <td className="px-3 py-2.5 text-center font-black text-slate-900">
+                                    <td className="px-3 py-2.5 text-center font-bold text-slate-700">
                                       {total}<span className="text-slate-400 font-normal">/{maxTotal}</span>
+                                    </td>
+                                    <td className="px-3 py-2.5 text-center font-black text-amber-800 bg-amber-50/80">
+                                      {scoreSur45} <span className="text-[10px] text-amber-600 font-normal">/ 45</span>
                                     </td>
                                   </tr>
                                 )
@@ -1565,15 +1617,21 @@ export default function ClassementPage() {
                   {/* Notes Manager */}
                   {(() => {
                     const managerEvals = detailedNotes.evaluateursNotes.filter(
-                      (e) => e.notes.some((n) => n.typeEvaluateur === 'MANAGER')
+                      (e) => e.evaluateur.role === 'MANAGER' || e.evaluateur.role === 'ADMIN' || e.notes.some((n) => n.typeEvaluateur === 'MANAGER')
                     )
-                    const managerCriteres = detailedNotes.criteres.filter((c) => c.typeEvaluateur === 'MANAGER')
+                    const managerCriteres = detailedNotes.criteres.filter((c) => {
+                      const types = (c as any).typeEvaluateurs && (c as any).typeEvaluateurs.length > 0 ? (c as any).typeEvaluateurs : [c.typeEvaluateur]
+                      return types.includes('MANAGER') || types.includes('TOUS')
+                    })
                     if (managerEvals.length === 0) return null
                     return (
                       <div className="bg-indigo-50/50 border border-indigo-100 rounded-2xl overflow-hidden">
-                        <div className="bg-indigo-600 px-4 py-2.5 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-2">
-                          <Crown className="w-4 h-4" />
-                          Notes du Manager ({managerEvals.length})
+                        <div className="bg-indigo-600 px-4 py-2.5 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Crown className="w-4 h-4" />
+                            <span>Notes du Manager ({managerEvals.length})</span>
+                          </div>
+                          <span className="text-[11px] font-black bg-white/20 px-2 py-0.5 rounded">Barème normalisé sur 55 pts</span>
                         </div>
                         <div className="overflow-x-auto">
                           <table className="w-full text-xs">
@@ -1586,14 +1644,19 @@ export default function ClassementPage() {
                                     <div className="text-[10px] font-normal text-indigo-500">/{c.noteMaximale}</div>
                                   </th>
                                 ))}
-                                <th className="px-3 py-2.5 text-center font-black text-indigo-900 whitespace-nowrap">Total</th>
+                                <th className="px-3 py-2.5 text-center font-bold text-indigo-900 whitespace-nowrap">Total Brut</th>
+                                <th className="px-3 py-2.5 text-center font-black text-indigo-950 whitespace-nowrap bg-indigo-100/60">Sur 55 pts</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-indigo-50">
                               {managerEvals.map((ev) => {
-                                const managerNotes = ev.notes.filter((n) => n.typeEvaluateur === 'MANAGER')
+                                const managerNotes = ev.notes.filter((n) => {
+                                  const types = (n as any).typeEvaluateurs && (n as any).typeEvaluateurs.length > 0 ? (n as any).typeEvaluateurs : [n.typeEvaluateur]
+                                  return types.includes('MANAGER') || types.includes('TOUS')
+                                })
                                 const total = managerNotes.reduce((s, n) => s + n.valeur, 0)
-                                const maxTotal = managerCriteres.reduce((s, c) => s + c.noteMaximale, 0)
+                                const maxTotal = managerNotes.reduce((s, n) => s + n.noteMaximale, 0)
+                                const scoreSur55 = maxTotal > 0 ? Math.round((total / maxTotal) * 55 * 10) / 10 : 0
                                 return (
                                   <tr key={ev.evaluateur.id} className="hover:bg-indigo-50/50 transition-colors">
                                     <td className="px-3 py-2.5 whitespace-nowrap">
@@ -1616,8 +1679,11 @@ export default function ClassementPage() {
                                         </td>
                                       )
                                     })}
-                                    <td className="px-3 py-2.5 text-center font-black text-slate-900">
+                                    <td className="px-3 py-2.5 text-center font-bold text-slate-700">
                                       {total}<span className="text-slate-400 font-normal">/{maxTotal}</span>
+                                    </td>
+                                    <td className="px-3 py-2.5 text-center font-black text-indigo-700 bg-indigo-50/80">
+                                      {scoreSur55} <span className="text-[10px] text-indigo-500 font-normal">/ 55</span>
                                     </td>
                                   </tr>
                                 )
@@ -1723,8 +1789,8 @@ function ScoreTable({
             <th className="px-4 py-3.5 text-left">Collaborateur</th>
             {showStructureTags && <th className="px-4 py-3.5 text-left">Organisation</th>}
             <th className="px-4 py-3.5 text-center">Titres & Distinctions</th>
-            <th className="px-4 py-3.5 text-right">Collègues (18 pts)</th>
-            <th className="px-4 py-3.5 text-right">Clients Ext. (27 pts)</th>
+            <th className="px-4 py-3.5 text-right">Collègues & Pairs</th>
+            <th className="px-4 py-3.5 text-right">Clients QR</th>
             <th className="px-4 py-3.5 text-right">Manager (55 pts)</th>
             <th className="px-4 py-3.5 text-right">Score Total</th>
             <th className="px-4 py-3.5 text-left pl-6">Appréciation</th>
@@ -1741,9 +1807,26 @@ function ScoreTable({
             const displayMatricule = anonymized
               ? `***${score.matricule.slice(-2)}`
               : score.matricule
-            const partCollegues = Math.round(score.scoreCollegues * 0.18 * 10) / 10
+
+            const hasColl = score.hasCollegues
+            const hasCli = score.hasClient
             const clientVal = score.scoreClient !== undefined ? score.scoreClient : 0
-            const partClients = Math.round(clientVal * 0.27 * 10) / 10
+
+            // Règle DSM TAMIS : Collègues + Client Interne + Client QR sur 45 pts, Manager sur 55 pts
+            const partCollegues = hasColl && hasCli
+              ? Math.round(score.scoreCollegues * 0.20 * 10) / 10
+              : hasColl
+              ? Math.round(score.scoreCollegues * 0.45 * 10) / 10
+              : 0
+            const maxCollegues = hasColl && hasCli ? 20 : 45
+
+            const partClients = hasColl && hasCli
+              ? Math.round(clientVal * 0.25 * 10) / 10
+              : hasCli
+              ? Math.round(clientVal * 0.45 * 10) / 10
+              : 0
+            const maxClients = hasColl && hasCli ? 25 : 45
+
             const partManager = Math.round(score.scoreManager * 0.55 * 10) / 10
 
             return (
@@ -1804,10 +1887,10 @@ function ScoreTable({
                 </td>
 
                 <td className="px-4 py-4 text-right">
-                  {score.hasCollegues ? (
+                  {hasColl ? (
                     <>
                       <span className="font-bold text-slate-800">{partCollegues}</span>
-                      <span className="text-slate-500"> / 18</span>
+                      <span className="text-slate-500"> / {maxCollegues}</span>
                       <span className="text-[10px] text-slate-400 block font-normal">
                         ({score.scoreCollegues.toFixed(0)}%)
                       </span>
@@ -1820,19 +1903,16 @@ function ScoreTable({
                   )}
                 </td>
                 <td className="px-4 py-4 text-right">
-                  {score.hasClient ? (
+                  {hasCli ? (
                     <>
                       <span className="font-bold text-slate-800">{partClients}</span>
-                      <span className="text-slate-500"> / 27</span>
+                      <span className="text-slate-500"> / {maxClients}</span>
                       <span className="text-[10px] text-slate-400 block font-normal">
                         ({clientVal.toFixed(0)}%)
                       </span>
                     </>
                   ) : (
-                    <div className="flex items-center justify-end gap-1.5" title="Aucune note client reçue">
-                      <XCircle className="w-5 h-5 text-red-400" />
-                      <span className="text-xs font-semibold text-red-400">Non noté</span>
-                    </div>
+                    <span className="text-xs text-slate-400 font-medium">Non concerné</span>
                   )}
                 </td>
                 <td className="px-4 py-4 text-right">
