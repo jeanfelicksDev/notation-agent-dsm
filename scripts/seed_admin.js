@@ -53,11 +53,19 @@ function hashPassword(password) {
 
 async function main() {
   const args = process.argv.slice(2)
-  const matricule = (args[0] || '7453').toUpperCase().trim()
-  const password = args[1] || 'admin123'
-  const email = (args[2] || 'jeanfelicks11@gmail.com').toLowerCase().trim()
-  const nom = args[3] || 'ZIAGOUE'
-  const prenom = args[4] || 'Jean-Félix'
+  if (args.length < 5) {
+    console.error('Usage : npm run admin:seed -- <matricule> <motDePasse> <email> <nom> <prenom>')
+    process.exit(1)
+  }
+  const matricule = args[0].toUpperCase().trim()
+  const password = args[1]
+  const email = args[2].toLowerCase().trim()
+  const nom = args[3]
+  const prenom = args[4]
+  if (password.length < 8) {
+    console.error('Le mot de passe administrateur doit faire au moins 8 caractères.')
+    process.exit(1)
+  }
 
   console.log(`\n=== Initialisation Sécurisée Compte Administrateur DSM ===`)
   console.log(`Matricule : ${matricule}`)

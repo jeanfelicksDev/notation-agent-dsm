@@ -67,17 +67,17 @@ export default function NewUtilisateurPage() {
         
         <main className="flex-1 overflow-y-auto p-6">
           <div className="max-w-3xl mx-auto space-y-6">
-            <Link href="/admin/utilisateurs" className="group flex items-center gap-2 text-slate-500 hover:text-slate-800 font-bold transition-colors animate-fade-in">
+            <Link href="/admin/utilisateurs" className="group flex items-center gap-2 text-slate-500 hover:text-slate-800 font-bold transition-colors">
               <ArrowLeft className="w-5 h-5 transition-transform group-hover:-translate-x-1" /> Retour à la liste
             </Link>
 
-            <div className="glass rounded-3xl p-8 border border-slate-200/50 shadow-sm animate-fade-in" style={{ animationDelay: '100ms' }}>
+            <div className="bg-white shadow-card rounded-3xl p-8 border border-slate-200/50 shadow-sm">
               <div className="mb-8 flex items-center gap-4">
-                <div className="w-12 h-12 premium-gradient rounded-2xl flex items-center justify-center text-white shadow-lg shadow-brand-100">
+                <div className="w-12 h-12 bg-navy-900 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-navy-100">
                   <User className="w-6 h-6" />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-display font-bold text-slate-900">Profil Collaborateur</h2>
+                  <h2 className="text-2xl font-bold text-slate-900">Profil Collaborateur</h2>
                   <p className="text-slate-500 text-sm font-medium">Informations d'identification et accès système.</p>
                 </div>
               </div>
@@ -97,7 +97,7 @@ export default function NewUtilisateurPage() {
                       <input
                         type="text"
                         required
-                        className="w-full px-5 py-3.5 pl-12 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-brand-100 focus:border-brand-500 transition-all outline-none font-bold uppercase"
+                        className="w-full px-5 py-3.5 pl-12 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold uppercase"
                         value={formData.matricule}
                         onChange={e => setFormData({ ...formData, matricule: e.target.value.toUpperCase() })}
                         placeholder="Ex: MAT-001"
@@ -112,7 +112,7 @@ export default function NewUtilisateurPage() {
                       <input
                         type="email"
                         required
-                        className="w-full px-5 py-3.5 pl-12 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-brand-100 focus:border-brand-500 transition-all outline-none font-bold"
+                        className="w-full px-5 py-3.5 pl-12 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
                         value={formData.email}
                         onChange={e => setFormData({ ...formData, email: e.target.value })}
                         placeholder="email@dsm.com"
@@ -126,7 +126,7 @@ export default function NewUtilisateurPage() {
                     <input
                       type="text"
                       required
-                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-brand-100 focus:border-brand-500 transition-all outline-none font-bold"
+                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
                       value={formData.nom}
                       onChange={e => setFormData({ ...formData, nom: e.target.value })}
                     />
@@ -137,7 +137,7 @@ export default function NewUtilisateurPage() {
                     <input
                       type="text"
                       required
-                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-brand-100 focus:border-brand-500 transition-all outline-none font-bold"
+                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
                       value={formData.prenom}
                       onChange={e => setFormData({ ...formData, prenom: e.target.value })}
                     />
@@ -147,7 +147,7 @@ export default function NewUtilisateurPage() {
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Service / Département</label>
                     <input
                       type="text"
-                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-brand-100 focus:border-brand-500 transition-all outline-none font-bold"
+                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
                       value={formData.service}
                       onChange={e => setFormData({ ...formData, service: e.target.value })}
                       placeholder="Ex: Comptabilité"
@@ -158,7 +158,7 @@ export default function NewUtilisateurPage() {
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Rôle Système</label>
                     <div className="relative">
                       <select
-                        className="w-full px-5 py-3.5 pl-12 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-brand-100 focus:border-brand-500 transition-all outline-none font-bold appearance-none"
+                        className="w-full px-5 py-3.5 pl-12 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold appearance-none"
                         value={formData.role}
                         onChange={e => setFormData({ ...formData, role: e.target.value })}
                       >
@@ -175,7 +175,7 @@ export default function NewUtilisateurPage() {
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Affectation Site</label>
                     <div className="relative">
                       <select
-                        className="w-full px-5 py-3.5 pl-12 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-brand-100 focus:border-brand-500 transition-all outline-none font-bold appearance-none"
+                        className="w-full px-5 py-3.5 pl-12 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold appearance-none"
                         value={formData.siteId}
                         onChange={e => setFormData({ ...formData, siteId: e.target.value })}
                       >
@@ -190,17 +190,25 @@ export default function NewUtilisateurPage() {
 
 
 
-                  <div className="md:col-span-2 space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Mot de passe provisoire *</label>
-                    <input
-                      type="password"
-                      required
-                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-brand-100 focus:border-brand-500 transition-all outline-none font-bold"
-                      value={formData.motDePasse}
-                      onChange={e => setFormData({ ...formData, motDePasse: e.target.value })}
-                      placeholder="••••••••"
-                    />
-                  </div>
+                  {formData.role === 'ADMIN' ? (
+                    <div className="md:col-span-2 space-y-2">
+                      <label htmlFor="mdp" className="ml-1 block text-sm font-medium text-slate-700">Mot de passe administrateur (8 caractères minimum) *</label>
+                      <input
+                        id="mdp"
+                        type="password"
+                        required
+                        minLength={8}
+                        autoComplete="new-password"
+                        className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
+                        value={formData.motDePasse}
+                        onChange={e => setFormData({ ...formData, motDePasse: e.target.value })}
+                      />
+                    </div>
+                  ) : (
+                    <p className="md:col-span-2 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                      L’agent choisira lui-même son code PIN à 4 chiffres lors de sa première connexion.
+                    </p>
+                  )}
 
                   {/* QR Code checkbox */}
                   <div className="md:col-span-2">

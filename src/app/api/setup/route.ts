@@ -1,36 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { timingSafeEqual } from 'node:crypto'
 import prisma from '@/lib/prisma'
-import { hashPassword, requireAdmin } from '@/lib/auth'
+import { hashPassword, normalizeEmail, normalizeMatricule, requireAdmin } from '@/lib/auth'
 
+function secretValide(fourni: string | null): boolean {
+  const attendu = process.env.SETUP_SECRET_KEY
+  if (!attendu || !fourni) return false
+  const a = Buffer.from(attendu)
+  const b = Buffer.from(fourni)
+  return a.length === b.length && timingSafeEqual(a, b)
+}
+
+/**
+ * POST /api/setup
+ * Crée ou met à jour un compte administrateur.
+ * Exige une session ADMIN, ou l'en-tête `x-setup-key` égal à SETUP_SECRET_KEY — dans tous les environnements.
+ * Préférez la commande `npm run admin:seed`.
+ */
 export async function POST(req: NextRequest) {
   try {
-    // Vérification de sécurité : nécessite soit une session ADMIN active, soit une clé secrète dans le header
-    const setupSecret = process.env.SETUP_SECRET_KEY
-    const providedSecret = req.headers.get('x-setup-key') || req.nextUrl.searchParams.get('key')
-    
-    const isAuthorizedBySecret = setupSecret && providedSecret === setupSecret
-    const isAuthorizedBySession = Boolean(await requireAdmin())
-
-    // En environnement de production, bloquer les accès non autorisés
-    if (!isAuthorizedBySecret && !isAuthorizedBySession) {
-      if (process.env.NODE_ENV === 'production') {
-        return NextResponse.json(
-          {
-            error: 'Accès interdit. Pour initialiser le compte administrateur en production, utilisez la commande CLI "npm run admin:seed" ou fournissez l\'en-tête "x-setup-key".',
-          },
-          { status: 403 }
-        )
-      }
+    const autorise = secretValide(req.headers.get('x-setup-key')) || Boolean(await requireAdmin())
+    if (!autorise) {
+      return NextResponse.json({ error: 'Accès interdit.' }, { status: 403 })
     }
 
     const body = await req.json().catch(() => ({}))
-    const matricule = (body.matricule || '7453').toUpperCase().trim()
-    const password = body.password || 'admin123'
-    const email = (body.email || 'jeanfelicks11@gmail.com').toLowerCase().trim()
-    const nom = body.nom || 'ZIAGOUE'
-    const prenom = body.prenom || 'Jean-Félix'
+    const matricule = typeof body.matricule === 'string' ? normalizeMatricule(body.matricule) : ''
+    const email = typeof body.email === 'string' ? normalizeEmail(body.email) : ''
+    const password = typeof body.password === 'string' ? body.password : ''
+    const nom = typeof body.nom === 'string' ? body.nom.trim() : ''
+    const prenom = typeof body.prenom === 'string' ? body.prenom.trim() : ''
 
-    const adminPasswordHash = hashPassword(password)
+    if (!matricule || !email || !nom || !prenom) {
+      return NextResponse.json({ error: 'matricule, email, nom et prenom sont requis.' }, { status: 400 })
+    }
+    if (password.length < 8) {
+      return NextResponse.json({ error: 'Le mot de passe administrateur doit faire au moins 8 caractères.' }, { status: 400 })
+    }
 
     const site = await prisma.site.upsert({
       where: { nom: 'Siège Social' },
@@ -45,47 +51,30 @@ export async function POST(req: NextRequest) {
           { email: { equals: email, mode: 'insensitive' } },
         ],
       },
+      select: { id: true },
     })
 
-    if (existing) {
-      await prisma.utilisateur.update({
-        where: { id: existing.id },
-        data: {
-          matricule,
-          email,
-          motDePasse: adminPasswordHash,
-          role: 'ADMIN',
-          siteId: site.id,
-        },
-      })
-      return NextResponse.json({
-        success: true,
-        message: `Compte Admin (${matricule}) mis à jour avec succès.`,
-      })
+    const data = {
+      matricule,
+      email,
+      nom,
+      prenom,
+      motDePasse: hashPassword(password),
+      role: 'ADMIN' as const,
+      siteId: site.id,
+      tentativesEchouees: 0,
+      verrouilleJusqua: null,
     }
 
-    await prisma.utilisateur.create({
-      data: {
-        matricule,
-        nom,
-        prenom,
-        email,
-        motDePasse: adminPasswordHash,
-        role: 'ADMIN',
-        siteId: site.id,
-      },
-    })
+    if (existing) {
+      await prisma.utilisateur.update({ where: { id: existing.id }, data })
+      return NextResponse.json({ success: true, message: `Compte administrateur ${matricule} mis à jour.` })
+    }
 
-    return NextResponse.json({
-      success: true,
-      message: `Compte Admin (${matricule}) créé avec succès.`,
-    })
-  } catch (error: any) {
+    await prisma.utilisateur.create({ data })
+    return NextResponse.json({ success: true, message: `Compte administrateur ${matricule} créé.` })
+  } catch (error) {
     console.error('Setup error:', error)
-    return NextResponse.json({ error: error?.message || 'Erreur serveur' }, { status: 500 })
+    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
   }
-}
-
-export async function GET(req: NextRequest) {
-  return POST(req)
 }

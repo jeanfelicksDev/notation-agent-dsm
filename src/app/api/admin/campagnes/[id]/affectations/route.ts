@@ -85,65 +85,56 @@ export async function POST(
       return NextResponse.json({ success: true, count: newAffectationsData.length })
     }
 
-    // 2. Mode PAR COLLABORATEUR (Évalué) : attribuer à `evalueId` la liste `evaluateurIds`
+    // 2. Mode PAR COLLABORATEUR (Évalué) : la liste `evaluateurIds` devient celle des évaluateurs de `evalueId`.
     if (mode === 'by_evalue' || (evalueId && Array.isArray(evaluateurIds))) {
       if (!evalueId || !Array.isArray(evaluateurIds)) {
         return NextResponse.json({ error: 'Données invalides pour le mode collaborateur' }, { status: 400 })
       }
-
-      // Règle stricte : interdire l'auto-évaluation
-      const cleanEvaluateurIds = evaluateurIds.filter((evalId: string) => evalId && evalId !== evalueId)
-
-      await prisma.$transaction([
-        prisma.affectation.deleteMany({
-          where: {
-            campagneId: id,
-            evalueId: evalueId
-          }
-        }),
-        ...cleanEvaluateurIds.map((evalId: string) =>
-          prisma.affectation.create({
-            data: {
-              campagneId: id,
-              evaluateurId: evalId,
-              evalueId: evalueId
-            }
-          })
-        )
-      ])
-
-      return NextResponse.json({ success: true })
+      const resultat = await synchroniser(id, { evalueId }, 'evaluateurId', evaluateurIds, evalueId)
+      return NextResponse.json({ success: true, ...resultat })
     }
 
-    // 3. Mode PAR ÉVALUATEUR (Notant) : attribuer à `evaluateurId` la liste `evalueIds`
+    // 3. Mode PAR ÉVALUATEUR (Notant) : la liste `evalueIds` devient celle des collaborateurs notés par `evaluateurId`.
     if (!evaluateurId || !Array.isArray(evalueIds)) {
       return NextResponse.json({ error: 'Données invalides' }, { status: 400 })
     }
-
-    // Règle stricte : interdire l'auto-évaluation
-    const cleanEvalueIds = evalueIds.filter((targetId: string) => targetId && targetId !== evaluateurId)
-
-    await prisma.$transaction([
-      prisma.affectation.deleteMany({
-        where: {
-          campagneId: id,
-          evaluateurId: evaluateurId
-        }
-      }),
-      ...cleanEvalueIds.map((targetId: string) =>
-        prisma.affectation.create({
-          data: {
-            campagneId: id,
-            evaluateurId: evaluateurId,
-            evalueId: targetId
-          }
-        })
-      )
-    ])
-
-    return NextResponse.json({ success: true })
-  } catch (error: any) {
+    const resultat = await synchroniser(id, { evaluateurId }, 'evalueId', evalueIds, evaluateurId)
+    return NextResponse.json({ success: true, ...resultat })
+  } catch (error) {
     console.error('Affectation error:', error)
     return NextResponse.json({ error: 'Erreur lors de la mise à jour des affectations' }, { status: 500 })
   }
+}
+
+/**
+ * Aligne les affectations sur la liste voulue SANS toucher à celles qui restent :
+ * leur statut (brouillon, soumise) et leurs notes sont conservés. Seules les paires
+ * retirées sont supprimées et les nouvelles créées. L'auto-évaluation est toujours exclue.
+ */
+async function synchroniser(
+  campagneId: string,
+  fixe: { evalueId: string } | { evaluateurId: string },
+  cote: 'evaluateurId' | 'evalueId',
+  voulus: unknown[],
+  soiMeme: string
+) {
+  const cibles = new Set(voulus.filter((v): v is string => typeof v === 'string' && v !== '' && v !== soiMeme))
+  const existantes = await prisma.affectation.findMany({
+    where: { campagneId, ...fixe },
+    select: { id: true, evaluateurId: true, evalueId: true },
+  })
+  const actuels = new Set(existantes.map((a) => a[cote]))
+
+  const aSupprimer = existantes.filter((a) => !cibles.has(a[cote])).map((a) => a.id)
+  const aCreer = [...cibles].filter((c) => !actuels.has(c))
+
+  await prisma.$transaction([
+    prisma.affectation.deleteMany({ where: { id: { in: aSupprimer } } }),
+    prisma.affectation.createMany({
+      data: aCreer.map((c) => ({ campagneId, ...fixe, [cote]: c }) as { campagneId: string; evaluateurId: string; evalueId: string }),
+      skipDuplicates: true,
+    }),
+  ])
+
+  return { ajoutees: aCreer.length, retirees: aSupprimer.length }
 }

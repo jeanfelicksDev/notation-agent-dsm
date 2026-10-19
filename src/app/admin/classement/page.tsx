@@ -62,6 +62,12 @@ interface ScoreItem {
   totalInDirection: number
   totalInDepartement: number
   totalInService: number
+  partManager: number
+  partCollegues: number
+  partClient: number
+  maxManager: number
+  maxCollegues: number
+  maxClient: number
 }
 
 interface CampagneSummary {
@@ -86,6 +92,8 @@ interface CampagneInfo {
 
 interface ClassementData {
   campagne: CampagneInfo | null
+  /** Vrai si le classement est calculé à la volée (campagne ouverte ou jamais enregistrée) */
+  provisoire?: boolean
   toutesLesCampagnes?: CampagneSummary[]
   laureats: {
     majorGlobal: ScoreItem | null
@@ -241,37 +249,37 @@ export default function ClassementPage() {
     if (data.laureats.majorGlobal) {
       const mg = data.laureats.majorGlobal
       laureatsData.push({
-        Niveau: '🏆 SUPER LAURÉAT DIRECTION DSM',
+        Niveau: 'Premier toutes entités',
         Entité: mg.direction,
         Matricule: mg.matricule,
         Nom: mg.nom,
         Prénom: mg.prenom,
         'Score Total (%)': mg.scoreTotal,
-        'Prime & Dotation': data.campagne?.prixGlobal || '1 500 000 FCFA + Séjour familial & Gala AGL',
+        'Prime & Dotation': data.campagne?.prixGlobal ?? '',
       })
     }
 
     data.laureats.majorsDepartement.forEach((md) => {
       laureatsData.push({
-        Niveau: '🎖️ MEILLEUR AGENT DÉPARTEMENT',
+        Niveau: 'Premier de département',
         Entité: `${md.departementNom} (${md.directionNom})`,
         Matricule: md.major.matricule,
         Nom: md.major.nom,
         Prénom: md.major.prenom,
         'Score Total (%)': md.major.scoreTotal,
-        'Prime & Dotation': data.campagne?.prixDepartement || '1 000 000 FCFA',
+        'Prime & Dotation': data.campagne?.prixDepartement ?? '',
       })
     })
 
     data.laureats.majorsService.forEach((ms) => {
       laureatsData.push({
-        Niveau: '🏅 MEILLEUR AGENT DE SERVICE',
+        Niveau: 'Premier de service',
         Entité: `${ms.serviceNom} [${ms.departementNom}]`,
         Matricule: ms.major.matricule,
         Nom: ms.major.nom,
         Prénom: ms.major.prenom,
         'Score Total (%)': ms.major.scoreTotal,
-        'Prime & Dotation': data.campagne?.prixService || '500 000 FCFA',
+        'Prime & Dotation': data.campagne?.prixService ?? '',
       })
     })
 
@@ -290,11 +298,11 @@ export default function ClassementPage() {
           Matricule: s.matricule,
           Nom: s.nom,
           Prénom: s.prenom,
-          'Score Collègues & Clients (45 pts)': Math.round((s.hasClient && s.hasCollegues ? (s.scoreCollegues * 0.20 + s.scoreClient * 0.25) : (s.hasCollegues ? s.scoreCollegues * 0.45 : s.scoreClient * 0.45)) * 10) / 10,
-          'Score Manager (55 pts)': Math.round(s.scoreManager * 0.55 * 10) / 10,
+          'Part collègues & clients (pts)': Math.round((s.partCollegues + s.partClient) * 10) / 10,
+          'Part manager (pts)': s.partManager,
           'Score Total (/100)': s.scoreTotal,
           Appréciation: app.appreciation,
-          Titre: s.isMajorDirection ? '🏆 Major Direction' : '',
+          Titre: s.isMajorDirection ? 'Premier de direction' : '',
         })
       })
     })
@@ -316,7 +324,7 @@ export default function ClassementPage() {
           Prénom: s.prenom,
           'Score Total (%)': s.scoreTotal,
           Appréciation: app.appreciation,
-          Titre: s.isMajorDepartement ? '🎖️ Major Département' : '',
+          Titre: s.isMajorDepartement ? 'Premier de département' : '',
         })
       })
     })
@@ -339,7 +347,7 @@ export default function ClassementPage() {
           Prénom: s.prenom,
           'Score Total (%)': s.scoreTotal,
           Appréciation: app.appreciation,
-          Titre: s.isMajorService ? '🏅 Major Service' : '',
+          Titre: s.isMajorService ? 'Premier de service' : '',
         })
       })
     })
@@ -363,8 +371,8 @@ export default function ClassementPage() {
         'Score Collègues (/100)': s.scoreCollegues,
         'Score Clients QR (/100)': s.scoreClient,
         'Score Manager (/100)': s.scoreManager,
-        'Part Collègues & Clients (45 pts)': Math.round((s.hasClient && s.hasCollegues ? (s.scoreCollegues * 0.20 + s.scoreClient * 0.25) : (s.hasCollegues ? s.scoreCollegues * 0.45 : s.scoreClient * 0.45)) * 10) / 10,
-        'Part Manager (55 pts)': Math.round(s.scoreManager * 0.55 * 10) / 10,
+        'Part collègues & clients (pts)': Math.round((s.partCollegues + s.partClient) * 10) / 10,
+        'Part manager (pts)': s.partManager,
         'Score Total (/100)': s.scoreTotal,
         Appréciation: app.appreciation,
         Interprétation: app.interpretation,
@@ -461,7 +469,7 @@ export default function ClassementPage() {
   if (loading && !data) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-12 bg-slate-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500 mb-4"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-navy-700 mb-4"></div>
         <p className="text-slate-500 font-bold text-sm">Chargement des classements hiérarchiques DSM...</p>
       </div>
     )
@@ -480,13 +488,17 @@ export default function ClassementPage() {
             </Link>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-black text-slate-900">Classements & Palmarès DSM TAMIS</h1>
-                <span className="bg-amber-100 text-amber-800 text-[11px] font-black px-2.5 py-0.5 rounded-full border border-amber-200 uppercase tracking-wide">
-                  Officiel
-                </span>
+                <h1 className="text-2xl font-semibold tracking-tight text-navy-900">Classement et palmarès</h1>
+                {data?.provisoire ? (
+                  <span className="rounded-full bg-gold-50 px-2.5 py-0.5 text-xs font-medium text-gold-800 ring-1 ring-gold-200">Provisoire</span>
+                ) : data?.campagne ? (
+                  <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-800 ring-1 ring-emerald-200">Enregistré</span>
+                ) : null}
               </div>
-              <p className="text-xs text-slate-500 font-medium mt-0.5">
-                Paliers d'Excellence : Direction (1 500 000 F) • Département (1 000 000 F) • Service (500 000 F)
+              <p className="text-sm text-slate-500 mt-0.5">
+                {data?.provisoire
+                  ? 'Classement provisoire : calculé à partir des évaluations déjà soumises.'
+                  : 'Classement enregistré à partir des évaluations soumises.'}
               </p>
             </div>
           </div>
@@ -496,12 +508,12 @@ export default function ClassementPage() {
               onClick={() => setActiveTab('global')}
               className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold shadow-sm transition-all ${
                 activeTab === 'global'
-                  ? 'bg-blue-600 text-white ring-2 ring-blue-300'
-                  : 'bg-white hover:bg-blue-50 text-blue-900 border border-blue-200'
+                  ? 'bg-navy-700 text-white ring-2 ring-navy-300'
+                  : 'bg-white hover:bg-navy-50 text-navy-950 border border-navy-200'
               }`}
               title="Afficher la liste intégrale du classement de tous les notés"
             >
-              <ListOrdered className="w-4 h-4 text-blue-600" />
+              <ListOrdered className="w-4 h-4 text-navy-700" />
               <span>Classement des notés ({allScoresCount})</span>
             </button>
 
@@ -510,7 +522,7 @@ export default function ClassementPage() {
               className="flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold shadow-sm transition-all"
               title="Activer/Désactiver l'anonymisation des noms"
             >
-              {anonymized ? <Eye className="w-4 h-4 text-brand-600" /> : <EyeOff className="w-4 h-4 text-slate-400" />}
+              {anonymized ? <Eye className="w-4 h-4 text-navy-800" /> : <EyeOff className="w-4 h-4 text-slate-400" />}
               <span>{anonymized ? 'Noms visibles' : 'Anonymiser'}</span>
             </button>
 
@@ -527,7 +539,7 @@ export default function ClassementPage() {
               <button
                 onClick={handleRecalculate}
                 disabled={calculating}
-                className="flex items-center gap-2 px-4 py-2 bg-[#002B49] hover:bg-[#001D33] text-[#D4AF37] border border-[#D4AF37]/40 rounded-xl text-xs font-bold shadow-sm transition-all disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 bg-navy-900 hover:bg-navy-950 text-gold-500 border border-gold-500/40 rounded-xl text-xs font-bold shadow-sm transition-all disabled:opacity-50"
               >
                 <RefreshCw className={`w-4 h-4 ${calculating ? 'animate-spin' : ''}`} />
                 <span>{calculating ? 'Calcul en cours...' : 'Recalculer'}</span>
@@ -538,7 +550,7 @@ export default function ClassementPage() {
       </header>
 
       {toastMessage && (
-        <div className="max-w-[96rem] mx-auto px-6 pt-4 animate-fade-in">
+        <div className="max-w-[96rem] mx-auto px-6 pt-4">
           <div className="bg-emerald-50 border border-emerald-300 text-emerald-900 px-4 py-3 rounded-2xl flex items-center justify-between shadow-sm">
             <div className="flex items-center gap-2.5 font-bold text-xs">
               <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
@@ -553,17 +565,17 @@ export default function ClassementPage() {
 
       <main className="max-w-[96rem] mx-auto p-6 space-y-6">
         {/* Sélecteur de Campagne & Statut Actuel */}
-        <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-slate-200/80 flex flex-col md:flex-row md:items-center justify-between gap-4 animate-fade-in">
+        <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-slate-200/80 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-[#002B49] text-[#D4AF37] flex items-center justify-center font-black shadow-md shrink-0">
+            <div className="w-12 h-12 rounded-2xl bg-navy-900 text-gold-500 flex items-center justify-center font-black shadow-md shrink-0">
               <Trophy className="w-6 h-6" />
             </div>
             <div>
               <div className="flex items-center gap-2 mb-0.5">
-                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Campagne active</span>
+                
                 {data?.campagne?.statut === 'OUVERTE' && (
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
                     En cours de notation
                   </span>
                 )}
@@ -574,13 +586,13 @@ export default function ClassementPage() {
                   </span>
                 )}
                 {data?.campagne?.statut === 'CALCULEE' && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-blue-100 text-blue-800 border border-blue-200">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-navy-100 text-navy-900 border border-navy-200">
                     <CheckCircle2 className="w-3 h-3" />
                     Scores calculés
                   </span>
                 )}
               </div>
-              <h2 className="text-xl font-black text-[#002B49]">
+              <h2 className="text-xl font-black text-navy-900">
                 {data?.campagne?.libelle || 'Chargement de la campagne...'}
               </h2>
             </div>
@@ -597,11 +609,11 @@ export default function ClassementPage() {
                     setSelectedCampagneId(nextId)
                     loadScores(nextId)
                   }}
-                  className="px-4 py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-brand-500 transition-all cursor-pointer shadow-sm"
+                  className="px-4 py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-navy-700 transition-all cursor-pointer shadow-sm"
                 >
                   {data.toutesLesCampagnes.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.libelle} ({c.statut === 'OUVERTE' ? '🟢 En cours' : c.statut === 'CLOTUREE' ? '🔒 Clôturée' : '📊 Calculée'})
+                      {c.libelle}{c.statut === 'OUVERTE' ? ' — en cours' : c.statut === 'ANNUEL' ? '' : ' — terminée'}
                     </option>
                   ))}
                 </select>
@@ -620,51 +632,33 @@ export default function ClassementPage() {
           </div>
         </div>
 
-        {/* Banner Récompenses Officielles des Lauréats DSM */}
-        <div className="bg-gradient-to-r from-blue-950 via-indigo-950 to-slate-900 text-white rounded-3xl p-6 shadow-xl relative overflow-hidden border border-white/10">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
-          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 relative z-10">
-            <div>
-              <div className="flex items-center gap-2 text-yellow-400 font-extrabold text-xs uppercase tracking-widest mb-1.5">
-                <Gift className="w-4 h-4" /> Récompenses officielles des lauréats DSM
+        {/* Distinctions de la campagne (libellés modifiables dans les paramètres de la campagne) */}
+        {data?.campagne && (
+          <section className="rounded-[var(--radius-card)] bg-navy-900 p-6 text-white shadow-card" aria-labelledby="distinctions-titre">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <h2 id="distinctions-titre" className="flex items-center gap-2 text-lg font-semibold">
+                  <Gift className="h-5 w-5 text-gold-500" aria-hidden />
+                  Distinctions de la campagne
+                </h2>
+                <p className="mt-1 max-w-md text-sm text-navy-200">Les distinctions récompensent le premier de chaque entité.</p>
               </div>
-              <h2 className="text-xl sm:text-2xl font-black text-white">Grille des Distinctions & Primes</h2>
-              <p className="text-xs text-slate-300 mt-1 max-w-md">
-                Les prix récompensent les meilleurs collaborateurs de chaque entité selon l'évaluation TAMIS.
-              </p>
+              <dl className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:w-auto lg:grid-cols-4">
+                {[
+                  { label: 'Premier de service', valeur: data.campagne.prixService },
+                  { label: 'Premier de département', valeur: data.campagne.prixDepartement },
+                  { label: 'Premier de direction', valeur: data.campagne.prixDirection },
+                  { label: 'Premier toutes entités', valeur: data.campagne.prixGlobal, or: true },
+                ].map((d) => (
+                  <div key={d.label} className={`rounded-lg p-4 ring-1 ${d.or ? 'bg-gold-500/10 ring-gold-500/40' : 'bg-white/5 ring-white/10'}`}>
+                    <dt className={`text-xs font-medium ${d.or ? 'text-gold-300' : 'text-navy-200'}`}>{d.label}</dt>
+                    <dd className="mt-1 text-sm font-semibold text-white">{d.valeur || '—'}</dd>
+                  </div>
+                ))}
+              </dl>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full lg:w-auto">
-              {/* Carte Service */}
-              <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 text-left hover:bg-white/15 transition-all">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-300">
-                  <Award className="w-4 h-4 text-emerald-400" /> Meilleur Agent de Service
-                </div>
-                <div className="text-lg font-black text-white mt-1">500 000 FCFA</div>
-                <div className="text-[10px] text-slate-300 mt-0.5">Prime d'Excellence Cellule</div>
-              </div>
-
-              {/* Carte Département */}
-              <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 text-left hover:bg-white/15 transition-all">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-purple-300">
-                  <Medal className="w-4 h-4 text-purple-400" /> Meilleur Département
-                </div>
-                <div className="text-lg font-black text-white mt-1">1 000 000 FCFA</div>
-                <div className="text-[10px] text-slate-300 mt-0.5">Certificat de Mérite DSM</div>
-              </div>
-
-              {/* Carte Direction */}
-              <div className="bg-gradient-to-br from-yellow-500/25 to-amber-500/10 backdrop-blur-md rounded-2xl p-4 border border-yellow-400/40 text-left relative overflow-hidden shadow-lg">
-                <div className="flex items-center gap-1.5 text-xs font-black text-yellow-300 uppercase tracking-wide">
-                  <Trophy className="w-4 h-4 text-yellow-400" /> Super Lauréat Direction
-                </div>
-                <div className="text-xl font-black text-yellow-400 mt-1">1 500 000 FCFA</div>
-                <div className="text-[10px] text-yellow-200 mt-0.5 font-semibold">
-                  + Séjour familial & Gala AGL
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+          </section>
+        )}
 
         {/* Navigation par Onglets */}
         <div className="bg-white p-2 rounded-2xl shadow-sm border border-slate-200/80 flex items-center gap-1.5 overflow-x-auto">
@@ -756,7 +750,7 @@ export default function ClassementPage() {
             onClick={() => setActiveTab('global')}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition-all ${
               activeTab === 'global'
-                ? 'bg-blue-900 text-white shadow-md'
+                ? 'bg-navy-950 text-white shadow-md'
                 : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
             }`}
           >
@@ -765,7 +759,7 @@ export default function ClassementPage() {
             {allScoresCount > 0 && (
               <span
                 className={`text-[10px] font-black px-1.5 py-0.5 rounded-md ${
-                  activeTab === 'global' ? 'bg-blue-800 text-white' : 'bg-slate-200 text-slate-700'
+                  activeTab === 'global' ? 'bg-navy-900 text-white' : 'bg-slate-200 text-slate-700'
                 }`}
               >
                 {allScoresCount}
@@ -789,47 +783,46 @@ export default function ClassementPage() {
             {/* ONGLET 1 : PALMARÈS & LAURÉATS                               */}
             {/* ============================================================ */}
             {activeTab === 'palmares' && data && (
-              <div className="space-y-8 animate-fade-in">
+              <div className="space-y-8">
                 {/* Spotlight Super Lauréat Direction DSM */}
                 {data.laureats.majorGlobal && (
-                  <div className="bg-gradient-to-br from-amber-500 via-amber-600 to-yellow-600 rounded-3xl p-6 sm:p-8 text-white shadow-2xl relative overflow-hidden">
-                    <div className="absolute right-0 top-0 translate-x-12 -translate-y-12 w-64 h-64 bg-white/20 rounded-full blur-2xl pointer-events-none"></div>
+                  <div className="bg-navy-950 rounded-[var(--radius-card)] p-6 sm:p-8 text-white shadow-raised relative overflow-hidden ring-1 ring-gold-500/30">
                     <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10">
                       <div className="space-y-2">
-                        <div className="inline-flex items-center gap-2 bg-black/20 backdrop-blur-md px-3.5 py-1 rounded-full text-xs font-black uppercase tracking-widest text-amber-100">
-                          <Crown className="w-4 h-4 text-yellow-300" /> Super Lauréat Direction DSM (1er National)
-                        </div>
+                        <p className="flex items-center gap-2 text-sm font-medium text-gold-400">
+                          <Crown className="w-4 h-4" aria-hidden /> Premier toutes entités confondues
+                        </p>
                         <h3 className="text-2xl sm:text-3xl font-black">
                           {anonymized ? 'Collaborateur Anonyme' : `${data.laureats.majorGlobal.prenom} ${data.laureats.majorGlobal.nom}`}
                         </h3>
-                        <p className="text-sm text-amber-100 font-medium">
+                        <p className="text-sm text-navy-100 font-medium">
                           Matricule : <span className="font-mono font-bold">{data.laureats.majorGlobal.matricule}</span> • Direction :{' '}
                           <strong>{data.laureats.majorGlobal.direction}</strong> • Service : <strong>{data.laureats.majorGlobal.service}</strong>
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-4 bg-white/10 backdrop-blur-md px-6 py-4 rounded-2xl border border-white/20">
+                      <div className="flex items-center gap-4 bg-white/5 px-6 py-4 rounded-xl ring-1 ring-white/10">
                         <div className="text-right">
-                          <div className="text-xs text-amber-100 font-bold uppercase">Score Global DSM</div>
+                          <div className="text-xs text-navy-100 font-bold uppercase">Score Global DSM</div>
                           <div className="text-3xl sm:text-4xl font-black text-white">
                             {data.laureats.majorGlobal.scoreTotal.toFixed(1)} %
                           </div>
                         </div>
                         <button
                           onClick={() => setSelectedScore(data.laureats.majorGlobal)}
-                          className="px-4 py-2.5 bg-white text-slate-900 rounded-xl font-bold text-xs hover:bg-amber-50 shadow-md transition-all active:scale-95"
+                          className="px-4 py-2.5 bg-white text-navy-900 rounded-xl font-bold text-xs hover:bg-gold-50 shadow-md transition-all active:scale-95"
                         >
                           Fiche Bilan
                         </button>
                       </div>
                     </div>
 
-                    <div className="mt-6 pt-4 border-t border-white/20 flex flex-wrap items-center justify-between gap-4 text-xs font-semibold text-amber-100">
-                      <div>🎁 Dotation : 1 500 000 FCFA + Séjour familial & Gala AGL</div>
+                    <div className="mt-6 pt-4 border-t border-white/20 flex flex-wrap items-center justify-between gap-4 text-xs font-semibold text-navy-100">
+                      <div>Distinction : {data.campagne?.prixGlobal}</div>
                       <div className="flex items-center gap-3">
-                        <span>Collègues & Clients : {Math.round((data.laureats.majorGlobal.hasClient && data.laureats.majorGlobal.hasCollegues ? data.laureats.majorGlobal.scoreCollegues * 0.20 + data.laureats.majorGlobal.scoreClient * 0.25 : data.laureats.majorGlobal.hasCollegues ? data.laureats.majorGlobal.scoreCollegues * 0.45 : data.laureats.majorGlobal.scoreClient * 0.45) * 10) / 10}/45 pts</span>
+                        <span>Collègues & clients : {Math.round((data.laureats.majorGlobal.partCollegues + data.laureats.majorGlobal.partClient) * 10) / 10} / {data.campagne?.poidsCollegues} pts</span>
                         <span>•</span>
-                        <span>Manager : {Math.round(data.laureats.majorGlobal.scoreManager * 0.55 * 10) / 10}/55 pts</span>
+                        <span>Manager : {data.laureats.majorGlobal.partManager} / {data.laureats.majorGlobal.maxManager} pts</span>
                       </div>
                     </div>
                   </div>
@@ -839,15 +832,15 @@ export default function ClassementPage() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold">
+                      <div className="w-8 h-8 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center font-bold">
                         <Medal className="w-5 h-5" />
                       </div>
                       <div>
                         <h3 className="text-lg font-black text-slate-900">Meilleur Agent par Département</h3>
-                        <p className="text-xs text-slate-500">Major de chaque département • Prime de 1 000 000 FCFA</p>
+                        <p className="text-xs text-slate-500">Premier de chaque département · {data.campagne?.prixDepartement}</p>
                       </div>
                     </div>
-                    <span className="text-xs font-bold text-purple-700 bg-purple-50 border border-purple-100 px-3 py-1 rounded-full">
+                    <span className="text-xs font-bold text-teal-700 bg-teal-50 border border-teal-100 px-3 py-1 rounded-full">
                       {data.laureats.majorsDepartement.length} département{data.laureats.majorsDepartement.length > 1 ? 's' : ''}
                     </span>
                   </div>
@@ -865,7 +858,7 @@ export default function ClassementPage() {
                         >
                           <div>
                             <div className="flex items-center justify-between gap-2 mb-2">
-                              <span className="text-[11px] font-black uppercase text-purple-700 bg-purple-50 border border-purple-100 px-2.5 py-0.5 rounded-lg truncate">
+                              <span className="text-[11px] font-black uppercase text-teal-700 bg-teal-50 border border-teal-100 px-2.5 py-0.5 rounded-lg truncate">
                                 📁 {md.departementNom}
                               </span>
                               <span className="text-[11px] text-slate-400 font-medium">
@@ -874,8 +867,8 @@ export default function ClassementPage() {
                             </div>
 
                             <div className="flex items-start gap-3 mt-3">
-                              <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-black text-sm flex-shrink-0 group-hover:scale-110 transition-transform">
-                                🥇
+                              <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center font-black text-sm flex-shrink-0 group-hover:scale-110 transition-transform">
+                                1
                               </div>
                               <div className="min-w-0">
                                 <h4 className="font-bold text-slate-900 text-base truncate">{displayName}</h4>
@@ -887,13 +880,13 @@ export default function ClassementPage() {
                           <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
                             <div>
                               <span className="text-xs text-slate-400 block font-medium">Score Département</span>
-                              <span className="text-lg font-black text-purple-700">
+                              <span className="text-lg font-black text-teal-700">
                                 {md.major.scoreTotal.toFixed(1)} %
                               </span>
                             </div>
                             <button
                               onClick={() => setSelectedScore(md.major)}
-                              className="px-3 py-1.5 bg-slate-100 hover:bg-purple-50 hover:text-purple-700 text-slate-700 rounded-lg text-xs font-bold transition-colors"
+                              className="px-3 py-1.5 bg-slate-100 hover:bg-teal-50 text-navy-900 hover:text-teal-800 rounded-lg text-xs font-bold transition-colors"
                             >
                               Consulter
                             </button>
@@ -913,7 +906,7 @@ export default function ClassementPage() {
                       </div>
                       <div>
                         <h3 className="text-lg font-black text-slate-900">Meilleur Agent par Service & Cellule</h3>
-                        <p className="text-xs text-slate-500">Major de chaque cellule de travail • Prime de 500 000 FCFA</p>
+                        <p className="text-xs text-slate-500">Premier de chaque service · {data.campagne?.prixService}</p>
                       </div>
                     </div>
                     <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-3 py-1 rounded-full">
@@ -944,7 +937,7 @@ export default function ClassementPage() {
 
                             <div className="flex items-start gap-3 mt-3">
                               <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-black text-sm flex-shrink-0 group-hover:scale-110 transition-transform">
-                                🥇
+                                1
                               </div>
                               <div className="min-w-0">
                                 <h4 className="font-bold text-slate-900 text-base truncate">{displayName}</h4>
@@ -962,7 +955,7 @@ export default function ClassementPage() {
                             </div>
                             <button
                               onClick={() => setSelectedScore(ms.major)}
-                              className="px-3 py-1.5 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-700 rounded-lg text-xs font-bold transition-colors"
+                              className="px-3 py-1.5 bg-slate-100 hover:bg-emerald-50 text-navy-900 hover:text-emerald-800 rounded-lg text-xs font-bold transition-colors"
                             >
                               Consulter
                             </button>
@@ -974,15 +967,15 @@ export default function ClassementPage() {
                 </div>
 
                 {/* Bouton d'accès direct au classement complet de l'ensemble des notés */}
-                <div className="bg-gradient-to-r from-blue-950 via-slate-900 to-indigo-950 rounded-3xl p-6 text-white flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl border border-white/10">
+                <div className="bg-navy-950 rounded-3xl p-6 text-white flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl border border-white/10">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-2xl bg-amber-400/20 text-yellow-300 flex items-center justify-center font-black text-xl flex-shrink-0">
                       <ListOrdered className="w-6 h-6" />
                     </div>
                     <div>
                       <h4 className="text-base font-black text-white">Classement Complet de l'Ensemble des Notés</h4>
-                      <p className="text-xs text-blue-200 mt-0.5">
-                        Accédez au tableau exhaustif des {allScoresCount} agents évalués avec leurs rangs et le détail de chaque note (Collègues & Clients 45 pts, Manager 55 pts).
+                      <p className="text-xs text-navy-200 mt-0.5">
+                        Accédez au tableau exhaustif des {allScoresCount} agents évalués avec leurs rangs et le détail de chaque note, selon les pondérations de la campagne.
                       </p>
                     </div>
                   </div>
@@ -991,7 +984,7 @@ export default function ClassementPage() {
                       setActiveTab('global')
                       window.scrollTo({ top: 400, behavior: 'smooth' })
                     }}
-                    className="px-6 py-3.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs sm:text-sm rounded-2xl shadow-lg shadow-amber-500/20 transition-all hover:scale-105 flex items-center gap-2.5 whitespace-nowrap"
+                    className="px-6 py-3.5 bg-gold-500 hover:bg-gold-400 text-navy-950 font-semibold text-xs sm:text-sm rounded-2xl transition-all flex items-center gap-2.5 whitespace-nowrap"
                   >
                     <ListOrdered className="w-4 h-4" />
                     <span>Afficher le classement complet ({allScoresCount} notés)</span>
@@ -1005,12 +998,12 @@ export default function ClassementPage() {
             {/* ONGLET 2 : CLASSEMENT PAR DIRECTION                          */}
             {/* ============================================================ */}
             {activeTab === 'direction' && data && (
-              <div className="space-y-6 animate-fade-in">
+              <div className="space-y-6">
                 {data.groupesDirection.map((groupe) => (
                   <div key={groupe.directionNom} className="bg-white rounded-3xl shadow-sm border border-slate-200/80 overflow-hidden">
                     <div className="bg-slate-900 px-6 py-4 flex flex-wrap items-center justify-between gap-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold">
+                        <div className="w-9 h-9 rounded-xl bg-navy-600/20 text-navy-400 flex items-center justify-center font-bold">
                           <Building2 className="w-5 h-5" />
                         </div>
                         <div>
@@ -1052,27 +1045,27 @@ export default function ClassementPage() {
             {/* ONGLET 3 : CLASSEMENT PAR DÉPARTEMENT                        */}
             {/* ============================================================ */}
             {activeTab === 'departement' && data && (
-              <div className="space-y-6 animate-fade-in">
+              <div className="space-y-6">
                 {data.groupesDepartement.map((groupe) => (
                   <div key={groupe.departementNom} className="bg-white rounded-3xl shadow-sm border border-slate-200/80 overflow-hidden">
-                    <div className="bg-purple-950 px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+                    <div className="bg-teal-950 px-6 py-4 flex flex-wrap items-center justify-between gap-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-purple-500/20 text-purple-300 flex items-center justify-center font-bold">
+                        <div className="w-9 h-9 rounded-xl bg-teal-500/20 text-teal-300 flex items-center justify-center font-bold">
                           <FolderGit2 className="w-5 h-5" />
                         </div>
                         <div>
                           <h3 className="text-lg font-bold text-white flex items-center gap-2">
                             {groupe.departementNom}
                           </h3>
-                          <p className="text-xs text-purple-300">
+                          <p className="text-xs text-teal-300">
                             Direction : {groupe.directionNom} • {groupe.scores.length} agent{groupe.scores.length > 1 ? 's' : ''}
                           </p>
                         </div>
                       </div>
 
                       {groupe.major && (
-                        <div className="bg-white/10 border border-white/20 rounded-xl px-4 py-2 flex items-center gap-2.5 text-xs text-purple-200">
-                          <Medal className="w-4 h-4 text-purple-300 flex-shrink-0" />
+                        <div className="bg-white/10 border border-white/20 rounded-xl px-4 py-2 flex items-center gap-2.5 text-xs text-teal-200">
+                          <Medal className="w-4 h-4 text-teal-300 flex-shrink-0" />
                           <span>
                             Major Département :{' '}
                             <strong className="text-white">
@@ -1099,7 +1092,7 @@ export default function ClassementPage() {
             {/* ONGLET 4 : CLASSEMENT PAR SERVICE / CELLULE                  */}
             {/* ============================================================ */}
             {activeTab === 'service' && data && (
-              <div className="space-y-6 animate-fade-in">
+              <div className="space-y-6">
                 {data.groupesService.map((groupe) => (
                   <div key={groupe.serviceNom} className="bg-white rounded-3xl shadow-sm border border-slate-200/80 overflow-hidden">
                     <div className="bg-slate-900 px-6 py-4 flex flex-wrap items-center justify-between gap-4">
@@ -1146,7 +1139,7 @@ export default function ClassementPage() {
             {/* ONGLET 5 : CLASSEMENT GÉNÉRAL ET FILTRES                     */}
             {/* ============================================================ */}
             {activeTab === 'global' && data && (
-              <div className="space-y-6 animate-fade-in">
+              <div className="space-y-6">
                 {/* Barre de Recherche et Filtres */}
                 <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row items-center gap-3">
                   <div className="relative flex-1 w-full">
@@ -1156,7 +1149,7 @@ export default function ClassementPage() {
                       placeholder="Rechercher par nom, prénom, matricule, service..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold outline-none focus:bg-white focus:ring-2 focus:ring-brand-500 transition-all"
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold outline-none focus:bg-white focus:ring-2 focus:ring-navy-700 transition-all"
                     />
                   </div>
 
@@ -1242,11 +1235,11 @@ export default function ClassementPage() {
 
       {/* MODALE FICHE BILAN INDIVIDUELLE */}
       {selectedScore && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto p-6 sm:p-8 space-y-6">
             <div className="flex items-center justify-between border-b pb-4">
               <div>
-                <span className="text-xs font-extrabold uppercase text-brand-600 tracking-wider">
+                <span className="text-xs font-extrabold uppercase text-navy-800 tracking-wider">
                   Bilan Individuel d'Évaluation TAMIS
                 </span>
                 <h2 className="text-2xl font-black text-slate-900">
@@ -1267,29 +1260,29 @@ export default function ClassementPage() {
             {/* Rangs Hiérarchiques (Direction, Département, Service) */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {/* Rang Direction */}
-              <div className="bg-blue-50/70 border border-blue-100 rounded-2xl p-3.5 text-center">
-                <div className="text-[11px] font-bold text-blue-800 uppercase">Direction</div>
-                <div className="text-xl font-black text-blue-950 mt-1">
-                  {selectedScore.rangDirection === 1 ? '🥇 1er' : `${selectedScore.rangDirection}ème`}
-                  <span className="text-xs text-blue-600 font-normal"> / {selectedScore.totalInDirection}</span>
+              <div className="bg-navy-50/70 border border-navy-100 rounded-2xl p-3.5 text-center">
+                <div className="text-[11px] font-bold text-navy-900 uppercase">Direction</div>
+                <div className="text-xl font-black text-navy-950 mt-1">
+                  {selectedScore.rangDirection === 1 ? '1er' : `${selectedScore.rangDirection}e`}
+                  <span className="text-xs text-navy-700 font-normal"> / {selectedScore.totalInDirection}</span>
                 </div>
                 {selectedScore.isMajorDirection && (
                   <span className="text-[10px] font-black text-amber-700 bg-amber-100 px-2 py-0.5 rounded-md mt-1 inline-block">
-                    🏆 Major Direction
+                    Premier de direction
                   </span>
                 )}
               </div>
 
               {/* Rang Département */}
-              <div className="bg-purple-50/70 border border-purple-100 rounded-2xl p-3.5 text-center">
-                <div className="text-[11px] font-bold text-purple-800 uppercase">Département</div>
-                <div className="text-xl font-black text-purple-950 mt-1">
-                  {selectedScore.rangDepartement === 1 ? '🥇 1er' : `${selectedScore.rangDepartement}ème`}
-                  <span className="text-xs text-purple-600 font-normal"> / {selectedScore.totalInDepartement}</span>
+              <div className="bg-teal-50/70 border border-teal-100 rounded-2xl p-3.5 text-center">
+                <div className="text-[11px] font-bold text-teal-800 uppercase">Département</div>
+                <div className="text-xl font-black text-teal-950 mt-1">
+                  {selectedScore.rangDepartement === 1 ? '1er' : `${selectedScore.rangDepartement}e`}
+                  <span className="text-xs text-teal-600 font-normal"> / {selectedScore.totalInDepartement}</span>
                 </div>
                 {selectedScore.isMajorDepartement && (
-                  <span className="text-[10px] font-black text-purple-700 bg-purple-100 px-2 py-0.5 rounded-md mt-1 inline-block">
-                    🎖️ Major Département
+                  <span className="text-[10px] font-black text-teal-700 bg-teal-100 px-2 py-0.5 rounded-md mt-1 inline-block">
+                    Premier de département
                   </span>
                 )}
               </div>
@@ -1298,12 +1291,12 @@ export default function ClassementPage() {
               <div className="bg-emerald-50/70 border border-emerald-100 rounded-2xl p-3.5 text-center">
                 <div className="text-[11px] font-bold text-emerald-800 uppercase">Service / Cellule</div>
                 <div className="text-xl font-black text-emerald-950 mt-1">
-                  {selectedScore.rangService === 1 ? '🥇 1er' : `${selectedScore.rangService}ème`}
+                  {selectedScore.rangService === 1 ? '1er' : `${selectedScore.rangService}e`}
                   <span className="text-xs text-emerald-600 font-normal"> / {selectedScore.totalInService}</span>
                 </div>
                 {selectedScore.isMajorService && (
                   <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md mt-1 inline-block">
-                    🏅 Major Service
+                    Premier de service
                   </span>
                 )}
               </div>
@@ -1316,51 +1309,36 @@ export default function ClassementPage() {
               const hasCli = selectedScore.hasClient
               const clientVal = selectedScore.scoreClient !== undefined ? selectedScore.scoreClient : 0
 
-              // Règle DSM TAMIS : Collègues + Client Interne + Client QR sur 45 pts, Manager sur 55 pts
-              const partCollegues = hasColl && hasCli
-                ? Math.round(selectedScore.scoreCollegues * 0.20 * 10) / 10
-                : hasColl
-                ? Math.round(selectedScore.scoreCollegues * 0.45 * 10) / 10
-                : 0
-              const maxCollegues = hasColl && hasCli ? 20 : 45
-
-              const partClients = hasColl && hasCli
-                ? Math.round(clientVal * 0.25 * 10) / 10
-                : hasCli
-                ? Math.round(clientVal * 0.45 * 10) / 10
-                : 0
-              const maxClients = hasColl && hasCli ? 25 : 45
-
-              const partNonManager = Math.round(
-                (hasColl && hasCli
-                  ? partCollegues + partClients
-                  : hasColl
-                  ? partCollegues
-                  : partClients) * 10
-              ) / 10
-
-              const partManager = Math.round(selectedScore.scoreManager * 0.55 * 10) / 10
+              // Parts en points, calculées côté serveur selon les pondérations de la campagne
+              const partCollegues = selectedScore.partCollegues
+              const maxCollegues = selectedScore.maxCollegues
+              const partClients = selectedScore.partClient
+              const maxClients = selectedScore.maxClient
+              const partNonManager = Math.round((partCollegues + partClients) * 10) / 10
+              const maxNonManager = data?.campagne?.poidsCollegues ?? 45
+              const partManager = selectedScore.partManager
+              const maxManager = selectedScore.maxManager
 
               return (
                 <>
-                  <div className="bg-gradient-to-br from-slate-900 to-blue-950 text-white rounded-2xl p-6 space-y-4 shadow-lg">
+                  <div className="bg-navy-950 text-white rounded-2xl p-6 space-y-4 shadow-lg">
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="text-xs text-slate-300 uppercase font-bold">Rang Global National</div>
                         <div className="text-3xl font-black text-yellow-400">
                           {selectedScore.rangGlobal === 1
-                            ? '🥇 1er Global'
+                            ? '1er'
                             : selectedScore.rangGlobal === 2
-                            ? '🥈 2ème'
+                            ? '2e'
                             : selectedScore.rangGlobal === 3
-                            ? '🥉 3ème'
-                            : `${selectedScore.rangGlobal}ème`}
+                            ? '3e'
+                            : `${selectedScore.rangGlobal}e`}
                         </div>
                       </div>
                       <div className="text-right">
                         <div className="text-xs text-slate-300 uppercase font-bold">Score Global TAMIS</div>
                         <div className="text-4xl font-black text-white">
-                          {selectedScore.scoreTotal.toFixed(1)} <span className="text-lg text-blue-300">/ 100</span>
+                          {selectedScore.scoreTotal.toFixed(1)} <span className="text-lg text-navy-300">/ 100</span>
                         </div>
                       </div>
                     </div>
@@ -1382,7 +1360,7 @@ export default function ClassementPage() {
                         Répartition des composantes d'évaluation
                       </div>
                       <div className="text-xs font-bold text-slate-600">
-                        Collègues & Clients ({partNonManager} / 45 pts) • Manager ({partManager} / 55 pts)
+                        Collègues & clients ({partNonManager} / {maxNonManager} pts) · Manager ({partManager} / {maxManager} pts)
                       </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -1393,13 +1371,13 @@ export default function ClassementPage() {
                           <div className="text-xl font-black text-slate-900 mt-1">
                             {partCollegues} <span className="text-xs font-medium text-slate-500">/ {maxCollegues} pts</span>
                           </div>
-                          <div className="text-[11px] text-blue-600 font-semibold mt-0.5">
+                          <div className="text-[11px] text-navy-700 font-semibold mt-0.5">
                             Note : {selectedScore.scoreCollegues.toFixed(1)}%
                           </div>
                         </div>
                         <div className="w-full bg-slate-200 h-1.5 rounded-full mt-3 overflow-hidden">
                           <div
-                            className="bg-blue-600 h-full rounded-full"
+                            className="bg-navy-700 h-full rounded-full"
                             style={{ width: `${maxCollegues > 0 ? Math.min(100, (partCollegues / maxCollegues) * 100) : 0}%` }}
                           ></div>
                         </div>
@@ -1431,20 +1409,20 @@ export default function ClassementPage() {
                       </div>
 
                       {/* Manager */}
-                      <div className="bg-indigo-50/50 rounded-2xl p-4 border border-indigo-200/80 flex flex-col justify-between">
+                      <div className="bg-navy-50/50 rounded-2xl p-4 border border-navy-200/80 flex flex-col justify-between">
                         <div>
-                          <div className="text-[11px] font-bold text-indigo-800 uppercase">Manager (55 pts)</div>
-                          <div className="text-xl font-black text-indigo-900 mt-1">
-                            {partManager} <span className="text-xs font-medium text-indigo-700">/ 55 pts</span>
+                          <div className="text-[11px] font-bold text-navy-900 uppercase">Manager ({maxManager} pts)</div>
+                          <div className="text-xl font-black text-navy-950 mt-1">
+                            {partManager} <span className="text-xs font-medium text-navy-800">/ {maxManager} pts</span>
                           </div>
-                          <div className="text-[11px] text-indigo-700 font-semibold mt-0.5">
+                          <div className="text-[11px] text-navy-800 font-semibold mt-0.5">
                             Note : {selectedScore.scoreManager.toFixed(1)}%
                           </div>
                         </div>
-                        <div className="w-full bg-indigo-200 h-1.5 rounded-full mt-3 overflow-hidden">
+                        <div className="w-full bg-navy-200 h-1.5 rounded-full mt-3 overflow-hidden">
                           <div
-                            className="bg-indigo-600 h-full rounded-full"
-                            style={{ width: `${Math.min(100, (partManager / 55) * 100)}%` }}
+                            className="bg-navy-700 h-full rounded-full"
+                            style={{ width: `${Math.min(100, (partManager / maxManager) * 100)}%` }}
                           ></div>
                         </div>
                       </div>
@@ -1457,7 +1435,7 @@ export default function ClassementPage() {
             {/* Détail des Notes par Évaluateur */}
             <div className="space-y-4">
               <div className="flex items-center gap-2">
-                <ClipboardList className="w-5 h-5 text-brand-600" />
+                <ClipboardList className="w-5 h-5 text-navy-800" />
                 <h3 className="text-sm font-black uppercase text-slate-700 tracking-wider">Détail des notes reçues</h3>
               </div>
 
@@ -1479,8 +1457,8 @@ export default function ClassementPage() {
                     })
                     if (colleguesEvals.length === 0) return null
                     return (
-                      <div className="bg-blue-50/50 border border-blue-100 rounded-2xl overflow-hidden">
-                        <div className="bg-blue-600 px-4 py-2.5 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-between">
+                      <div className="bg-navy-50/50 border border-navy-100 rounded-2xl overflow-hidden">
+                        <div className="bg-navy-700 px-4 py-2.5 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <Users2 className="w-4 h-4" />
                             <span>Notes des Collègues & Clients Internes ({colleguesEvals.length} évaluateur{colleguesEvals.length > 1 ? 's' : ''})</span>
@@ -1489,20 +1467,20 @@ export default function ClassementPage() {
                         </div>
                         <div className="overflow-x-auto">
                           <table className="w-full text-xs">
-                            <thead className="bg-blue-50 border-b border-blue-100">
+                            <thead className="bg-navy-50 border-b border-navy-100">
                               <tr>
-                                <th className="px-3 py-2.5 text-left font-bold text-blue-800 whitespace-nowrap">Évaluateur</th>
+                                <th className="px-3 py-2.5 text-left font-bold text-navy-900 whitespace-nowrap">Évaluateur</th>
                                 {colleguesCriteres.map((c) => (
-                                  <th key={c.id} className="px-3 py-2.5 text-center font-bold text-blue-800 whitespace-nowrap" title={c.libelle}>
+                                  <th key={c.id} className="px-3 py-2.5 text-center font-bold text-navy-900 whitespace-nowrap" title={c.libelle}>
                                     {c.libelle.length > 20 ? c.libelle.slice(0, 18) + '…' : c.libelle}
-                                    <div className="text-[10px] font-normal text-blue-500">/{c.noteMaximale}</div>
+                                    <div className="text-[10px] font-normal text-navy-600">/{c.noteMaximale}</div>
                                   </th>
                                 ))}
-                                <th className="px-3 py-2.5 text-center font-bold text-blue-900 whitespace-nowrap">Total Brut</th>
-                                <th className="px-3 py-2.5 text-center font-black text-blue-950 whitespace-nowrap bg-blue-100/60">Sur 45 pts</th>
+                                <th className="px-3 py-2.5 text-center font-bold text-navy-950 whitespace-nowrap">Total Brut</th>
+                                <th className="px-3 py-2.5 text-center font-black text-navy-950 whitespace-nowrap bg-navy-100/60">Sur 45 pts</th>
                               </tr>
                             </thead>
-                            <tbody className="divide-y divide-blue-50">
+                            <tbody className="divide-y divide-navy-50">
                               {colleguesEvals.map((ev) => {
                                 const filteredNotes = ev.notes.filter((n) => {
                                   const types = (n as any).typeEvaluateurs && (n as any).typeEvaluateurs.length > 0 ? (n as any).typeEvaluateurs : [n.typeEvaluateur]
@@ -1510,9 +1488,9 @@ export default function ClassementPage() {
                                 })
                                 const total = filteredNotes.reduce((s, n) => s + n.valeur, 0)
                                 const maxTotal = filteredNotes.reduce((s, n) => s + n.noteMaximale, 0)
-                                const scoreSur45 = maxTotal > 0 ? Math.round((total / maxTotal) * 45 * 10) / 10 : 0
+                                const scoreSur45 = maxTotal > 0 ? Math.round((total / maxTotal) * (data?.campagne?.poidsCollegues ?? 45) * 10) / 10 : 0
                                 return (
-                                  <tr key={ev.evaluateur.id} className="hover:bg-blue-50/50 transition-colors">
+                                  <tr key={ev.evaluateur.id} className="hover:bg-navy-50/50 transition-colors">
                                     <td className="px-3 py-2.5 whitespace-nowrap">
                                       <div className="font-bold text-slate-800">
                                         {anonymized ? 'Évaluateur Anonyme' : `${ev.evaluateur.prenom} ${ev.evaluateur.nom}`}
@@ -1536,8 +1514,8 @@ export default function ClassementPage() {
                                     <td className="px-3 py-2.5 text-center font-bold text-slate-700">
                                       {total}<span className="text-slate-400 font-normal">/{maxTotal}</span>
                                     </td>
-                                    <td className="px-3 py-2.5 text-center font-black text-blue-700 bg-blue-50/80">
-                                      {scoreSur45} <span className="text-[10px] text-blue-500 font-normal">/ 45</span>
+                                    <td className="px-3 py-2.5 text-center font-black text-navy-800 bg-navy-50/80">
+                                      {scoreSur45} <span className="text-[10px] text-navy-600 font-normal">/ 45</span>
                                     </td>
                                   </tr>
                                 )
@@ -1580,7 +1558,7 @@ export default function ClassementPage() {
                               {detailedNotes.clientsNotes.map((cl, idx) => {
                                 const total = cl.notes.reduce((s, n) => s + n.valeur, 0)
                                 const maxTotal = cl.notes.reduce((s, n) => s + n.noteMaximale, 0)
-                                const scoreSur45 = maxTotal > 0 ? Math.round((total / maxTotal) * 45 * 10) / 10 : 0
+                                const scoreSur45 = maxTotal > 0 ? Math.round((total / maxTotal) * (data?.campagne?.poidsCollegues ?? 45) * 10) / 10 : 0
                                 return (
                                   <tr key={idx} className="hover:bg-amber-50/50 transition-colors">
                                     <td className="px-3 py-2.5 whitespace-nowrap font-bold text-slate-800">{cl.clientLabel}</td>
@@ -1625,8 +1603,8 @@ export default function ClassementPage() {
                     })
                     if (managerEvals.length === 0) return null
                     return (
-                      <div className="bg-indigo-50/50 border border-indigo-100 rounded-2xl overflow-hidden">
-                        <div className="bg-indigo-600 px-4 py-2.5 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-between">
+                      <div className="bg-navy-50/50 border border-navy-100 rounded-2xl overflow-hidden">
+                        <div className="bg-navy-700 px-4 py-2.5 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <Crown className="w-4 h-4" />
                             <span>Notes du Manager ({managerEvals.length})</span>
@@ -1635,20 +1613,20 @@ export default function ClassementPage() {
                         </div>
                         <div className="overflow-x-auto">
                           <table className="w-full text-xs">
-                            <thead className="bg-indigo-50 border-b border-indigo-100">
+                            <thead className="bg-navy-50 border-b border-navy-100">
                               <tr>
-                                <th className="px-3 py-2.5 text-left font-bold text-indigo-800 whitespace-nowrap">Manager</th>
+                                <th className="px-3 py-2.5 text-left font-bold text-navy-900 whitespace-nowrap">Manager</th>
                                 {managerCriteres.map((c) => (
-                                  <th key={c.id} className="px-3 py-2.5 text-center font-bold text-indigo-800 whitespace-nowrap" title={c.libelle}>
+                                  <th key={c.id} className="px-3 py-2.5 text-center font-bold text-navy-900 whitespace-nowrap" title={c.libelle}>
                                     {c.libelle.length > 20 ? c.libelle.slice(0, 18) + '…' : c.libelle}
-                                    <div className="text-[10px] font-normal text-indigo-500">/{c.noteMaximale}</div>
+                                    <div className="text-[10px] font-normal text-navy-600">/{c.noteMaximale}</div>
                                   </th>
                                 ))}
-                                <th className="px-3 py-2.5 text-center font-bold text-indigo-900 whitespace-nowrap">Total Brut</th>
-                                <th className="px-3 py-2.5 text-center font-black text-indigo-950 whitespace-nowrap bg-indigo-100/60">Sur 55 pts</th>
+                                <th className="px-3 py-2.5 text-center font-bold text-navy-950 whitespace-nowrap">Total Brut</th>
+                                <th className="px-3 py-2.5 text-center font-black text-navy-950 whitespace-nowrap bg-navy-100/60">Sur 55 pts</th>
                               </tr>
                             </thead>
-                            <tbody className="divide-y divide-indigo-50">
+                            <tbody className="divide-y divide-navy-50">
                               {managerEvals.map((ev) => {
                                 const managerNotes = ev.notes.filter((n) => {
                                   const types = (n as any).typeEvaluateurs && (n as any).typeEvaluateurs.length > 0 ? (n as any).typeEvaluateurs : [n.typeEvaluateur]
@@ -1656,9 +1634,9 @@ export default function ClassementPage() {
                                 })
                                 const total = managerNotes.reduce((s, n) => s + n.valeur, 0)
                                 const maxTotal = managerNotes.reduce((s, n) => s + n.noteMaximale, 0)
-                                const scoreSur55 = maxTotal > 0 ? Math.round((total / maxTotal) * 55 * 10) / 10 : 0
+                                const scoreSur55 = maxTotal > 0 ? Math.round((total / maxTotal) * (data?.campagne?.poidsManager ?? 55) * 10) / 10 : 0
                                 return (
-                                  <tr key={ev.evaluateur.id} className="hover:bg-indigo-50/50 transition-colors">
+                                  <tr key={ev.evaluateur.id} className="hover:bg-navy-50/50 transition-colors">
                                     <td className="px-3 py-2.5 whitespace-nowrap">
                                       <div className="font-bold text-slate-800">
                                         {anonymized ? 'Manager Anonyme' : `${ev.evaluateur.prenom} ${ev.evaluateur.nom}`}
@@ -1682,8 +1660,8 @@ export default function ClassementPage() {
                                     <td className="px-3 py-2.5 text-center font-bold text-slate-700">
                                       {total}<span className="text-slate-400 font-normal">/{maxTotal}</span>
                                     </td>
-                                    <td className="px-3 py-2.5 text-center font-black text-indigo-700 bg-indigo-50/80">
-                                      {scoreSur55} <span className="text-[10px] text-indigo-500 font-normal">/ 55</span>
+                                    <td className="px-3 py-2.5 text-center font-black text-navy-800 bg-navy-50/80">
+                                      {scoreSur55} <span className="text-[10px] text-navy-600 font-normal">/ 55</span>
                                     </td>
                                   </tr>
                                 )
@@ -1748,19 +1726,19 @@ function ScoreTable({
       case 1:
         return (
           <div className="w-7 h-7 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center font-black text-xs shadow-sm">
-            🥇
+            1
           </div>
         )
       case 2:
         return (
           <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center font-black text-xs">
-            🥈
+            2
           </div>
         )
       case 3:
         return (
           <div className="w-7 h-7 rounded-lg bg-orange-100 text-orange-700 flex items-center justify-center font-black text-xs">
-            🥉
+            3
           </div>
         )
       default:
@@ -1812,22 +1790,12 @@ function ScoreTable({
             const hasCli = score.hasClient
             const clientVal = score.scoreClient !== undefined ? score.scoreClient : 0
 
-            // Règle DSM TAMIS : Collègues + Client Interne + Client QR sur 45 pts, Manager sur 55 pts
-            const partCollegues = hasColl && hasCli
-              ? Math.round(score.scoreCollegues * 0.20 * 10) / 10
-              : hasColl
-              ? Math.round(score.scoreCollegues * 0.45 * 10) / 10
-              : 0
-            const maxCollegues = hasColl && hasCli ? 20 : 45
-
-            const partClients = hasColl && hasCli
-              ? Math.round(clientVal * 0.25 * 10) / 10
-              : hasCli
-              ? Math.round(clientVal * 0.45 * 10) / 10
-              : 0
-            const maxClients = hasColl && hasCli ? 25 : 45
-
-            const partManager = Math.round(score.scoreManager * 0.55 * 10) / 10
+            // Parts en points, calculées côté serveur selon les pondérations de la campagne
+            const partCollegues = score.partCollegues
+            const maxCollegues = score.maxCollegues
+            const partClients = score.partClient
+            const maxClients = score.maxClient
+            const partManager = score.partManager
 
             return (
               <tr
@@ -1866,18 +1834,18 @@ function ScoreTable({
                       </span>
                     )}
                     {score.isMajorDirection && !score.isMajorGlobal && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-100 text-blue-800 border border-blue-200">
-                        🏆 1er Direction
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-navy-100 text-navy-900 border border-navy-200">
+                        1er de direction
                       </span>
                     )}
                     {score.isMajorDepartement && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-purple-100 text-purple-800 border border-purple-200">
-                        🎖️ 1er Département
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-teal-100 text-teal-800 border border-teal-200">
+                        1er de département
                       </span>
                     )}
                     {score.isMajorService && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200">
-                        🏅 1er Service
+                        1er de service
                       </span>
                     )}
                     {!score.isMajorGlobal && !score.isMajorDirection && !score.isMajorDepartement && !score.isMajorService && (
@@ -1919,7 +1887,7 @@ function ScoreTable({
                   {score.hasManager ? (
                     <>
                       <span className="font-bold text-slate-800">{partManager}</span>
-                      <span className="text-slate-500"> / 55</span>
+                      <span className="text-slate-500"> / {score.maxManager}</span>
                       <span className="text-[10px] text-slate-400 block font-normal">
                         ({score.scoreManager.toFixed(0)}%)
                       </span>
@@ -1934,7 +1902,7 @@ function ScoreTable({
                 <td className="px-4 py-4 text-right">
                   <span
                     className={`text-base font-black ${
-                      rang === 1 ? 'text-amber-600' : 'text-blue-600'
+                      rang === 1 ? 'text-amber-600' : 'text-navy-700'
                     }`}
                   >
                     {score.scoreTotal.toFixed(1)} %
@@ -1953,7 +1921,7 @@ function ScoreTable({
                 <td className="px-4 py-4 text-center">
                   <button
                     onClick={() => onSelectScore(score)}
-                    className="px-3 py-1.5 bg-slate-100 hover:bg-brand-50 hover:text-brand-600 text-slate-700 rounded-lg text-xs font-bold transition-colors shadow-sm"
+                    className="px-3 py-1.5 bg-slate-100 hover:bg-navy-50 hover:text-navy-800 text-slate-700 rounded-lg text-xs font-bold transition-colors shadow-sm"
                   >
                     Consulter
                   </button>

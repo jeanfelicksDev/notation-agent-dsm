@@ -94,7 +94,7 @@ export default function SiteDetailPage({ params }: { params: Promise<{ id: strin
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-navy-700"></div>
       </div>
     )
   }
@@ -127,7 +127,7 @@ export default function SiteDetailPage({ params }: { params: Promise<{ id: strin
               <input
                 type="text"
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 outline-none"
                 value={formData.nom}
                 onChange={e => setFormData({ ...formData, nom: e.target.value })}
               />
@@ -137,7 +137,7 @@ export default function SiteDetailPage({ params }: { params: Promise<{ id: strin
               <label className="block text-sm font-medium text-gray-700 mb-1">Ville</label>
               <input
                 type="text"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 outline-none"
                 value={formData.ville}
                 onChange={e => setFormData({ ...formData, ville: e.target.value })}
               />
@@ -160,7 +160,7 @@ export default function SiteDetailPage({ params }: { params: Promise<{ id: strin
               <button
                 type="submit"
                 disabled={saving}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-8 py-2 rounded-lg font-bold disabled:opacity-50 transition-colors"
+                className="flex items-center gap-2 bg-navy-700 hover:bg-navy-800 text-white px-8 py-2 rounded-lg font-bold disabled:opacity-50 transition-colors"
               >
                 {saving ? 'Enregistrement...' : <><Save className="w-4 h-4" /> Enregistrer</>}
               </button>
@@ -171,7 +171,7 @@ export default function SiteDetailPage({ params }: { params: Promise<{ id: strin
 
       {/* Custom Confirmation Modal */}
       {showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4 border border-slate-100">
             <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto">
               <Trash2 className="w-6 h-6" />

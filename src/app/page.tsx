@@ -1,560 +1,363 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
+import { AlertCircle, ArrowLeft, ArrowRight, Eye, EyeOff, Loader2, Smartphone } from 'lucide-react'
+import { destinationPourRole } from '@/lib/roles'
+import { BrandMark } from '@/components/BrandMark'
 
-const DynamicQR = dynamic(() => import('qrcode.react').then(m => m.QRCodeSVG), { ssr: false })
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import {
-  User,
-  UserCheck,
-  ShieldCheck,
-  ShieldAlert,
-  ChevronRight,
-  Smartphone,
-  Loader2,
-  Lock,
-  UserPlus,
-  LogIn,
-  Eye,
-  EyeOff,
-  TrendingUp,
-  Star,
-  Users,
-  Award,
-  LayoutDashboard,
-  Anchor,
-  CheckCircle2,
-  Zap,
-  Globe,
-} from 'lucide-react'
+const QRCode = dynamic(() => import('qrcode.react').then((m) => m.QRCodeSVG), { ssr: false })
 
-type Mode = 'register' | 'login'
+type Etape = 'identifiant' | 'connexion' | 'definir' | 'contact_admin'
 
-/* ─── Animated Counter Hook ─── */
-function useCounter(target: number, duration = 1200, start = false) {
-  const [value, setValue] = useState(0)
-  useEffect(() => {
-    if (!start) return
-    let startTime: number | null = null
-    const step = (timestamp: number) => {
-      if (!startTime) startTime = timestamp
-      const progress = Math.min((timestamp - startTime) / duration, 1)
-      const eased = 1 - Math.pow(1 - progress, 3)
-      setValue(Math.floor(eased * target))
-      if (progress < 1) requestAnimationFrame(step)
-    }
-    requestAnimationFrame(step)
-  }, [target, duration, start])
-  return value
+type CampagnePublique = { libelle: string; dateFin: string; completionRate: number } | null
+
+const MESSAGES_REDIRECTION: Record<string, string> = {
+  admin_required: 'Cet espace est réservé aux administrateurs. Connectez-vous avec un compte administrateur.',
+  auth_required: 'Connectez-vous pour continuer.',
+  session_expired: 'Votre session a expiré. Connectez-vous à nouveau.',
 }
 
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+}
 
-
-/* ─── Particles Canvas ─── */
-function ParticleCanvas() {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-
-    let animId: number
-    const particles: { x: number; y: number; r: number; vx: number; vy: number; alpha: number }[] = []
-
-    const resize = () => {
-      canvas.width = canvas.offsetWidth
-      canvas.height = canvas.offsetHeight
-    }
-    resize()
-    window.addEventListener('resize', resize)
-
-    for (let i = 0; i < 38; i++) {
-      particles.push({
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height,
-        r: Math.random() * 2 + 0.5,
-        vx: (Math.random() - 0.5) * 0.3,
-        vy: (Math.random() - 0.5) * 0.3,
-        alpha: Math.random() * 0.5 + 0.1,
-      })
-    }
-
-    const draw = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height)
-      particles.forEach((p) => {
-        p.x += p.vx
-        p.y += p.vy
-        if (p.x < 0) p.x = canvas.width
-        if (p.x > canvas.width) p.x = 0
-        if (p.y < 0) p.y = canvas.height
-        if (p.y > canvas.height) p.y = 0
-
-        ctx.beginPath()
-        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2)
-        ctx.fillStyle = `rgba(212,175,55,${p.alpha})`
-        ctx.fill()
-      })
-
-      // Draw connecting lines
-      for (let i = 0; i < particles.length; i++) {
-        for (let j = i + 1; j < particles.length; j++) {
-          const dx = particles[i].x - particles[j].x
-          const dy = particles[i].y - particles[j].y
-          const dist = Math.sqrt(dx * dx + dy * dy)
-          if (dist < 100) {
-            ctx.beginPath()
-            ctx.strokeStyle = `rgba(212,175,55,${0.06 * (1 - dist / 100)})`
-            ctx.lineWidth = 0.5
-            ctx.moveTo(particles[i].x, particles[i].y)
-            ctx.lineTo(particles[j].x, particles[j].y)
-            ctx.stroke()
-          }
-        }
-      }
-
-      animId = requestAnimationFrame(draw)
-    }
-    draw()
-
-    return () => {
-      cancelAnimationFrame(animId)
-      window.removeEventListener('resize', resize)
-    }
-  }, [])
-
+export default function Accueil() {
   return (
-    <canvas
-      ref={canvasRef}
-      style={{
-        position: 'absolute',
-        inset: 0,
-        width: '100%',
-        height: '100%',
-        pointerEvents: 'none',
-        zIndex: 0,
-      }}
-    />
+    <Suspense>
+      <AccueilContenu />
+    </Suspense>
   )
 }
 
-/* ═══════════════════════════════════════════
-   MAIN COMPONENT
-═══════════════════════════════════════════ */
-/** Met en majuscule la 1ère lettre de chaque mot, le reste en minuscules ("PHASE PILOTE" → "Phase Pilote") */
-const capitalizeWords = (s: string) =>
-  s.toLowerCase().replace(/(^|[\s'\-‐–—])([a-zà-öø-ÿ])/g, (_, sep: string, ch: string) => sep + ch.toUpperCase())
-
-export default function Home() {
-  const router = useRouter()
-  const [mode, setMode] = useState<Mode>('register')
-  const [visible, setVisible] = useState(false)
-  const [evaluationUrl, setEvaluationUrl] = useState('/')
-
-  const [matricule, setMatricule] = useState('')
-  const [password, setPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
-  const [campaignLabel, setCampaignLabel] = useState('')
-  const [statsData, setStatsData] = useState<{
-    agentsCount: number
-    campagnesCount: number
-    completionRate: number
-  }>({
-    agentsCount: 0,
-    campagnesCount: 0,
-    completionRate: 0,
-  })
-
-  const [user, setUser] = useState<{ id: string; matricule: string; role: string } | null>(null)
-  const [error, setError] = useState('')
+function AccueilContenu() {
+  const reason = useSearchParams().get('reason')
+  const [etape, setEtape] = useState<Etape>('identifiant')
+  const [identifiant, setIdentifiant] = useState('')
+  const [secret, setSecret] = useState('')
+  const [confirmation, setConfirmation] = useState('')
+  const [estAdmin, setEstAdmin] = useState(false)
+  const [voirSecret, setVoirSecret] = useState(false)
+  const [error, setError] = useState(() => (reason && MESSAGES_REDIRECTION[reason]) || '')
   const [loading, setLoading] = useState(false)
-
-  // Animated counters connected to live database values
-  const agentCount = useCounter(statsData.agentsCount, 1400, visible && statsData.agentsCount > 0)
-  const campagneCount = useCounter(statsData.campagnesCount, 900, visible && statsData.campagnesCount > 0)
-  const scoreCount = useCounter(statsData.completionRate, 1600, visible && statsData.completionRate > 0)
+  const [campagne, setCampagne] = useState<CampagnePublique>(null)
+  const secretRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    const t = setTimeout(() => setVisible(true), 300)
-    return () => clearTimeout(t)
-  }, [])
-
-  useEffect(() => {
-    // Check if session is already active and auto-redirect if so
     fetch('/api/auth/session')
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (data?.authenticated && data?.user) {
-          setUser(data.user)
-          // Seul l'administrateur accède à l'espace admin ; MANAGER et UTILISATEUR vont sur la page de notation
-          const target = data.user.role === 'ADMIN'
-            ? '/admin'
-            : data.user.role === 'EXTERNE'
-            ? '/qr'
-            : '/evaluer'
-          window.location.href = target
-        }
+        if (data?.authenticated && data.user) window.location.href = destinationPourRole(data.user.role)
       })
       .catch(() => {})
 
-    // Load real platform statistics & active campaign info
     fetch('/api/stats/public')
       .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data) {
-          setStatsData({
-            agentsCount: data.agentsCount || 0,
-            campagnesCount: data.campagnesCount || 0,
-            completionRate: data.completionRate || 0,
-          })
-          if (data.campaignLabel) {
-            setCampaignLabel(capitalizeWords(data.campaignLabel))
-          }
-        }
-      })
+      .then((data) => setCampagne(data?.campagne ?? null))
       .catch(() => {})
 
-    setEvaluationUrl(`${window.location.origin}/`)
-
-    const params = new URLSearchParams(window.location.search)
-    const reason = params.get('reason')
-    if (reason === 'admin_required' || reason === 'admin_unauthorized') {
-      setMode('login')
-      setError('Accès réservé aux administrateurs. Veuillez vous connecter avec vos identifiants Administrateur.')
-      window.history.replaceState({}, '', '/')
-    } else if (reason === 'auth_required' || reason === 'session_expired') {
-      setMode('login')
-      setError('Votre session a expiré ou une connexion est requise. Veuillez vous connecter.')
-      window.history.replaceState({}, '', '/')
-    }
+    // Le message de redirection est affiché une fois ; on nettoie l'URL.
+    if (window.location.search) window.history.replaceState({}, '', '/')
   }, [])
 
-  const handleAdminClick = (e: React.MouseEvent) => {
-    e.preventDefault()
-    if (!user) {
-      setMode('login')
-      setError('Veuillez vous connecter avec vos identifiants administrateur.')
-    } else if (user.role === 'ADMIN') {
-      window.location.href = '/admin'
-    } else {
-      setError(`Accès refusé : seul un compte Administrateur a accès à l'espace d'administration (votre compte : ${user.role}).`)
-    }
+  useEffect(() => {
+    if (etape === 'connexion' || etape === 'definir') secretRef.current?.focus()
+  }, [etape])
+
+  const retour = () => {
+    setEtape('identifiant')
+    setSecret('')
+    setConfirmation('')
+    setError('')
   }
 
-  const handleRegister = async (e: React.FormEvent) => {
+  const post = async (url: string, body: object) => {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    return { res, data: await res.json().catch(() => ({})) }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    if (!matricule.trim() || !password) {
-      setError('Veuillez renseigner votre matricule ou téléphone et votre mot de passe à 4 chiffres.')
-      return
-    }
-    if (!/^\d{4}$/.test(password.trim())) {
-      setError('Le mot de passe doit comporter exactement 4 chiffres.')
-      return
-    }
     setLoading(true)
     try {
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          matricule: matricule.trim(),
-          password: password.trim(),
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) { setError(data.error || 'Erreur lors de la création du compte'); return }
-      const target = data.role === 'ADMIN'
-        ? '/admin'
-        : data.role === 'EXTERNE'
-        ? '/qr'
-        : '/evaluer'
-      window.location.href = target
+      if (etape === 'identifiant') {
+        const { res, data } = await post('/api/auth/identifier', { identifiant })
+        if (!res.ok) return setError(data.error || 'Identifiant inconnu.')
+        setEstAdmin(Boolean(data.admin))
+        setEtape(data.etat === 'pin_a_definir' ? 'definir' : data.etat === 'contact_admin' ? 'contact_admin' : 'connexion')
+        return
+      }
+
+      if (etape === 'definir') {
+        if (!/^\d{4}$/.test(secret)) return setError('Le PIN doit comporter exactement 4 chiffres.')
+        if (secret !== confirmation) return setError('Les deux PIN ne correspondent pas.')
+        const { res, data } = await post('/api/auth/definir-pin', { identifiant, pin: secret, confirmation })
+        if (!res.ok) {
+          if (res.status === 409) setEtape('connexion')
+          return setError(data.error || 'Impossible d’enregistrer ce PIN.')
+        }
+        window.location.href = destinationPourRole(data.role)
+        return
+      }
+
+      if (etape === 'connexion') {
+        const { res, data } = await post('/api/auth/login', { identifiant, password: secret })
+        if (!res.ok) {
+          setSecret('')
+          return setError(data.error || 'Identifiant ou PIN incorrect.')
+        }
+        window.location.href = destinationPourRole(data.role)
+      }
     } catch {
-      setError('Erreur de connexion au serveur.')
+      setError('Le serveur ne répond pas. Vérifiez votre connexion et réessayez.')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
-    if (!matricule.trim() || !password) {
-      setError('Veuillez renseigner votre matricule ou téléphone et votre mot de passe.')
-      return
-    }
-    setLoading(true)
-    try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rawMatricule: matricule.trim(), password }),
-      })
-      const data = await res.json()
-      if (!res.ok) { setError(data.error || 'Matricule/Téléphone ou mot de passe incorrect'); return }
-      const target = data.role === 'ADMIN'
-        ? '/admin'
-        : data.role === 'EXTERNE'
-        ? '/qr'
-        : '/evaluer'
-      window.location.href = target
-    } catch {
-      setError('Erreur de connexion au serveur.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const switchMode = useCallback((m: Mode) => {
-    setMode(m)
-    setError('')
-    setPassword('')
-  }, [])
+  const champPin = !estAdmin
+  const titre = {
+    identifiant: 'Connexion',
+    connexion: 'Saisissez votre PIN',
+    definir: 'Choisissez votre PIN',
+    contact_admin: 'Compte à activer',
+  }[etape]
 
   return (
-    <div className="dsm-split-screen" style={{ fontFamily: 'Inter, sans-serif' }}>
+    <div className="flex min-h-dvh flex-col lg:flex-row">
+      {/* ─── Panneau de marque ─── */}
+      <aside className="relative flex flex-col justify-between gap-10 overflow-hidden bg-navy-900 px-6 py-8 text-white sm:px-10 lg:w-[46%] lg:px-14 lg:py-12">
+        <ChartLines />
 
-      {/* ═══ LEFT — Hero Panel ═══ */}
-      <div className="dsm-hero-panel lg:w-[52%]">
-        <ParticleCanvas />
-
-        {/* Grid overlay */}
-        <div className="dsm-hero-grid" />
-
-        {/* Glow orbs */}
-        <div className="dsm-orb dsm-orb-gold" />
-        <div className="dsm-orb dsm-orb-cobalt" />
-
-        <div className="dsm-hero-content">
-
-          {/* Logo */}
-          <div className={`dsm-logo-row ${visible ? 'dsm-anim-fade-up' : 'opacity-0'}`} style={{ animationDelay: '0ms' }}>
-            <div className="dsm-logo-icon">
-              <div className="dsm-logo-pulse" />
-              <Anchor size={18} color="white" strokeWidth={2.5} />
-            </div>
-            <div>
-              <p className="dsm-eyebrow">Direction des Solutions Maritimes</p>
-              <p className="dsm-brand-name">DSM <span className="dsm-gold">TAMIS</span></p>
-            </div>
-          </div>
-
-          {/* Badge */}
-          <div className={`${visible ? 'dsm-anim-fade-up' : 'opacity-0'}`} style={{ animationDelay: '80ms' }}>
-            <span className="dsm-official-badge">
-              <ShieldCheck size={13} />
-              Plateforme Officielle
-            </span>
-          </div>
-
-          {/* Headline */}
-          <div className={`dsm-headline-block ${visible ? 'dsm-anim-fade-up' : 'opacity-0'}`} style={{ animationDelay: '150ms' }}>
-            <h1 className="dsm-headline">
-              <span className="dsm-gold dsm-gold-shine">TAMIS</span>
-              <br />
-              <span className="dsm-headline-sub">{campaignLabel || 'des Agents DSM'}</span>
-            </h1>
-            <p className="dsm-sub" style={{ color: '#D4AF37' }}>
-              Reconnaissance et Valorisation des compétences de nos agents.
+        <div className="relative flex items-center gap-3">
+          <BrandMark />
+          <div className="leading-tight">
+            <p className="text-[15px] font-semibold tracking-tight">
+              DSM <span className="text-gold-500">TAMIS</span>
             </p>
+            <p className="text-xs text-navy-200">Direction des Solutions Maritimes</p>
           </div>
-
-          {/* Stat pills with live counters */}
-          <div className={`dsm-stats-row ${visible ? 'dsm-anim-fade-up' : 'opacity-0'}`} style={{ animationDelay: '250ms' }}>
-            <div className="dsm-stat-pill-v2">
-              <div className="dsm-stat-icon" style={{ background: 'rgba(7,95,172,0.3)' }}>
-                <Users size={15} color="white" />
-              </div>
-              <div>
-                <p className="dsm-stat-num">{agentCount}</p>
-                <p className="dsm-stat-lbl">{agentCount > 1 ? 'Agents évalués' : 'Agent évalué'}</p>
-              </div>
-            </div>
-            <div className="dsm-stat-pill-v2">
-              <div className="dsm-stat-icon" style={{ background: 'rgba(212,175,55,0.25)' }}>
-                <TrendingUp size={15} color="#D4AF37" />
-              </div>
-              <div>
-                <p className="dsm-stat-num">{campagneCount}</p>
-                <p className="dsm-stat-lbl">{campagneCount > 1 ? 'Campagnes actives' : 'Campagne active'}</p>
-              </div>
-            </div>
-            <div className="dsm-stat-pill-v2">
-              <div className="dsm-stat-icon" style={{ background: 'rgba(0,125,85,0.3)' }}>
-                <Star size={15} color="white" />
-              </div>
-              <div>
-                <p className="dsm-stat-num">{scoreCount}<span>%</span></p>
-                <p className="dsm-stat-lbl">Taux de complétion</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Feature ticker */}
-          <div className={`dsm-ticker-wrap ${visible ? 'dsm-anim-fade-up' : 'opacity-0'}`} style={{ animationDelay: '350ms' }}>
-            <div className="dsm-ticker">
-              {[
-                { icon: <Zap size={12} />, label: 'Notation multi-critères' },
-                { icon: <Globe size={12} />, label: 'Accès mobile' },
-                { icon: <ShieldCheck size={12} />, label: 'Données sécurisées' },
-                { icon: <CheckCircle2 size={12} />, label: 'Scores anonymisés' },
-                { icon: <Award size={12} />, label: 'Rapports en temps réel' },
-                { icon: <Zap size={12} />, label: 'Notation multi-critères' },
-                { icon: <Globe size={12} />, label: 'Accès mobile' },
-                { icon: <ShieldCheck size={12} />, label: 'Données sécurisées' },
-                { icon: <CheckCircle2 size={12} />, label: 'Scores anonymisés' },
-                { icon: <Award size={12} />, label: 'Rapports en temps réel' },
-              ].map((item, i) => (
-                <span key={i} className="dsm-ticker-item">
-                  {item.icon}
-                  {item.label}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          {/* Admin link */}
-          <Link
-            href="/admin"
-            onClick={handleAdminClick}
-            className={`dsm-admin-link ${visible ? 'dsm-anim-fade-up' : 'opacity-0'}`}
-            style={{ animationDelay: '420ms' }}
-          >
-            <LayoutDashboard size={15} />
-            Espace Administrateur
-            <ChevronRight size={14} />
-          </Link>
         </div>
 
-        {/* QR Code + Footer */}
-        <div className="dsm-hero-footer">
-          <div className={`dsm-qr-card-v2 ${visible ? 'dsm-anim-fade-up' : 'opacity-0'}`} style={{ animationDelay: '500ms' }}>
-            <div className="dsm-qr-wrap">
-              <DynamicQR value={evaluationUrl} size={68} level="H" fgColor="#00182f" />
-            </div>
-            <div>
-              <div className="dsm-qr-title">
-                <Smartphone size={13} color="#D4AF37" />
-                Accès Mobile
+        <div className="relative max-w-md">
+          <h1 className="text-3xl leading-tight font-semibold tracking-tight sm:text-4xl">
+            Évaluation de la performance des agents
+          </h1>
+          {campagne ? (
+            <div className="mt-8 border-t border-white/10 pt-6">
+              <p className="text-lg font-medium text-gold-400">{campagne.libelle}</p>
+              <p className="mt-1 text-sm text-navy-200">
+                Ouverte jusqu’au {formatDate(campagne.dateFin)}
+              </p>
+              <div className="mt-5 max-w-xs">
+                <div className="flex items-baseline justify-between text-sm">
+                  <span className="text-navy-100">Évaluations soumises</span>
+                  <span className="font-semibold tabular-nums">{campagne.completionRate} %</span>
+                </div>
+                <div
+                  className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10"
+                  role="progressbar"
+                  aria-valuenow={campagne.completionRate}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label="Évaluations soumises"
+                >
+                  <div className="h-full rounded-full bg-gold-500" style={{ width: `${campagne.completionRate}%` }} />
+                </div>
               </div>
-              <p className="dsm-qr-sub">Scannez le QR code pour accéder depuis votre téléphone</p>
             </div>
-          </div>
-          <p className="dsm-watermark">© 2026 DSM Intelligence • Système de Notation des Agents</p>
+          ) : (
+            <p className="mt-6 text-base text-navy-200">Aucune campagne d’évaluation n’est ouverte pour le moment.</p>
+          )}
         </div>
-      </div>
 
-      {/* ═══ RIGHT — Form Panel ═══ */}
-      <div className="dsm-form-panel lg:w-[48%] flex items-center justify-center p-6 sm:p-12 bg-slate-50/50">
-        {/* Card */}
-        <div className="w-full max-w-[420px] bg-white rounded-3xl p-8 sm:p-10 shadow-xl border border-slate-100/90 space-y-6">
-
-          {/* Logo badge */}
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-full bg-[#b58b16] flex items-center justify-center text-white shadow-md shadow-amber-900/10 shrink-0">
-              <Anchor size={17} strokeWidth={2.5} />
-            </div>
-            <span className="font-extrabold text-lg tracking-tight text-[#002d50]">
-              DSM <span className="text-[#b58b16]">TAMIS</span>
-            </span>
+        <div className="relative hidden items-center gap-4 lg:flex">
+          <div className="h-20 w-20 rounded-lg bg-white p-2">
+            <QRCode value={typeof window !== 'undefined' ? `${window.location.origin}/` : '/'} size={64} level="M" fgColor="#002B49" />
           </div>
+          <p className="max-w-[16rem] text-sm text-navy-200">
+            <Smartphone className="mr-1.5 inline h-4 w-4 text-gold-500" aria-hidden />
+            Scannez pour ouvrir la plateforme sur votre téléphone.
+          </p>
+        </div>
+      </aside>
 
-          {/* Subtitle */}
-          <div>
-            <p className="text-sm font-medium text-slate-500 mt-1.5">
-              {mode === 'register'
-                ? 'Remplissez votre matricule pour accéder au questionnaire.'
-                : 'Connectez-vous pour participer aux évaluations.'}
-            </p>
-          </div>
-
-          {/* Form */}
-          <form onSubmit={mode === 'register' ? handleRegister : handleLogin} className="space-y-4">
-            {/* MATRICULE input */}
-            <div className="bg-[#eef4fa] rounded-2xl p-3.5 px-4 flex items-center justify-between border border-transparent focus-within:border-[#075fac] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#075fac]/10 transition-all">
-              <div className="flex-1 min-w-0">
-                <label htmlFor="form-matricule" className="text-[10px] font-black tracking-wider text-[#004b87] uppercase block mb-0.5">
-                  Matricule
-                </label>
-                <input
-                  id="form-matricule"
-                  type="text"
-                  value={matricule}
-                  onChange={(e) => setMatricule(e.target.value)}
-                  placeholder="0000"
-                  disabled={loading}
-                  required
-                  className="w-full bg-transparent border-0 p-0 text-base font-bold text-slate-900 placeholder:text-slate-400 outline-none tracking-wider"
-                  autoComplete="username"
-                />
-              </div>
-              <User className="w-5 h-5 text-slate-400 shrink-0 ml-3" />
-            </div>
-
-            {/* MOT DE PASSE input */}
-            <div className="bg-[#eef4fa] rounded-2xl p-3.5 px-4 flex items-center justify-between border border-transparent focus-within:border-[#075fac] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#075fac]/10 transition-all">
-              <div className="flex-1 min-w-0">
-                <label htmlFor="form-password" className="text-[10px] font-black tracking-wider text-[#004b87] uppercase block mb-0.5">
-                  Matricule
-                </label>
-                <input
-                  id="form-password"
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="0000"
-                  disabled={loading}
-                  required
-                  maxLength={mode === 'register' ? 4 : undefined}
-                  inputMode={mode === 'register' ? 'numeric' : 'text'}
-                  pattern={mode === 'register' ? '[0-9]*' : undefined}
-                  className="w-full bg-transparent border-0 p-0 text-base font-bold text-slate-900 placeholder:text-slate-400 outline-none tracking-wider"
-                  autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
-                />
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="text-slate-400 hover:text-slate-600 focus:outline-none p-1 shrink-0 ml-3"
-              >
-                {showPassword ? <EyeOff size={19} /> : <Eye size={19} />}
-              </button>
-            </div>
-
-            {error && (
-              <div className="p-3.5 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-bold flex items-center gap-2 animate-fade-in">
-                <ShieldAlert size={16} className="shrink-0 text-red-500" />
-                <span>{error}</span>
-              </div>
-            )}
-
-            {/* Submit Button */}
+      {/* ─── Formulaire ─── */}
+      <main className="flex flex-1 items-center justify-center px-5 py-10 sm:px-10">
+        <div className="w-full max-w-sm">
+          {etape !== 'identifiant' && (
             <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-[#002d50] hover:bg-[#001d36] text-white py-4 px-6 rounded-2xl font-bold text-base shadow-xl shadow-blue-950/20 transition-all active:scale-[0.99] disabled:opacity-50 flex items-center justify-center gap-2 mt-3 cursor-pointer"
+              type="button"
+              onClick={retour}
+              className="-ml-2 mb-6 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-200/60 hover:text-slate-900"
             >
-              {loading ? (
-                <>
-                  <Loader2 size={18} className="animate-spin" />
-                  <span>Traitement en cours…</span>
-                </>
-              ) : (
-                <>
-                  <span>{mode === 'register' ? 'Commencer' : 'Se connecter'}</span>
-                  <ChevronRight size={18} />
-                </>
-              )}
+              <ArrowLeft className="h-4 w-4" aria-hidden />
+              Changer d’identifiant
             </button>
+          )}
 
-          </form>
+          <h2 className="text-2xl font-semibold tracking-tight text-navy-900">{titre}</h2>
+          <p className="mt-2 text-sm leading-relaxed text-slate-600">
+            {etape === 'identifiant' && 'Saisissez votre matricule ou votre numéro de téléphone.'}
+            {etape === 'connexion' &&
+              (estAdmin ? (
+                <>Compte administrateur <strong className="font-medium text-slate-900">{identifiant}</strong>.</>
+              ) : (
+                <>Compte <strong className="font-medium text-slate-900">{identifiant}</strong>. Saisissez le PIN à 4 chiffres que vous avez choisi.</>
+              ))}
+            {etape === 'definir' && (
+              <>
+                Première connexion pour <strong className="font-medium text-slate-900">{identifiant}</strong>. Ce PIN vous
+                servira à chaque connexion ; seul un administrateur pourra le réinitialiser.
+              </>
+            )}
+            {etape === 'contact_admin' &&
+              'Ce compte administrateur n’a pas encore de mot de passe. Il doit être initialisé par la commande d’installation.'}
+          </p>
 
+          {etape !== 'contact_admin' && (
+            <form onSubmit={handleSubmit} className="mt-8 space-y-5" noValidate>
+              {etape === 'identifiant' && (
+                <Champ label="Matricule ou téléphone" htmlFor="identifiant">
+                  <input
+                    id="identifiant"
+                    value={identifiant}
+                    onChange={(e) => setIdentifiant(e.target.value)}
+                    autoComplete="username"
+                    autoCapitalize="characters"
+                    spellCheck={false}
+                    autoFocus
+                    required
+                    disabled={loading}
+                    className={INPUT}
+                  />
+                </Champ>
+              )}
+
+              {(etape === 'connexion' || etape === 'definir') && (
+                <Champ
+                  label={etape === 'definir' ? 'Nouveau PIN (4 chiffres)' : champPin ? 'PIN' : 'Mot de passe'}
+                  htmlFor="secret"
+                >
+                  <div className="relative">
+                    <input
+                      ref={secretRef}
+                      id="secret"
+                      type={voirSecret ? 'text' : 'password'}
+                      value={secret}
+                      onChange={(e) => setSecret(champPin ? e.target.value.replace(/\D/g, '').slice(0, 4) : e.target.value)}
+                      inputMode={champPin ? 'numeric' : undefined}
+                      maxLength={champPin ? 4 : undefined}
+                      autoComplete={etape === 'definir' ? 'new-password' : 'current-password'}
+                      required
+                      disabled={loading}
+                      className={`${INPUT} pr-11 ${champPin ? 'tracking-[0.5em] tabular-nums' : ''}`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setVoirSecret((v) => !v)}
+                      className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-lg text-slate-500 hover:text-slate-800"
+                      aria-label={voirSecret ? 'Masquer' : 'Afficher'}
+                    >
+                      {voirSecret ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
+                    </button>
+                  </div>
+                </Champ>
+              )}
+
+              {etape === 'definir' && (
+                <Champ label="Confirmez le PIN" htmlFor="confirmation">
+                  <input
+                    id="confirmation"
+                    type={voirSecret ? 'text' : 'password'}
+                    value={confirmation}
+                    onChange={(e) => setConfirmation(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                    inputMode="numeric"
+                    maxLength={4}
+                    autoComplete="new-password"
+                    required
+                    disabled={loading}
+                    className={`${INPUT} tracking-[0.5em] tabular-nums`}
+                  />
+                </Champ>
+              )}
+
+              {error && (
+                <p role="alert" className="flex gap-2 rounded-lg bg-red-50 px-3.5 py-3 text-sm text-red-800">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" aria-hidden />
+                  {error}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-navy-900 px-4 py-3 text-[15px] font-semibold text-white shadow-raised transition-colors hover:bg-navy-800 disabled:opacity-60"
+              >
+                {loading ? (
+                  <Loader2 className="h-4.5 w-4.5 animate-spin" aria-hidden />
+                ) : (
+                  <>
+                    {etape === 'identifiant' ? 'Continuer' : etape === 'definir' ? 'Enregistrer mon PIN' : 'Se connecter'}
+                    <ArrowRight className="h-4 w-4" aria-hidden />
+                  </>
+                )}
+              </button>
+
+              {etape === 'connexion' && champPin && (
+                <p className="text-center text-sm text-slate-500">
+                  PIN oublié ? Demandez une réinitialisation à votre administrateur.
+                </p>
+              )}
+            </form>
+          )}
         </div>
-      </div>
+      </main>
     </div>
+  )
+}
+
+const INPUT =
+  'block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-3 text-base text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-navy-600 focus:ring-3 focus:ring-navy-600/15 disabled:bg-slate-50'
+
+function Champ({ label, htmlFor, children }: { label: string; htmlFor: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label htmlFor={htmlFor} className="mb-1.5 block text-sm font-medium text-slate-800">
+        {label}
+      </label>
+      {children}
+    </div>
+  )
+}
+
+/** Isobathes : lignes de profondeur d'une carte marine, en filigrane du panneau navy. */
+function ChartLines() {
+  return (
+    <svg
+      aria-hidden
+      className="pointer-events-none absolute -right-24 -bottom-24 h-[130%] w-[130%] text-white/[0.045]"
+      viewBox="0 0 600 600"
+      preserveAspectRatio="xMaxYMax slice"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.2"
+    >
+      {Array.from({ length: 9 }, (_, i) => {
+        const r = 90 + i * 52
+        return (
+          <path
+            key={i}
+            d={`M ${600 - r} 600 C ${600 - r} ${600 - r * 0.62}, ${600 - r * 0.58} ${600 - r * 1.04}, 600 ${600 - r * 1.08}`}
+          />
+        )
+      })}
+    </svg>
   )
 }

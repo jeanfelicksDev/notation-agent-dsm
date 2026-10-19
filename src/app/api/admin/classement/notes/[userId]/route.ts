@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { getSessionUser } from '@/lib/auth'
+import { requireAdmin } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -9,8 +9,8 @@ export async function GET(
   { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
-    const sessionUser = await getSessionUser()
-    if (!sessionUser || (sessionUser.role !== 'ADMIN' && sessionUser.role !== 'MANAGER')) {
+    // Le détail nominatif des notes est réservé aux administrateurs.
+    if (!(await requireAdmin())) {
       return NextResponse.json({ error: 'Accès refusé' }, { status: 403 })
     }
 
@@ -91,7 +91,16 @@ export async function GET(
       })
     }
 
-    const evaluateursNotes = Array.from(evaluateurMap.values())
+    // Statut de chaque évaluation : seules les évaluations soumises comptent dans le score.
+    const affectations = await prisma.affectation.findMany({
+      where: { evalueId: userId, campagneId: campagne.id },
+      select: { evaluateurId: true, statut: true },
+    })
+    const statutPar = new Map(affectations.map((a) => [a.evaluateurId, a.statut]))
+    const evaluateursNotes = Array.from(evaluateurMap.values()).map((e) => ({
+      ...e,
+      soumis: statutPar.get(e.evaluateur.id) === 'TERMINEE',
+    }))
 
     // Grouper les notes clients par client (ipHash ou clientId)
     const clientMap = new Map<

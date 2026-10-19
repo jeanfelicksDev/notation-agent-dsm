@@ -71,7 +71,7 @@ export default function NewCampagnePage() {
               <input
                 type="text"
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 outline-none"
                 value={formData.libelle}
                 onChange={e => setFormData({ ...formData, libelle: e.target.value })}
                 placeholder="Ex: Évaluation Annuelle 2026"
@@ -85,7 +85,7 @@ export default function NewCampagnePage() {
                   <input
                     type="date"
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none pl-10"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 outline-none pl-10"
                     value={formData.dateDebut}
                     onChange={e => setFormData({ ...formData, dateDebut: e.target.value })}
                   />
@@ -99,7 +99,7 @@ export default function NewCampagnePage() {
                   <input
                     type="date"
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none pl-10"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 outline-none pl-10"
                     value={formData.dateFin}
                     onChange={e => setFormData({ ...formData, dateFin: e.target.value })}
                   />
@@ -113,7 +113,7 @@ export default function NewCampagnePage() {
                   type="number"
                   min="0"
                   max="100"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 outline-none"
                   value={formData.poidsCollegues}
                   onChange={e => {
                     const val = parseInt(e.target.value) || 0
@@ -128,7 +128,7 @@ export default function NewCampagnePage() {
                   type="number"
                   min="0"
                   max="100"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 outline-none"
                   value={formData.poidsManager}
                   onChange={e => {
                     const val = parseInt(e.target.value) || 0
@@ -148,7 +148,7 @@ export default function NewCampagnePage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-8 py-2 rounded-lg font-bold disabled:opacity-50 transition-colors"
+                className="flex items-center gap-2 bg-navy-700 hover:bg-navy-800 text-white px-8 py-2 rounded-lg font-bold disabled:opacity-50 transition-colors"
               >
                 {loading ? 'Création...' : <><Save className="w-4 h-4" /> Créer la campagne</>}
               </button>

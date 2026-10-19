@@ -4,6 +4,7 @@ import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Save, Trash2, AlertCircle, QrCode, KeyRound, Eye, EyeOff, Check } from 'lucide-react'
+import { confirmer, toast } from '@/components/ui/feedback'
 
 interface Site {
   id: string
@@ -76,8 +77,8 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
 
     // Validate password if provided
     if (newPassword || confirmPassword) {
-      if (newPassword.length < 4) {
-        setPwdError('Le mot de passe doit contenir au moins 4 caractères.')
+      if (newPassword.length < 8) {
+        setPwdError('Le mot de passe doit contenir au moins 8 caractères.')
         setSaving(false)
         return
       }
@@ -103,7 +104,7 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
         qrcodeActif: formData.qrcodeActif,
       }
 
-      if (newPassword.trim().length >= 4) {
+      if (formData.role === 'ADMIN' && newPassword.trim().length >= 8) {
         payload.motDePasse = newPassword.trim()
       }
 
@@ -114,7 +115,7 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
       })
 
       if (res.ok) {
-        if (newPassword.trim().length >= 4) {
+        if (formData.role === 'ADMIN' && newPassword.trim().length >= 8) {
           setPwdSuccess(true)
           setNewPassword('')
           setConfirmPassword('')
@@ -133,26 +134,33 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
   }
 
   const handleDelete = async () => {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer cet utilisateur ?')) return
+    const ok = await confirmer({
+      titre: 'Supprimer cet utilisateur ?',
+      message: 'Ses notes données et reçues, ses affectations et ses scores seront définitivement supprimés.',
+      confirmer: 'Supprimer',
+      danger: true,
+    })
+    if (!ok) return
 
     try {
       const res = await fetch(`/api/admin/utilisateurs/${id}`, { method: 'DELETE' })
       if (res.ok) {
+        toast.success('Utilisateur supprimé.')
         router.push('/admin/utilisateurs')
         router.refresh()
       } else {
-        const data = await res.json()
-        alert(data.error || 'Erreur lors de la suppression')
+        const data = await res.json().catch(() => ({}))
+        toast.error(data.error || 'La suppression a échoué.')
       }
-    } catch (err) {
-      alert('Erreur de connexion')
+    } catch {
+      toast.error('Connexion au serveur impossible.')
     }
   }
 
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-navy-700"></div>
       </div>
     )
   }
@@ -192,7 +200,7 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
                 <input
                   type="text"
                   required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none uppercase bg-white focus:ring-2 focus:ring-blue-400"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none uppercase bg-white focus:ring-2 focus:ring-navy-400"
                   value={formData.matricule}
                   onChange={e => setFormData({ ...formData, matricule: e.target.value })}
                 />
@@ -203,7 +211,7 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
                 <input
                   type="email"
                   required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 outline-none"
                   value={formData.email}
                   onChange={e => setFormData({ ...formData, email: e.target.value })}
                 />
@@ -214,7 +222,7 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
                 <label className="block text-sm font-medium text-gray-700 mb-1">Téléphone</label>
                 <input
                   type="tel"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 outline-none"
                   value={formData.telephone}
                   onChange={e => setFormData({ ...formData, telephone: e.target.value })}
                   placeholder="+225 07 00 00 00 00"
@@ -226,7 +234,7 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
                 <input
                   type="text"
                   required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 outline-none"
                   value={formData.nom}
                   onChange={e => setFormData({ ...formData, nom: e.target.value })}
                 />
@@ -237,7 +245,7 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
                 <input
                   type="text"
                   required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 outline-none"
                   value={formData.prenom}
                   onChange={e => setFormData({ ...formData, prenom: e.target.value })}
                 />
@@ -246,7 +254,7 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Rôle</label>
                 <select
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 outline-none"
                   value={formData.role}
                   onChange={e => setFormData({ ...formData, role: e.target.value })}
                 >
@@ -259,7 +267,7 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Site</label>
                 <select
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 outline-none"
                   value={formData.siteId}
                   onChange={e => setFormData({ ...formData, siteId: e.target.value })}
                 >
@@ -273,7 +281,7 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
                 <label className="block text-sm font-medium text-gray-700 mb-1">Service</label>
                 <input
                   type="text"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 outline-none"
                   value={formData.service}
                   onChange={e => setFormData({ ...formData, service: e.target.value })}
                   placeholder="ex: Facturation, Opérations..."
@@ -284,7 +292,7 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
                 <label className="block text-sm font-medium text-gray-700 mb-1">Département</label>
                 <input
                   type="text"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 outline-none"
                   value={formData.departement}
                   onChange={e => setFormData({ ...formData, departement: e.target.value })}
                   placeholder="ex: Dsm, Manut, Entrepot..."
@@ -295,7 +303,7 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
                 <label className="block text-sm font-medium text-gray-700 mb-1">Direction</label>
                 <input
                   type="text"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 outline-none"
                   value={formData.direction}
                   onChange={e => setFormData({ ...formData, direction: e.target.value })}
                   placeholder="ex: Direction des Opérations..."
@@ -352,16 +360,45 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
               </div>
             </div>
 
+            {/* PIN d'un agent : réinitialisation uniquement (l'agent le choisit lui-même) */}
+            {(formData.role === 'UTILISATEUR' || formData.role === 'MANAGER') && (
+              <div className="mt-4 flex flex-col gap-3 rounded-xl bg-slate-50 p-5 ring-1 ring-slate-200 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-navy-900">Code PIN</p>
+                  <p className="text-sm text-slate-600">L’agent choisit lui-même son PIN à sa première connexion. En cas d’oubli, réinitialisez-le.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const ok = await confirmer({
+                      titre: 'Réinitialiser le PIN ?',
+                      message: 'Le PIN actuel est effacé et les sessions de l’agent sont fermées. Il en choisira un nouveau à sa prochaine connexion.',
+                      confirmer: 'Réinitialiser le PIN',
+                    })
+                    if (!ok) return
+                    const res = await fetch(`/api/admin/utilisateurs/${id}/reinitialiser-pin`, { method: 'POST' })
+                    const data = await res.json().catch(() => ({}))
+                    if (res.ok) toast.success('PIN réinitialisé.')
+                    else toast.error(data.error || 'La réinitialisation a échoué.')
+                  }}
+                  className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-white px-3.5 py-2 text-sm font-medium text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50"
+                >
+                  <KeyRound className="h-4 w-4" aria-hidden />
+                  Réinitialiser le PIN
+                </button>
+              </div>
+            )}
+
             {/* Password change section — ADMIN only */}
             {formData.role === 'ADMIN' && (
-              <div className="mt-4 p-5 border-2 border-blue-100 bg-blue-50 rounded-2xl">
+              <div className="mt-4 p-5 border-2 border-navy-100 bg-navy-50 rounded-2xl">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <div className="w-9 h-9 bg-navy-700 rounded-xl flex items-center justify-center flex-shrink-0">
                     <KeyRound className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <p className="font-bold text-blue-900 text-sm">Changer le mot de passe</p>
-                    <p className="text-xs text-blue-600">Laissez vide pour conserver le mot de passe actuel.</p>
+                    <p className="font-bold text-navy-950 text-sm">Changer le mot de passe</p>
+                    <p className="text-xs text-navy-700">Laissez vide pour conserver le mot de passe actuel.</p>
                   </div>
                 </div>
 
@@ -380,39 +417,39 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-blue-800 mb-1 uppercase tracking-wide">Nouveau mot de passe</label>
+                    <label className="block text-xs font-bold text-navy-900 mb-1 uppercase tracking-wide">Nouveau mot de passe</label>
                     <div className="relative">
                       <input
                         type={showNewPwd ? 'text' : 'password'}
                         value={newPassword}
                         onChange={e => { setNewPassword(e.target.value); setPwdError('') }}
-                        className="w-full px-4 py-2 pr-10 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-400 outline-none bg-white text-sm"
+                        className="w-full px-4 py-2 pr-10 border border-navy-200 rounded-lg focus:ring-2 focus:ring-navy-400 outline-none bg-white text-sm"
                         placeholder="Nouveau mot de passe"
                         minLength={4}
                       />
                       <button
                         type="button"
                         onClick={() => setShowNewPwd(v => !v)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-400 hover:text-blue-700"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-navy-400 hover:text-navy-800"
                       >
                         {showNewPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-blue-800 mb-1 uppercase tracking-wide">Confirmer le mot de passe</label>
+                    <label className="block text-xs font-bold text-navy-900 mb-1 uppercase tracking-wide">Confirmer le mot de passe</label>
                     <div className="relative">
                       <input
                         type={showConfirmPwd ? 'text' : 'password'}
                         value={confirmPassword}
                         onChange={e => { setConfirmPassword(e.target.value); setPwdError('') }}
-                        className="w-full px-4 py-2 pr-10 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-400 outline-none bg-white text-sm"
+                        className="w-full px-4 py-2 pr-10 border border-navy-200 rounded-lg focus:ring-2 focus:ring-navy-400 outline-none bg-white text-sm"
                         placeholder="Répétez le mot de passe"
                       />
                       <button
                         type="button"
                         onClick={() => setShowConfirmPwd(v => !v)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-400 hover:text-blue-700"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-navy-400 hover:text-navy-800"
                       >
                         {showConfirmPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
@@ -432,7 +469,7 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
               <button
                 type="submit"
                 disabled={saving}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-8 py-2 rounded-lg font-bold disabled:opacity-50 transition-colors"
+                className="flex items-center gap-2 bg-navy-700 hover:bg-navy-800 text-white px-8 py-2 rounded-lg font-bold disabled:opacity-50 transition-colors"
               >
                 {saving ? 'Enregistrement...' : <><Save className="w-4 h-4" /> Enregistrer</>}
               </button>

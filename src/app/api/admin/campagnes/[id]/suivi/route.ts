@@ -16,7 +16,7 @@ export async function GET(
       where: { campagneId: id },
       include: {
         evaluateur: {
-          select: { id: true, matricule: true, nom: true, prenom: true, role: true, service: true, telephone: true }
+          select: { id: true, matricule: true, nom: true, prenom: true, role: true, service: true }
         },
         evalue: {
           select: { id: true, matricule: true, nom: true, prenom: true, role: true, service: true }
@@ -101,17 +101,19 @@ export async function GET(
 
     const internalTrackingList = [...internalEvalMap.values()].map(item => {
       const totalToEvaluate = item.affectations.length
-      const isTerminee = item.affectations.some((a: any) => a.statut === 'TERMINEE')
-      const isBrouillon = item.affectations.some((a: any) => a.statut === 'BROUILLON')
+      const terminees = item.affectations.filter((a: any) => a.statut === 'TERMINEE').length
+      const brouillons = item.affectations.filter((a: any) => a.statut === 'BROUILLON').length
 
+      // « Terminé » seulement si TOUTES les évaluations de l'évaluateur sont soumises.
       let statut = 'EN_ATTENTE'
-      if (isTerminee) statut = 'TERMINEE'
-      else if (isBrouillon) statut = 'BROUILLON'
+      if (terminees === totalToEvaluate) statut = 'TERMINEE'
+      else if (terminees > 0 || brouillons > 0) statut = 'BROUILLON'
 
       return {
         user: item.user,
         statut,
         totalToEvaluate,
+        terminees,
         affectations: item.affectations
       }
     })

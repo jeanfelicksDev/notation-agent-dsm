@@ -1,58 +1,38 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { CRITERES_CLIENTS_DSM } from '@/lib/default-criteres'
+import { getCampagneOuverte } from '@/lib/campagne'
+import { estClientExterne } from '@/lib/criteres'
 
 /**
- * GET /api/qr/criteres
- * Public route.
- * Returns evaluation criteria for the active campaign (specifically the 3 client criteria).
+ * GET /api/qr/criteres — route publique.
+ * Critères « clients externes » de la campagne ouverte. Lecture seule : si la campagne n'en
+ * comporte pas, c'est à l'administration de les ajouter (bouton « grille officielle »).
  */
 export async function GET() {
   try {
-    const campagne = await prisma.campagne.findFirst({
-      where: { statut: 'OUVERTE' },
-      include: {
-        criteres: true,
-      },
-    })
-
+    const campagne = await getCampagneOuverte()
     if (!campagne) {
-      return NextResponse.json({ error: 'Aucune campagne active' }, { status: 404 })
+      return NextResponse.json({ error: 'Aucune campagne d’évaluation n’est ouverte en ce moment.' }, { status: 404 })
     }
 
-    // Look for criteria of type CLIENT
-    let clientCriteres = campagne.criteres.filter(
-      (c) => {
-        const types = c.typeEvaluateurs && c.typeEvaluateurs.length > 0 ? c.typeEvaluateurs : [c.typeEvaluateur];
-        return types.includes('CLIENT') || types.includes('TOUS');
-      }
-    )
+    const criteres = await prisma.critere.findMany({
+      where: { campagneId: campagne.id },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, libelle: true, description: true, noteMaximale: true, typeEvaluateur: true, typeEvaluateurs: true },
+    })
+    const clientCriteres = criteres
+      .filter(estClientExterne)
+      .map(({ id, libelle, description, noteMaximale }) => ({ id, libelle, description, noteMaximale }))
 
-    // If not found in database for this campaign, auto-create the 3 official client criteria
     if (clientCriteres.length === 0) {
-      for (const crit of CRITERES_CLIENTS_DSM) {
-        const created = await prisma.critere.create({
-          data: {
-            campagneId: campagne.id,
-            libelle: crit.libelle,
-            description: crit.description,
-            noteMaximale: crit.noteMaximale,
-            typeEvaluateur: 'CLIENT',
-          },
-        })
-        clientCriteres.push(created)
-      }
+      return NextResponse.json({ error: 'Le questionnaire client n’est pas encore configuré pour cette campagne.' }, { status: 404 })
     }
 
     return NextResponse.json({
-      campagne: {
-        id: campagne.id,
-        libelle: campagne.libelle,
-        criteres: clientCriteres,
-      },
+      campagne: { id: campagne.id, libelle: campagne.libelle, criteres: clientCriteres },
     })
   } catch (error) {
-    console.error('Fetch global criteria error:', error)
+    console.error('qr/criteres error:', error)
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
   }
 }

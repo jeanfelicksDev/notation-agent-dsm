@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getSessionUser } from '@/lib/auth'
+import { getCampagneOuverte } from '@/lib/campagne'
+import { ErreurNotation, preparerNotation, type NoteEntrante } from '@/lib/notation'
 
-type IncomingNote = {
-  evalueId: string
-  critereId: string
-  valeur: number
-  commentaire?: string | null
-}
-
+/**
+ * POST /api/evaluation/submit — soumission définitive.
+ * Toutes les affectations de l'évaluateur sont verrouillées d'un coup, et seulement si
+ * chaque collaborateur a une note pour chacun de ses critères.
+ */
 export async function POST(request: NextRequest) {
   try {
     const sessionUser = await getSessionUser()
@@ -17,116 +17,78 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json().catch(() => null)
-    const notes: IncomingNote[] = Array.isArray(body?.notes) ? body.notes : []
+    const notes: NoteEntrante[] = Array.isArray(body?.notes) ? body.notes : []
 
-    if (notes.length === 0) {
-      return NextResponse.json({ error: 'Aucune note à soumettre' }, { status: 400 })
+    const campagneOuverte = await getCampagneOuverte()
+    if (!campagneOuverte) {
+      return NextResponse.json({ error: 'Aucune campagne ouverte.' }, { status: 404 })
     }
 
-    const campagne = await prisma.campagne.findFirst({
-      where: { statut: 'OUVERTE' },
-    })
-
-    if (!campagne) {
-      return NextResponse.json({ error: 'Aucune campagne ouverte' }, { status: 404 })
-    }
-
-    // Filtrer les evalueId vides/nuls AVANT de construire le Set
-    const evalueIds = [
-      ...new Set(
-        notes
-          .map((n) => n.evalueId)
-          .filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
-      ),
-    ]
-
-    // Interdire formellement l'auto-évaluation
-    if (evalueIds.includes(sessionUser.id)) {
-      return NextResponse.json(
-        { error: "L'auto-évaluation est strictement interdite" },
-        { status: 403 }
-      )
-    }
-
-    // Vérifier que toutes les affectations appartiennent bien à l'évaluateur connecté
-    const myAffectations = await prisma.affectation.findMany({
+    // La soumission porte sur l'ensemble des collaborateurs encore ouverts de l'évaluateur.
+    const ouvertes = await prisma.affectation.findMany({
       where: {
         evaluateurId: sessionUser.id,
-        campagneId: campagne.id,
-        evalueId: { in: evalueIds },
+        statut: { not: 'TERMINEE' },
+        campagneId: campagneOuverte.id,
+        evalueId: { not: sessionUser.id },
       },
+      select: { evalueId: true },
     })
-
-    if (myAffectations.length !== evalueIds.length) {
-      return NextResponse.json(
-        { error: 'Certaines évaluations ne vous sont pas affectées' },
-        { status: 403 }
-      )
+    const evalueIds = [...new Set(ouvertes.map((a) => a.evalueId))]
+    if (evalueIds.length === 0) {
+      return NextResponse.json({ error: 'Vos évaluations ont déjà été soumises.' }, { status: 409 })
     }
 
-    if (myAffectations.some((a: { statut: string }) => a.statut === 'TERMINEE')) {
-      return NextResponse.json(
-        { error: 'Une partie des évaluations a déjà été soumise' },
-        { status: 409 }
-      )
-    }
+    const { campagne, affectations, attendus, valider } = await preparerNotation(sessionUser.id, evalueIds)
+    const valides = valider(notes)
 
     await prisma.$transaction(
       async (tx) => {
-        for (const note of notes) {
-          if (typeof note?.critereId !== 'string' || typeof note?.evalueId !== 'string') {
-            continue
-          }
-          if (typeof note.valeur !== 'number' || note.valeur <= 0) continue
-
-          // Upsert : idempotent en cas de double-soumission ou condition de course
+        for (const n of valides) {
           await tx.note.upsert({
             where: {
               evaluateurId_evalueId_critereId_campagneId: {
                 evaluateurId: sessionUser.id,
-                evalueId: note.evalueId,
-                critereId: note.critereId,
+                evalueId: n.evalueId,
+                critereId: n.critereId,
                 campagneId: campagne.id,
               },
             },
-            update: {
-              valeur: note.valeur,
-              commentaire: note.commentaire ?? null,
-            },
-            create: {
-              valeur: note.valeur,
-              commentaire: note.commentaire ?? null,
-              evaluateurId: sessionUser.id,
-              evalueId: note.evalueId,
-              critereId: note.critereId,
-              campagneId: campagne.id,
-            },
+            update: { valeur: n.valeur, commentaire: n.commentaire },
+            create: { ...n, evaluateurId: sessionUser.id, campagneId: campagne.id },
           })
         }
 
-        for (const evalueId of evalueIds) {
-          await tx.affectation.update({
-            where: {
-              evaluateurId_evalueId_campagneId: {
-                evaluateurId: sessionUser.id,
-                evalueId,
-                campagneId: campagne.id,
-              },
-            },
-            data: { statut: 'TERMINEE' },
-          })
+        // Contrôle de complétude sur l'état final en base (brouillons antérieurs inclus).
+        const enBase = await tx.note.findMany({
+          where: { evaluateurId: sessionUser.id, campagneId: campagne.id, evalueId: { in: evalueIds } },
+          select: { evalueId: true, critereId: true },
+        })
+        const notees = new Set(enBase.map((n) => `${n.evalueId}:${n.critereId}`))
+        for (const a of affectations) {
+          const manquant = attendus.get(a.evalueId)?.find((c) => !notees.has(`${a.evalueId}:${c.id}`))
+          if (manquant) {
+            throw new ErreurNotation(
+              `Le critère « ${manquant.libelle} » n'est pas noté pour ${a.evalue.prenom} ${a.evalue.nom}.`,
+              400
+            )
+          }
         }
+
+        await tx.affectation.updateMany({
+          where: { evaluateurId: sessionUser.id, campagneId: campagne.id, evalueId: { in: evalueIds } },
+          data: { statut: 'TERMINEE' },
+        })
       },
-      { timeout: 15000 } // 15s pour gérer les soumissions volumineuses
+      { timeout: 20000 }
     )
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error submitting evaluation:', error)
-    let msg = error instanceof Error ? error.message : 'Inconnue'
-    if (msg.includes('Foreign key constraint failed')) {
-      msg = "Erreur de contrainte : un évaluateur ou un évalué n'existe plus."
+    if (error instanceof ErreurNotation) {
+      return NextResponse.json({ error: error.message }, { status: error.status })
     }
-    return NextResponse.json({ error: 'Erreur serveur: ' + msg }, { status: 500 })
+    console.error('evaluation/submit error:', error)
+    return NextResponse.json({ error: "La soumission n'a pas abouti. Vos notes sont conservées en brouillon." }, { status: 500 })
   }
 }

@@ -4,21 +4,13 @@ import prisma from '@/lib/prisma'
 
 export const SESSION_COOKIE_NAME = 'eval_session'
 const SESSION_DURATION_MS = 1000 * 60 * 60 * 8 // 8 heures
-const OTP_DURATION_MS = 1000 * 60 * 5 // 5 minutes
-const OTP_MAX_ATTEMPTS = 5
 
-export function generateOtpCode(): string {
-  // 6 chiffres, jamais à zéro initial pour rester sur 6 caractères affichés
-  const n = 100000 + Math.floor(Math.random() * 900000)
-  return String(n)
-}
-
-export function hashCode(code: string): string {
-  return createHash('sha256').update(code).digest('hex')
-}
+/** Après MAX_TENTATIVES PIN erronés, le compte est verrouillé VERROU_DURATION_MS. */
+export const MAX_TENTATIVES = 5
+const VERROU_DURATION_MS = 1000 * 60 * 15 // 15 minutes
 
 /**
- * Hachage sécurisé de mot de passe basé sur scrypt avec sel aléatoire unique (64 octets)
+ * Hachage sécurisé de mot de passe basé sur scrypt avec sel aléatoire unique
  */
 export function hashPassword(password: string): string {
   const salt = randomBytes(16).toString('hex')
@@ -26,10 +18,21 @@ export function hashPassword(password: string): string {
   return `scrypt:${salt}:${derivedKey}`
 }
 
+const LEGACY_SHA256 = /^[0-9a-f]{64}$/
+
+/**
+ * Un PIN (ou mot de passe admin) est considéré comme défini lorsqu'il est stocké
+ * sous forme de hash. Une valeur vide ou en clair (import Excel) = PIN à définir.
+ */
+export function pinEstDefini(storedHash: string | null | undefined): boolean {
+  if (!storedHash) return false
+  return storedHash.startsWith('scrypt:') || LEGACY_SHA256.test(storedHash)
+}
+
 /**
  * Vérifie un mot de passe contre son hash stocké en base.
- * Gère le format scrypt sécurisé ainsi que la migration transparente
- * des anciens hashs legacy (SHA256 ou texte brut initial).
+ * Gère le format scrypt ainsi que la migration transparente des anciens hashs SHA256.
+ * Les valeurs en clair ne sont jamais acceptées.
  */
 export function verifyPassword(
   password: string,
@@ -39,37 +42,45 @@ export function verifyPassword(
     return { isValid: false, needsRehash: false }
   }
 
-  // 1. Format moderne scrypt:salt:derivedKey
   if (storedHash.startsWith('scrypt:')) {
     const parts = storedHash.split(':')
-    if (parts.length === 3) {
-      const [, salt, expectedHash] = parts
-      try {
-        const derivedKey = scryptSync(password, salt, 64).toString('hex')
-        const bufA = Buffer.from(derivedKey, 'hex')
-        const bufB = Buffer.from(expectedHash, 'hex')
-        if (bufA.length === bufB.length && timingSafeEqual(bufA, bufB)) {
-          return { isValid: true, needsRehash: false }
-        }
-      } catch {
-        return { isValid: false, needsRehash: false }
-      }
+    if (parts.length !== 3) return { isValid: false, needsRehash: false }
+    const [, salt, expectedHash] = parts
+    try {
+      const bufA = scryptSync(password, salt, 64)
+      const bufB = Buffer.from(expectedHash, 'hex')
+      return { isValid: bufA.length === bufB.length && timingSafeEqual(bufA, bufB), needsRehash: false }
+    } catch {
+      return { isValid: false, needsRehash: false }
     }
-    return { isValid: false, needsRehash: false }
   }
 
-  // 2. Format legacy SHA256 (compatibilité avec anciens comptes)
-  const legacySha256 = createHash('sha256').update(`salt_dsm_${password}`).digest('hex')
-  if (storedHash === legacySha256) {
-    return { isValid: true, needsRehash: true }
-  }
-
-  // 3. Format texte brut initial (import seed sans hash préalable)
-  if (storedHash === password) {
-    return { isValid: true, needsRehash: true }
+  if (LEGACY_SHA256.test(storedHash)) {
+    const legacy = createHash('sha256').update(`salt_dsm_${password}`).digest()
+    const stored = Buffer.from(storedHash, 'hex')
+    const ok = legacy.length === stored.length && timingSafeEqual(legacy, stored)
+    return { isValid: ok, needsRehash: ok }
   }
 
   return { isValid: false, needsRehash: false }
+}
+
+export function compteVerrouille(verrouilleJusqua: Date | null | undefined): boolean {
+  return Boolean(verrouilleJusqua && verrouilleJusqua.getTime() > Date.now())
+}
+
+/** Enregistre un échec de connexion et verrouille le compte au-delà du seuil. */
+export async function enregistrerEchec(utilisateurId: string, tentativesActuelles: number) {
+  const tentatives = tentativesActuelles + 1
+  const verrouiller = tentatives >= MAX_TENTATIVES
+  await prisma.utilisateur.update({
+    where: { id: utilisateurId },
+    data: {
+      tentativesEchouees: verrouiller ? 0 : tentatives,
+      verrouilleJusqua: verrouiller ? new Date(Date.now() + VERROU_DURATION_MS) : undefined,
+    },
+  })
+  return { verrouille: verrouiller, restantes: Math.max(0, MAX_TENTATIVES - tentatives) }
 }
 
 export function generateSessionToken(): string {
@@ -86,64 +97,12 @@ export type SessionUser = {
   role: string
 }
 
-export async function createOtpToken(utilisateurId: string, code: string) {
-  // Invalider les anciens OTPs non consommés pour cet utilisateur
-  await prisma.otpToken.updateMany({
-    where: {
-      utilisateurId,
-      consumedAt: null,
-      expiresAt: { gt: new Date() },
-    },
-    data: { consumedAt: new Date() },
-  })
-
-  return prisma.otpToken.create({
-    data: {
-      utilisateurId,
-      codeHash: hashCode(code),
-      expiresAt: new Date(Date.now() + OTP_DURATION_MS),
-    },
-  })
-}
-
-export async function verifyOtpCode(
-  utilisateurId: string,
-  code: string
-): Promise<
-  | { ok: true }
-  | { ok: false; reason: 'expired' | 'invalid' | 'too_many_attempts' | 'not_found' }
-> {
-  const token = await prisma.otpToken.findFirst({
-    where: {
-      utilisateurId,
-      consumedAt: null,
-    },
-    orderBy: { createdAt: 'desc' },
-  })
-
-  if (!token) return { ok: false, reason: 'not_found' }
-
-  if (token.attempts >= OTP_MAX_ATTEMPTS) {
-    return { ok: false, reason: 'too_many_attempts' }
-  }
-
-  if (token.expiresAt.getTime() < Date.now()) {
-    return { ok: false, reason: 'expired' }
-  }
-
-  if (hashCode(code) !== token.codeHash) {
-    await prisma.otpToken.update({
-      where: { id: token.id },
-      data: { attempts: { increment: 1 } },
-    })
-    return { ok: false, reason: 'invalid' }
-  }
-
-  await prisma.otpToken.update({
-    where: { id: token.id },
-    data: { consumedAt: new Date() },
-  })
-  return { ok: true }
+export function clientIp(headers: Headers): string | null {
+  return (
+    headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    headers.get('x-real-ip') ||
+    null
+  )
 }
 
 export async function createSession(

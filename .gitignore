@@ -45,3 +45,6 @@ next-env.d.ts
 *.xlsx
 
 .vercel
+
+# Le modèle d’import Excel est un fichier public servi par l’application
+!public/templates/*.xlsx

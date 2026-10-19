@@ -68,7 +68,7 @@ export default function NewSitePage() {
               <input
                 type="text"
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 outline-none"
                 value={formData.nom}
                 onChange={e => setFormData({ ...formData, nom: e.target.value })}
                 placeholder="Ex: Siège Social"
@@ -79,7 +79,7 @@ export default function NewSitePage() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Ville</label>
               <input
                 type="text"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 outline-none"
                 value={formData.ville}
                 onChange={e => setFormData({ ...formData, ville: e.target.value })}
                 placeholder="Ex: Abidjan"
@@ -96,7 +96,7 @@ export default function NewSitePage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-8 py-2 rounded-lg font-bold disabled:opacity-50 transition-colors"
+                className="flex items-center gap-2 bg-navy-700 hover:bg-navy-800 text-white px-8 py-2 rounded-lg font-bold disabled:opacity-50 transition-colors"
               >
                 {loading ? 'Création...' : <><Save className="w-4 h-4" /> Créer le site</>}
               </button>

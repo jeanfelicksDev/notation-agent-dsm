@@ -1,126 +1,70 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import {
+  clientIp,
+  compteVerrouille,
   createSession,
+  enregistrerEchec,
   hashPassword,
-  normalizeMatricule,
   verifyPassword,
 } from '@/lib/auth'
+import { trouverParIdentifiant } from '@/lib/identifiant'
 
-function normalizePhone(phone: string): string {
-  return phone.replace(/\s+/g, '').replace(/[-()+]/g, '')
-}
+const ERREUR_GENERIQUE = 'Identifiant ou PIN incorrect.'
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => null)
-    if (!body || typeof body !== 'object') {
-      return NextResponse.json({ error: 'Corps de requête invalide' }, { status: 400 })
+    const saisie = typeof body?.identifiant === 'string' ? body.identifiant : ''
+    const password = typeof body?.password === 'string' ? body.password : ''
+
+    if (!saisie.trim() || !password) {
+      return NextResponse.json({ error: 'Identifiant et PIN requis.' }, { status: 400 })
     }
 
-    const { rawMatricule, password } = body
-
-    const matriculeInput = typeof rawMatricule === 'string' ? rawMatricule : typeof body.matricule === 'string' ? body.matricule : ''
-    const passInput = typeof password === 'string' ? password : ''
-
-    if (!matriculeInput.trim() || !passInput) {
-      return NextResponse.json(
-        { error: 'Le matricule (ou téléphone / email) et le mot de passe sont requis' },
-        { status: 400 }
-      )
-    }
-
-    const cleanInput = matriculeInput.trim()
-    const matricule = normalizeMatricule(cleanInput)
-    const emailCandidate = cleanInput.toLowerCase()
-    const cleanPhone = normalizePhone(cleanInput)
-
-    // 1. Recherche par matricule exact, email exact, ou téléphone direct
-    let utilisateur = await prisma.utilisateur.findFirst({
-      where: {
-        OR: [
-          { matricule: { equals: matricule, mode: 'insensitive' } },
-          { email: { equals: emailCandidate, mode: 'insensitive' } },
-          { telephone: { equals: cleanInput, mode: 'insensitive' } },
-        ],
-      },
+    const utilisateur = await trouverParIdentifiant(saisie, {
+      id: true,
+      role: true,
+      motDePasse: true,
+      tentativesEchouees: true,
+      verrouilleJusqua: true,
     })
-
-    // 2. Recherche tolérante par numéro de téléphone nettoyé
-    if (!utilisateur && cleanPhone.length >= 4) {
-      const candidates = await prisma.utilisateur.findMany({
-        where: { telephone: { not: null } },
-      })
-      utilisateur = candidates.find((u) => {
-        if (!u.telephone) return false
-        const uPhoneClean = normalizePhone(u.telephone)
-        return (
-          uPhoneClean === cleanPhone ||
-          uPhoneClean.endsWith(cleanPhone) ||
-          cleanPhone.endsWith(uPhoneClean)
-        )
-      }) || null
-    }
-
-    // 3. Recherche par matricule tolérant aux espaces/zéros
-    if (!utilisateur && cleanPhone.length >= 1) {
-      const allUsers = await prisma.utilisateur.findMany()
-      utilisateur = allUsers.find((u) => {
-        const uMatClean = normalizePhone(u.matricule)
-        return uMatClean === cleanPhone
-      }) || null
-    }
-
     if (!utilisateur) {
+      return NextResponse.json({ error: ERREUR_GENERIQUE }, { status: 401 })
+    }
+
+    if (compteVerrouille(utilisateur.verrouilleJusqua)) {
+      const minutes = Math.ceil((utilisateur.verrouilleJusqua!.getTime() - Date.now()) / 60000)
       return NextResponse.json(
-        { error: 'Matricule/Téléphone ou mot de passe incorrect.' },
-        { status: 401 }
+        { error: `Trop de tentatives. Réessayez dans ${minutes} minute${minutes > 1 ? 's' : ''}.` },
+        { status: 429 }
       )
     }
 
-    const { isValid, needsRehash } = verifyPassword(passInput, utilisateur.motDePasse)
+    const { isValid, needsRehash } = verifyPassword(password, utilisateur.motDePasse)
     if (!isValid) {
-      return NextResponse.json(
-        { error: 'Matricule/Téléphone ou mot de passe incorrect.' },
-        { status: 401 }
-      )
+      const { verrouille, restantes } = await enregistrerEchec(utilisateur.id, utilisateur.tentativesEchouees)
+      const error = verrouille
+        ? 'Trop de tentatives. Compte verrouillé pendant 15 minutes.'
+        : restantes <= 2
+          ? `${ERREUR_GENERIQUE} Encore ${restantes} essai${restantes > 1 ? 's' : ''} avant verrouillage.`
+          : ERREUR_GENERIQUE
+      return NextResponse.json({ error }, { status: verrouille ? 429 : 401 })
     }
 
-    // Mise à niveau transparente du hash vers scrypt sécurisé si nécessaire
-    if (needsRehash) {
-      try {
-        const upgradedHash = hashPassword(passInput)
-        await prisma.utilisateur.update({
-          where: { id: utilisateur.id },
-          data: { motDePasse: upgradedHash },
-        })
-      } catch (err) {
-        console.warn('Could not upgrade password hash for user', utilisateur.id, err)
-      }
-    }
-
-    // Créer la session pour connecter l'utilisateur
-    const userAgent = request.headers.get('user-agent')
-    const ipAddress = request.headers.get('x-forwarded-for') || null
-    await createSession(utilisateur.id, userAgent, ipAddress)
-
-    return NextResponse.json({
-      success: true,
-      role: utilisateur.role,
-      user: {
-        id: utilisateur.id,
-        matricule: utilisateur.matricule,
-        nom: utilisateur.nom,
-        prenom: utilisateur.prenom,
-        email: utilisateur.email,
-        role: utilisateur.role,
+    await prisma.utilisateur.update({
+      where: { id: utilisateur.id },
+      data: {
+        tentativesEchouees: 0,
+        verrouilleJusqua: null,
+        ...(needsRehash ? { motDePasse: hashPassword(password) } : {}),
       },
     })
-  } catch (error: any) {
+
+    await createSession(utilisateur.id, request.headers.get('user-agent'), clientIp(request.headers))
+    return NextResponse.json({ success: true, role: utilisateur.role })
+  } catch (error) {
     console.error('Login error:', error)
-    return NextResponse.json(
-      { error: error?.message || 'Erreur serveur lors de la connexion' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Erreur serveur lors de la connexion' }, { status: 500 })
   }
 }

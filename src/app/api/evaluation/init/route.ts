@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getSessionUser } from '@/lib/auth'
+import { campagneEnCours, getCampagneOuverte, messageHorsPeriode } from '@/lib/campagne'
+import { criteresPourPaire, estEvaluateurManager } from '@/lib/criteres'
 
 export async function GET() {
   try {
@@ -12,160 +14,83 @@ export async function GET() {
     const [evaluateur, campagne] = await Promise.all([
       prisma.utilisateur.findUnique({
         where: { id: sessionUser.id },
-        include: { site: true },
+        select: {
+          id: true, matricule: true, nom: true, prenom: true, email: true,
+          service: true, role: true, site: { select: { nom: true } },
+        },
       }),
-      prisma.campagne.findFirst({
-        where: { statut: 'OUVERTE' },
-        include: { criteres: true },
-      })
+      getCampagneOuverte(),
     ])
 
     if (!evaluateur) {
       return NextResponse.json({ error: 'Compte introuvable' }, { status: 404 })
     }
-
     if (evaluateur.role === 'EXTERNE') {
-      return NextResponse.json({ redirect: '/qr' }, { status: 200 })
+      return NextResponse.json({ redirect: '/qr' })
     }
-
     if (!campagne) {
-      // Seul l'administrateur est renvoyé vers l'espace admin ; les autres rôles restent sur la notation
-      if (evaluateur.role === 'ADMIN') {
-        return NextResponse.json(
-          { redirect: '/admin', evaluateur, error: "Aucune campagne d'évaluation ouverte." },
-          { status: 200 }
-        )
-      }
       return NextResponse.json(
-        { error: "Aucune campagne d'évaluation ouverte" },
+        { evaluateur, etat: 'aucune_campagne', error: "Aucune campagne d'évaluation n'est ouverte pour le moment." },
         { status: 404 }
       )
     }
 
-    let [affectations, notes] = await Promise.all([
+    // Les affectations sont définies par l'administration : aucune n'est créée automatiquement ici.
+    const [affectations, notes, criteres] = await Promise.all([
       prisma.affectation.findMany({
-        where: {
-          evaluateurId: evaluateur.id,
-          campagneId: campagne.id,
-          evalueId: { not: evaluateur.id },
+        where: { evaluateurId: evaluateur.id, campagneId: campagne.id, evalueId: { not: evaluateur.id } },
+        select: {
+          id: true, evalueId: true, statut: true,
+          evalue: {
+            select: { id: true, matricule: true, nom: true, prenom: true, service: true, site: { select: { nom: true } } },
+          },
         },
-        include: {
-          evalue: { include: { site: true } },
-        },
+        orderBy: [{ evalue: { nom: 'asc' } }, { evalue: { prenom: 'asc' } }],
       }),
       prisma.note.findMany({
-        where: {
-          evaluateurId: evaluateur.id,
-          campagneId: campagne.id,
-          evalueId: { not: evaluateur.id },
-        },
-      })
+        where: { evaluateurId: evaluateur.id, campagneId: campagne.id },
+        select: { evalueId: true, critereId: true, valeur: true, commentaire: true },
+      }),
+      prisma.critere.findMany({
+        where: { campagneId: campagne.id },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true, libelle: true, description: true, noteMaximale: true, typeEvaluateur: true, typeEvaluateurs: true },
+      }),
     ])
 
-    // On-the-fly auto-assignment if no affectations exist for this evaluator
     if (affectations.length === 0) {
-      const allUsers = await prisma.utilisateur.findMany({
-        where: {
-          id: { not: evaluateur.id },
-          role: 'UTILISATEUR'
-        }
-      })
-
-      if (allUsers.length > 0) {
-        let targets: typeof allUsers = []
-
-        if (evaluateur.service) {
-          const servicePeers = allUsers.filter(u => u.service === evaluateur.service)
-          targets.push(...servicePeers)
-        }
-
-        if (targets.length === 0 && evaluateur.siteId) {
-          const sitePeers = allUsers.filter(u => u.siteId === evaluateur.siteId)
-          targets.push(...sitePeers)
-        }
-
-        if (targets.length === 0) {
-          targets = allUsers.slice(0, 10)
-        }
-
-        const uniqueTargetIds = Array.from(new Set(targets.map(t => t.id))).filter(id => id !== evaluateur.id)
-
-        if (uniqueTargetIds.length > 0) {
-          await prisma.affectation.createMany({
-            data: uniqueTargetIds.map(evalueId => ({
-              campagneId: campagne.id,
-              evaluateurId: evaluateur.id,
-              evalueId,
-            })),
-            skipDuplicates: true
-          })
-
-          const refreshed = await Promise.all([
-            prisma.affectation.findMany({
-              where: {
-                evaluateurId: evaluateur.id,
-                campagneId: campagne.id,
-                evalueId: { not: evaluateur.id },
-              },
-              include: {
-                evalue: { include: { site: true } },
-              },
-            }),
-            prisma.note.findMany({
-              where: {
-                evaluateurId: evaluateur.id,
-                campagneId: campagne.id,
-                evalueId: { not: evaluateur.id },
-              },
-            })
-          ])
-          affectations = refreshed[0]
-          notes = refreshed[1]
-        }
-      }
-    }
-
-    if (affectations.length === 0) {
-      // Seul l'administrateur est renvoyé vers l'espace admin ; les autres rôles restent sur la notation
-      if (evaluateur.role === 'ADMIN') {
-        return NextResponse.json(
-          { redirect: '/admin', evaluateur, error: 'Aucune affectation trouvée.' },
-          { status: 200 }
-        )
-      }
       return NextResponse.json(
-        { error: 'Aucune affectation trouvée pour votre compte. Veuillez contacter l\'administrateur.' },
+        {
+          evaluateur,
+          etat: 'aucune_affectation',
+          error: "Aucun collaborateur ne vous est attribué pour cette campagne. Contactez l'administrateur si c'est une erreur.",
+        },
         { status: 404 }
       )
     }
 
-    const isManager = evaluateur.role === 'MANAGER' || evaluateur.role === 'ADMIN'
-
-    const filteredCriteres = campagne.criteres.filter(
-      (c: { typeEvaluateur: string, typeEvaluateurs?: string[] }) => {
-        const types = c.typeEvaluateurs && c.typeEvaluateurs.length > 0 ? c.typeEvaluateurs : [c.typeEvaluateur];
-        return types.includes('TOUS') ||
-          (isManager && types.includes('MANAGER')) ||
-          (!isManager && types.includes('COLLEGUE')) ||
-          (!isManager && types.includes('CLIENT_INTERNE'));
-      }
-    )
+    // Les critères à noter sont calculés ici, une seule fois, pour chaque collaborateur.
+    const affectationsAvecCriteres = affectations.map((a) => ({
+      ...a,
+      critereIds: criteresPourPaire(criteres, evaluateur, a.evalue).map((c) => c.id),
+    }))
 
     return NextResponse.json({
       evaluateur,
       campagne: {
         id: campagne.id,
         libelle: campagne.libelle,
-        poidsCollegues: campagne.poidsCollegues,
-        poidsManager: campagne.poidsManager,
+        dateFin: campagne.dateFin,
+        ouverte: campagneEnCours(campagne),
+        messagePeriode: campagneEnCours(campagne) ? null : messageHorsPeriode(campagne),
       },
-      criteres: filteredCriteres,
-      affectations,
+      criteres,
+      affectations: affectationsAvecCriteres,
       notes,
-      isManager,
+      isManager: estEvaluateurManager(evaluateur.role),
     })
   } catch (error) {
-    console.error('Error:', error)
+    console.error('evaluation/init error:', error)
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
   }
 }

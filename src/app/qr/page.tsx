@@ -1,17 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import {
-  Star,
-  ChevronRight,
-  CheckCircle,
-  AlertCircle,
-  Loader2,
-  Anchor,
-  User,
-  ArrowLeft,
-  Check,
-} from 'lucide-react'
+import { AlertCircle, ArrowLeft, Check, CircleCheck, Loader2, Star } from 'lucide-react'
+import { BrandMark } from '@/components/BrandMark'
 
 interface Critere {
   id: string
@@ -29,449 +20,315 @@ interface Agent {
   hasRated: boolean
 }
 
-type Stage = 'verify-client' | 'dashboard' | 'form' | 'submitting' | 'done' | 'error'
+type Etape = 'identification' | 'agents' | 'formulaire' | 'merci'
 
-export default function GlobalQrPage() {
-  const [stage, setStage] = useState<Stage>('verify-client')
+const LIBELLES_ETOILES = ['Très insatisfait', 'Insatisfait', 'Correct', 'Satisfait', 'Très satisfait']
+
+export default function PortailClient() {
+  const [etape, setEtape] = useState<Etape>('identification')
   const [telephone, setTelephone] = useState('')
-  const [verifying, setVerifying] = useState(false)
-  const [verificationError, setVerificationError] = useState('')
+  const [chargement, setChargement] = useState(false)
+  const [erreur, setErreur] = useState('')
+  const [indisponible, setIndisponible] = useState<string | null>(null)
 
-  // Session states
-  const [clientId, setClientId] = useState<string>('')
-  const [clientName, setClientName] = useState('')
-  const [campagneLibelle, setCampagneLibelle] = useState('')
-  const [campagneId, setCampagneId] = useState('')
+  const [client, setClient] = useState<{ id: string; nom: string; prenom: string } | null>(null)
+  const [campagne, setCampagne] = useState('')
   const [agents, setAgents] = useState<Agent[]>([])
-
-  // Selection & evaluation states
-  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
   const [criteres, setCriteres] = useState<Critere[]>([])
+
+  const [agent, setAgent] = useState<Agent | null>(null)
   const [notes, setNotes] = useState<Record<string, number>>({})
   const [commentaire, setCommentaire] = useState('')
-  const [hovered, setHovered] = useState<Record<string, number>>({})
-  const [submittingError, setSubmittingError] = useState('')
 
-  // Load criteria of the active campaign once
   useEffect(() => {
     fetch('/api/qr/criteres')
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.campagne) {
-          setCriteres(data.campagne.criteres)
-          setCampagneId(data.campagne.id)
-          setCampagneLibelle(data.campagne.libelle)
-        }
+      .then(async (r) => ({ ok: r.ok, data: await r.json() }))
+      .then(({ ok, data }) => {
+        if (!ok) return setIndisponible(data.error || 'Le questionnaire est indisponible pour le moment.')
+        setCriteres(data.campagne.criteres)
+        setCampagne(data.campagne.libelle)
       })
-      .catch((err) => console.error('Error loading criteria:', err))
+      .catch(() => setIndisponible('Connexion impossible. Vérifiez votre réseau puis rechargez la page.'))
   }, [])
 
-  const refreshAgentList = async (phoneToUse?: string) => {
-    const activePhone = phoneToUse || telephone
-    if (!activePhone) return
+  const verifier = async (silencieux = false) => {
+    if (!silencieux) {
+      setErreur('')
+      setChargement(true)
+    }
     try {
       const res = await fetch('/api/qr/verify-client', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ telephone: activePhone.trim() }),
-      })
-      const data = await res.json()
-      if (res.ok) {
-        setAgents(data.agents || [])
-      }
-    } catch (err) {
-      console.error('Error refreshing agents:', err)
-    }
-  }
-
-  const handleVerifyClient = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setVerificationError('')
-    if (!telephone.trim()) {
-      setVerificationError('Veuillez renseigner votre numéro de téléphone.')
-      return
-    }
-    setVerifying(true)
-    try {
-      const res = await fetch('/api/qr/verify-client', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ telephone: telephone.trim() }),
+        body: JSON.stringify({ telephone }),
       })
       const data = await res.json()
       if (!res.ok) {
-        setVerificationError(data.error || 'Vérification échouée')
+        if (!silencieux) setErreur(data.error || 'Numéro non reconnu.')
         return
       }
-      setClientId(data.client.id)
-      setClientName(`${data.client.prenom} ${data.client.nom}`)
-      setAgents(data.agents || [])
-      setStage('dashboard')
+      setClient(data.client)
+      setAgents(data.agents ?? [])
+      if (!silencieux) setEtape('agents')
     } catch {
-      setVerificationError('Erreur de connexion au serveur.')
+      if (!silencieux) setErreur('Connexion impossible. Réessayez dans un instant.')
     } finally {
-      setVerifying(false)
+      setChargement(false)
     }
   }
 
-  const handleSelectAgent = (agent: Agent) => {
-    if (agent.hasRated) return
-    setSelectedAgent(agent)
-    // Init notes at 0 for all criteria
-    const init: Record<string, number> = {}
-    criteres.forEach((c) => {
-      init[c.id] = 0
-    })
-    setNotes(init)
+  const ouvrir = (a: Agent) => {
+    if (a.hasRated) return
+    setAgent(a)
+    setNotes({})
     setCommentaire('')
-    setSubmittingError('')
-    setStage('form')
+    setErreur('')
+    setEtape('formulaire')
+    window.scrollTo({ top: 0 })
   }
 
-  const allRated = criteres.every((c) => (notes[c.id] ?? 0) > 0)
+  const complet = criteres.length > 0 && criteres.every((c) => (notes[c.id] ?? 0) > 0)
 
-  const handleSubmitEvaluation = async () => {
-    if (!allRated || !selectedAgent || !clientId) return
-    setStage('submitting')
-    setSubmittingError('')
-    const payload = criteres.map((c) => ({
-      critereId: c.id,
-      valeur: notes[c.id],
-      commentaire: commentaire.trim() || undefined,
-    }))
+  const envoyer = async () => {
+    if (!complet || !agent || !client) return
+    setChargement(true)
+    setErreur('')
     try {
       const res = await fetch('/api/qr/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          notes: payload,
-          clientId,
-          agentId: selectedAgent.id,
+          clientId: client.id,
+          agentId: agent.id,
+          // Le commentaire général est rattaché au premier critère (une seule fois).
+          notes: criteres.map((c, i) => ({ critereId: c.id, valeur: notes[c.id], commentaire: i === 0 ? commentaire : '' })),
         }),
       })
       const data = await res.json()
       if (!res.ok) {
-        setSubmittingError(data.error || 'Erreur lors de la soumission')
-        setStage('form')
+        setErreur(data.error || 'L’envoi a échoué.')
         return
       }
-      // Refresh list to update checkmark statuses
-      await refreshAgentList()
-      setStage('done')
+      await verifier(true)
+      setEtape('merci')
     } catch {
-      setSubmittingError('Erreur de connexion au serveur.')
-      setStage('form')
+      setErreur('Connexion impossible. Votre avis n’a pas été envoyé : réessayez.')
+    } finally {
+      setChargement(false)
     }
   }
 
-  const setNote = (critereId: string, val: number) => {
-    setNotes((prev) => ({ ...prev, [critereId]: val }))
-  }
+  const restants = agents.filter((a) => !a.hasRated)
 
-  /* ─── STAGE: Verify Client ─── */
-  if (stage === 'verify-client') {
-    return (
-      <div className="qr-page">
-        <div className="qr-header">
-          <div className="qr-brand-icon">
-            <Anchor size={16} color="white" strokeWidth={2.5} />
-          </div>
-          <span className="qr-brand-name">
-            DSM <span className="qr-brand-gold">360°</span>
+  return (
+    <div className="min-h-dvh bg-canvas">
+      <header className="bg-navy-900 text-white">
+        <div className="mx-auto flex h-14 max-w-xl items-center gap-3 px-5">
+          <BrandMark size={28} />
+          <span className="text-[15px] font-semibold">
+            DSM <span className="text-gold-500">TAMIS</span>
           </span>
+          {campagne && <span className="ml-auto truncate text-xs text-navy-200">{campagne}</span>}
         </div>
+      </header>
 
-        <div className="qr-card">
-          <h2 className="qr-status-title text-left mb-2">Authentification Client</h2>
-          <p className="text-xs text-slate-500 mb-6">
-            Saisissez votre numéro de téléphone ou matricule afin d&apos;accéder aux agents que vous êtes autorisé à
-            évaluer.
-          </p>
-
-          <form onSubmit={handleVerifyClient} className="space-y-6">
-            <div className="qr-comment-group">
-              <label className="qr-comment-label">Numéro de téléphone ou Matricule</label>
-              <input
-                type="text"
-                required
-                placeholder="Ex : +225 07 00 00 00 ou CLI-001"
-                className="qr-comment"
-                value={telephone}
-                onChange={(e) => setTelephone(e.target.value)}
-                disabled={verifying}
-              />
-            </div>
-
-            {verificationError && (
-              <div className="p-3 bg-red-50 border border-red-100 rounded-xl flex items-center gap-2 text-xs text-red-700 font-bold animate-fade-in">
-                <AlertCircle size={14} />
-                <span>{verificationError}</span>
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={verifying || !telephone.trim()}
-              className="qr-submit qr-submit-ready"
-            >
-              {verifying ? (
-                <>
-                  <Loader2 size={18} className="animate-spin" /> Vérification…
-                </>
-              ) : (
-                <>
-                  Se connecter <ChevronRight size={18} />
-                </>
-              )}
-            </button>
-          </form>
-        </div>
-
-        <p className="qr-footer">Direction des Solutions Maritimes © 2026</p>
-      </div>
-    )
-  }
-
-  /* ─── STAGE: Dashboard (Agent List) ─── */
-  if (stage === 'dashboard') {
-    return (
-      <div className="qr-page">
-        <div className="qr-header">
-          <div className="qr-brand-icon">
-            <Anchor size={16} color="white" strokeWidth={2.5} />
-          </div>
-          <span className="qr-brand-name">
-            DSM <span className="qr-brand-gold">360°</span>
-          </span>
-        </div>
-
-        <div className="qr-card">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-2">
-            <div>
-              <p className="text-[10px] font-black uppercase text-amber-500 tracking-wider">
-                Espace Évaluation
-              </p>
-              <h2 className="text-lg font-black text-slate-900">
-                Bonjour, {clientName}
-              </h2>
-            </div>
-            <button
-              onClick={() => {
-                setStage('verify-client')
-                setTelephone('')
-                setClientId('')
-                setClientName('')
+      <main className="mx-auto max-w-xl px-4 py-6 sm:px-5 sm:py-10">
+        {indisponible ? (
+          <Carte>
+            <AlertCircle className="h-6 w-6 text-gold-700" aria-hidden />
+            <h1 className="mt-4 text-xl font-semibold text-navy-900">Questionnaire indisponible</h1>
+            <p className="mt-2 text-[15px] text-slate-600">{indisponible}</p>
+          </Carte>
+        ) : etape === 'identification' ? (
+          <Carte>
+            <h1 className="text-xl font-semibold tracking-tight text-navy-900">Votre avis sur nos agents</h1>
+            <p className="mt-2 text-[15px] leading-relaxed text-slate-600">
+              Saisissez le numéro de téléphone enregistré par la DSM pour retrouver les agents qui vous ont accompagné.
+            </p>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                verifier()
               }}
-              className="text-xs font-bold text-slate-400 hover:text-slate-600 transition-colors"
+              className="mt-6 space-y-4"
             >
-              Se déconnecter
-            </button>
-          </div>
-
-          <p className="text-xs text-slate-500 leading-relaxed mb-4">
-            Voici la liste des agents DSM que vous êtes autorisé à évaluer lors de la campagne{' '}
-            <strong>{campagneLibelle}</strong>.
-          </p>
-
-          <div className="space-y-3">
-            {agents.length === 0 ? (
-              <div className="p-8 text-center text-slate-400 bg-slate-50 rounded-2xl border border-slate-100">
-                <User className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-                <p className="text-xs font-bold">Aucun agent assigné</p>
-                <p className="text-[10px] mt-0.5">
-                  Vous n&apos;avez aucun agent disponible à évaluer pour le moment.
-                </p>
+              <div>
+                <label htmlFor="tel" className="mb-1.5 block text-sm font-medium text-slate-800">
+                  Numéro de téléphone
+                </label>
+                <input
+                  id="tel"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  required
+                  value={telephone}
+                  onChange={(e) => setTelephone(e.target.value)}
+                  className="block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-3 text-base outline-none focus:border-navy-600 focus:ring-3 focus:ring-navy-600/15"
+                />
               </div>
+              {erreur && <Erreur>{erreur}</Erreur>}
+              <button type="submit" disabled={chargement || !telephone.trim()} className={BTN}>
+                {chargement ? <Loader2 className="h-4.5 w-4.5 animate-spin" aria-hidden /> : 'Continuer'}
+              </button>
+            </form>
+          </Carte>
+        ) : etape === 'agents' ? (
+          <>
+            <h1 className="text-xl font-semibold tracking-tight text-navy-900">Bonjour {client?.prenom} {client?.nom}</h1>
+            <p className="mt-1 text-[15px] text-slate-600">
+              {restants.length > 0
+                ? `Choisissez l’agent à évaluer (${restants.length} restant${restants.length > 1 ? 's' : ''}).`
+                : 'Vous avez donné votre avis sur tous les agents. Merci !'}
+            </p>
+            {agents.length === 0 ? (
+              <Carte className="mt-5">
+                <p className="text-[15px] text-slate-600">Aucun agent n’est ouvert à l’évaluation pour vous en ce moment.</p>
+              </Carte>
             ) : (
-              agents.map((agent) => (
-                <div
-                  key={agent.id}
-                  onClick={() => !agent.hasRated && handleSelectAgent(agent)}
-                  className={`p-4 border rounded-2xl flex items-center justify-between gap-4 transition-all ${
-                    agent.hasRated
-                      ? 'bg-slate-50 border-slate-100 cursor-not-allowed opacity-75'
-                      : 'bg-white border-slate-200 hover:border-amber-400 hover:shadow-sm cursor-pointer'
-                  }`}
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div
-                      className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs ${
-                        agent.hasRated ? 'bg-slate-200 text-slate-500' : 'bg-amber-100 text-amber-700'
-                      }`}
+              <ul className="mt-5 divide-y divide-slate-100 overflow-hidden rounded-[var(--radius-card)] bg-white shadow-card">
+                {agents.map((a) => (
+                  <li key={a.id}>
+                    <button
+                      onClick={() => ouvrir(a)}
+                      disabled={a.hasRated}
+                      className="flex w-full items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-navy-50 disabled:cursor-default disabled:hover:bg-transparent"
                     >
-                      {agent.prenom[0]}
-                      {agent.nom[0]}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="font-bold text-sm text-slate-900 truncate">
-                        {agent.prenom} {agent.nom}
-                      </p>
-                      <p className="text-[10px] text-slate-400 truncate">
-                        {agent.service || 'DSM Maritime'}
-                      </p>
-                    </div>
-                  </div>
-
-                  {agent.hasRated ? (
-                    <div className="flex items-center gap-1 text-[10px] font-black uppercase text-emerald-600 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full">
-                      <Check size={10} strokeWidth={3} /> Évalué
-                    </div>
-                  ) : (
-                    <ChevronRight size={16} className="text-slate-400" />
-                  )}
-                </div>
-              ))
+                      <span
+                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
+                          a.hasRated ? 'bg-emerald-50 text-emerald-700' : 'bg-navy-900 text-white'
+                        }`}
+                      >
+                        {a.hasRated ? <Check className="h-4.5 w-4.5" aria-hidden /> : `${a.prenom[0] ?? ''}${a.nom[0] ?? ''}`}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-medium text-slate-900">
+                          {a.prenom} {a.nom}
+                        </span>
+                        <span className="block truncate text-sm text-slate-500">{[a.service, a.site].filter(Boolean).join(' · ') || 'DSM'}</span>
+                      </span>
+                      <span className={`shrink-0 text-sm ${a.hasRated ? 'text-emerald-700' : 'font-medium text-navy-800'}`}>
+                        {a.hasRated ? 'Avis donné' : 'Évaluer'}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
             )}
-          </div>
-        </div>
+          </>
+        ) : etape === 'formulaire' && agent ? (
+          <>
+            <button
+              onClick={() => setEtape('agents')}
+              className="-ml-2 mb-4 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-200/60 hover:text-slate-900"
+            >
+              <ArrowLeft className="h-4 w-4" aria-hidden />
+              Liste des agents
+            </button>
+            <Carte>
+              <p className="text-sm text-slate-500">Votre avis sur</p>
+              <h1 className="text-xl font-semibold tracking-tight text-navy-900">
+                {agent.prenom} {agent.nom}
+              </h1>
+              {agent.service && <p className="text-sm text-slate-600">{agent.service}</p>}
 
-        <p className="qr-footer">Évaluation confidentielle et anonyme</p>
-      </div>
-    )
-  }
+              <div className="mt-6 space-y-6">
+                {criteres.map((c) => (
+                  <Etoiles key={c.id} critere={c} valeur={notes[c.id] ?? 0} onChange={(v) => setNotes((n) => ({ ...n, [c.id]: v }))} />
+                ))}
+              </div>
 
-  /* ─── STAGE: Survey Form ─── */
-  if (stage === 'form' && selectedAgent) {
-    const initials = `${selectedAgent.prenom[0]}${selectedAgent.nom[0]}`.toUpperCase()
-    return (
-      <div className="qr-page">
-        <div className="qr-header">
-          <button
-            onClick={() => setStage('dashboard')}
-            className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-slate-500 hover:text-slate-800 transition-colors"
-          >
-            <ArrowLeft size={14} /> Retour à la liste
-          </button>
-        </div>
+              <div className="mt-6">
+                <label htmlFor="com" className="flex items-baseline justify-between text-sm font-medium text-slate-800">
+                  Un commentaire ? <span className="text-xs font-normal text-slate-400">facultatif</span>
+                </label>
+                <textarea
+                  id="com"
+                  rows={3}
+                  maxLength={1000}
+                  value={commentaire}
+                  onChange={(e) => setCommentaire(e.target.value)}
+                  className="mt-1.5 block w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-base outline-none focus:border-navy-600 focus:ring-3 focus:ring-navy-600/15"
+                />
+              </div>
 
-        <div className="qr-card">
-          <div className="qr-agent-hero">
-            <div className="qr-agent-avatar">{initials}</div>
-            <div>
-              <p className="qr-agent-name">
-                {selectedAgent.prenom} {selectedAgent.nom}
-              </p>
-              <p className="qr-agent-service">
-                {selectedAgent.service || 'DSM Maritime'}
-              </p>
-            </div>
-          </div>
-
-          <div className="qr-criteres border-t border-slate-100 pt-4">
-            {criteres.map((critere) => {
-              const current = notes[critere.id] ?? 0
-              const hov = hovered[critere.id] ?? 0
-              return (
-                <div key={critere.id} className="qr-critere">
-                  <div className="qr-critere-header"><div className="qr-critere-title"><span className="qr-critere-label">{critere.libelle}</span><span className="qr-critere-counter">
-                      {current}/{critere.noteMaximale}
-                    </span></div></div>
-                  {critere.description && (
-                    <p className="qr-critere-desc">{critere.description}</p>
-                  )}
-                  <div
-                    className="qr-stars"
-                    onMouseLeave={() => setHovered((h) => ({ ...h, [critere.id]: 0 }))}
-                  >
-                    {Array.from({ length: critere.noteMaximale }, (_, i) => {
-                      const val = i + 1
-                      const filled = val <= (hov || current)
-                      return (
-                        <button
-                          key={val}
-                          type="button"
-                          className={`qr-star${filled ? ' filled' : ''}`}
-                          onMouseEnter={() =>
-                            setHovered((h) => ({ ...h, [critere.id]: val }))
-                          }
-                          onClick={() => setNote(critere.id, val)}
-                          aria-label={`${val} sur ${critere.noteMaximale}`}
-                        >
-                          <Star size={28} fill={filled ? 'currentColor' : 'none'} />
-                        </button>
-                      )
-                    })}
-                  </div>
+              {erreur && (
+                <div className="mt-4">
+                  <Erreur>{erreur}</Erreur>
                 </div>
-              )
-            })}
-          </div>
+              )}
 
-          <div className="qr-comment-group">
-            <label className="qr-comment-label">Commentaire (optionnel)</label>
-            <textarea
-              className="qr-comment"
-              rows={3}
-              placeholder="Partagez votre expérience avec cet agent…"
-              value={commentaire}
-              onChange={(e) => setCommentaire(e.target.value)}
-            />
-          </div>
+              <button onClick={envoyer} disabled={!complet || chargement} className={`${BTN} mt-6`}>
+                {chargement ? <Loader2 className="h-4.5 w-4.5 animate-spin" aria-hidden /> : 'Envoyer mon avis'}
+              </button>
+              {!complet && <p className="mt-2 text-center text-sm text-slate-500">Notez chaque critère pour envoyer votre avis.</p>}
+            </Carte>
+          </>
+        ) : (
+          <Carte className="text-center">
+            <CircleCheck className="mx-auto h-10 w-10 text-emerald-600" aria-hidden />
+            <h1 className="mt-4 text-xl font-semibold text-navy-900">Merci pour votre avis</h1>
+            <p className="mt-2 text-[15px] text-slate-600">
+              Il a bien été transmis{agent ? ` pour ${agent.prenom} ${agent.nom}` : ''}.
+            </p>
+            {restants.length > 0 && (
+              <button onClick={() => setEtape('agents')} className={`${BTN} mt-6`}>
+                Évaluer un autre agent
+              </button>
+            )}
+          </Carte>
+        )}
+      </main>
+    </div>
+  )
+}
 
-          {submittingError && (
-            <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-xs text-red-700 font-bold flex items-center gap-2">
-              <AlertCircle size={14} />
-              <span>{submittingError}</span>
-            </div>
-          )}
+const BTN =
+  'flex w-full items-center justify-center gap-2 rounded-lg bg-navy-900 px-4 py-3 text-[15px] font-semibold text-white transition-colors hover:bg-navy-800 disabled:cursor-not-allowed disabled:opacity-40'
 
-          <button
-            onClick={handleSubmitEvaluation}
-            disabled={!allRated}
-            className={`qr-submit${allRated ? ' qr-submit-ready' : ''}`}
-          >
-            Soumettre l&apos;évaluation
-          </button>
+function Carte({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return <section className={`animate-rise-in rounded-[var(--radius-card)] bg-white p-6 shadow-card sm:p-8 ${className}`}>{children}</section>
+}
+
+function Erreur({ children }: { children: React.ReactNode }) {
+  return (
+    <p role="alert" className="flex gap-2 rounded-lg bg-red-50 px-3.5 py-3 text-sm text-red-800">
+      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" aria-hidden />
+      {children}
+    </p>
+  )
+}
+
+function Etoiles({ critere, valeur, onChange }: { critere: Critere; valeur: number; onChange: (v: number) => void }) {
+  const [survol, setSurvol] = useState(0)
+  const affiche = survol || valeur
+  const echelle = Array.from({ length: critere.noteMaximale }, (_, i) => i + 1)
+  const libelle = critere.noteMaximale === 5 && affiche ? LIBELLES_ETOILES[affiche - 1] : affiche ? `${affiche} / ${critere.noteMaximale}` : ''
+
+  return (
+    <fieldset>
+      <legend className="text-[15px] font-medium text-slate-900">{critere.libelle}</legend>
+      {critere.description && <p className="mt-0.5 text-sm text-slate-500">{critere.description}</p>}
+      <div className="mt-2 flex items-center gap-3" onMouseLeave={() => setSurvol(0)}>
+        <div className="flex" role="radiogroup" aria-label={critere.libelle}>
+          {echelle.map((n) => (
+            <label key={n} className="cursor-pointer p-1 has-[:focus-visible]:rounded has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-navy-600" onMouseEnter={() => setSurvol(n)}>
+              <input type="radio" name={critere.id} value={n} checked={valeur === n} onChange={() => onChange(n)} className="sr-only" />
+              <span className="sr-only">
+                {n} sur {critere.noteMaximale}
+              </span>
+              <Star
+                className={`h-8 w-8 transition-colors ${n <= affiche ? 'fill-gold-500 text-gold-500' : 'fill-transparent text-slate-300'}`}
+                strokeWidth={1.5}
+                aria-hidden
+              />
+            </label>
+          ))}
         </div>
+        <span className="text-sm text-slate-600" aria-hidden>
+          {libelle}
+        </span>
       </div>
-    )
-  }
-
-  /* ─── STAGE: Submitting loader ─── */
-  if (stage === 'submitting') {
-    return (
-      <div className="qr-page">
-        <div className="qr-card qr-status-card">
-          <div className="qr-loader">
-            <Loader2 className="qr-spinner" />
-            <p className="font-bold text-slate-800 text-sm">Envoi en cours…</p>
-            <p className="text-[10px] text-slate-400">Veuillez ne pas quitter cette page.</p>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  /* ─── STAGE: Success Done ─── */
-  if (stage === 'done') {
-    return (
-      <div className="qr-page">
-        <div className="qr-card qr-status-card">
-          <div className="qr-status-icon qr-status-success">
-            <CheckCircle size={36} />
-          </div>
-          <h2 className="qr-status-title">Évaluation soumise !</h2>
-          <p className="qr-status-sub">
-            Merci pour votre avis. Vos notes pour{' '}
-            <strong>
-              {selectedAgent?.prenom} {selectedAgent?.nom}
-            </strong>{' '}
-            ont bien été enregistrées.
-          </p>
-
-          <button
-            onClick={() => {
-              setSelectedAgent(null)
-              setStage('dashboard')
-            }}
-            className="qr-submit qr-submit-ready mt-4"
-          >
-            Retourner aux agents
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  return null
+    </fieldset>
+  )
 }

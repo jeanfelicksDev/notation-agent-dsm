@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { requireAdmin } from '@/lib/auth'
 import { CRITERES_OFFICIELS_DSM } from '@/lib/default-criteres'
+import { normaliserTypes, typesDuCritere } from '@/lib/criteres'
 
-// PATCH : Met à jour uniquement les descriptions des critères existants (sans supprimer les notes)
+// PATCH : met à jour les descriptions des critères officiels existants, sans toucher aux notes.
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -13,42 +14,25 @@ export async function PATCH(
 
   try {
     const { id } = await params
-
-    const campagne = await prisma.campagne.findUnique({ where: { id } })
-    if (!campagne) {
-      return NextResponse.json({ error: 'Campagne introuvable' }, { status: 404 })
-    }
-
     const existingCriteres = await prisma.critere.findMany({ where: { campagneId: id } })
 
     let updatedCount = 0
-
     for (const officiel of CRITERES_OFFICIELS_DSM) {
-      // Trouver le critère correspondant par libellé ET typeEvaluateur
+      const typesOfficiels = normaliserTypes([officiel.typeEvaluateur]).typeEvaluateurs.join(',')
       const match = existingCriteres.find(
-        (c) => c.libelle === officiel.libelle && c.typeEvaluateur === officiel.typeEvaluateur
+        (c) => c.libelle === officiel.libelle && typesDuCritere(c).join(',') === typesOfficiels
       )
       if (match) {
-        await prisma.critere.update({
-          where: { id: match.id },
-          data: {
-            description: officiel.description,
-            noteMaximale: officiel.noteMaximale,
-          },
-        })
+        await prisma.critere.update({ where: { id: match.id }, data: { description: officiel.description } })
         updatedCount++
       }
     }
 
-    const updatedCriteres = await prisma.critere.findMany({
-      where: { campagneId: id },
-      orderBy: { createdAt: 'asc' },
-    })
-
+    const criteres = await prisma.critere.findMany({ where: { campagneId: id }, orderBy: { createdAt: 'asc' } })
     return NextResponse.json({
       success: true,
-      message: `${updatedCount} critère(s) mis à jour avec barème sur 5 points.`,
-      criteres: updatedCriteres,
+      message: `${updatedCount} description(s) de critère mise(s) à jour.`,
+      criteres,
     })
   } catch (error) {
     console.error('Error updating critere descriptions:', error)
@@ -56,6 +40,7 @@ export async function PATCH(
   }
 }
 
+// POST : remplace TOUS les critères de la campagne par la grille officielle (supprime les notes associées).
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -65,43 +50,32 @@ export async function POST(
 
   try {
     const { id } = await params
-
-    const campagne = await prisma.campagne.findUnique({ where: { id } })
+    const campagne = await prisma.campagne.findUnique({ where: { id }, select: { id: true } })
     if (!campagne) {
       return NextResponse.json({ error: 'Campagne introuvable' }, { status: 404 })
     }
 
-    // Supprimer les notes et critères actuels de cette campagne
-    const existingCriteres = await prisma.critere.findMany({ where: { campagneId: id }, select: { id: true } })
-    const critereIds = existingCriteres.map(c => c.id)
-    if (critereIds.length > 0) {
-      await Promise.all([
-        prisma.note.deleteMany({ where: { critereId: { in: critereIds } } }),
-        prisma.noteClient.deleteMany({ where: { critereId: { in: critereIds } } }),
-      ])
-    }
-    await prisma.critere.deleteMany({ where: { campagneId: id } })
+    await prisma.$transaction([
+      prisma.note.deleteMany({ where: { campagneId: id } }),
+      prisma.noteClient.deleteMany({ where: { campagneId: id } }),
+      prisma.scoreFinal.deleteMany({ where: { campagneId: id } }),
+      prisma.critere.deleteMany({ where: { campagneId: id } }),
+      prisma.critere.createMany({
+        data: CRITERES_OFFICIELS_DSM.map((c) => ({
+          libelle: c.libelle,
+          description: c.description,
+          noteMaximale: c.noteMaximale,
+          ...normaliserTypes([c.typeEvaluateur]),
+          campagneId: id,
+        })),
+      }),
+    ])
 
-    // Réinsérer tous les critères officiels DSM (tous sur 5 points)
-    await prisma.critere.createMany({
-      data: CRITERES_OFFICIELS_DSM.map((c) => ({
-        libelle: c.libelle,
-        description: c.description,
-        noteMaximale: 5,
-        typeEvaluateur: c.typeEvaluateur,
-        campagneId: id,
-      })),
-    })
-
-    const newCriteres = await prisma.critere.findMany({
-      where: { campagneId: id },
-      orderBy: { createdAt: 'asc' },
-    })
-
+    const criteres = await prisma.critere.findMany({ where: { campagneId: id }, orderBy: { createdAt: 'asc' } })
     return NextResponse.json({
       success: true,
-      message: 'Les 11 critères officiels DSM ont été appliqués.',
-      criteres: newCriteres,
+      message: `Les ${criteres.length} critères officiels DSM ont été appliqués.`,
+      criteres,
     })
   } catch (error) {
     console.error('Error seeding criteres:', error)

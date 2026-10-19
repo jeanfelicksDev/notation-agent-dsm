@@ -1,30 +1,37 @@
-import type { Metadata } from "next";
-import "./globals.css";
+import type { Metadata, Viewport } from 'next'
+import { Public_Sans } from 'next/font/google'
+import { Toaster } from '@/components/ui/feedback'
+import './globals.css'
+
+const publicSans = Public_Sans({
+  subsets: ['latin'],
+  variable: '--font-public-sans',
+  display: 'swap',
+})
 
 export const metadata: Metadata = {
-  title: "DSM - Système de Notation & Performance",
-  description: "Plateforme ultra-premium de gestion de la performance et de notation des agents.",
-};
+  title: {
+    default: 'DSM TAMIS — Évaluation des agents',
+    template: '%s · DSM TAMIS',
+  },
+  description: 'Plateforme interne d’évaluation de la performance des agents de la Direction des Solutions Maritimes.',
+}
+
+export const viewport: Viewport = {
+  themeColor: '#002B49',
+}
 
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode;
+  children: React.ReactNode
 }>) {
   return (
-    <html
-      lang="fr"
-      className={`h-full antialiased`}
-    >
-      <head>
-        <link
-          href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
-          rel="stylesheet"
-        />
-      </head>
-      <body className="min-h-full font-sans bg-slate-50 text-slate-900 selection:bg-blue-100 selection:text-blue-900" style={{ fontFamily: '"Inter", sans-serif' }}>
+    <html lang="fr" className={`${publicSans.variable} h-full`}>
+      <body className="min-h-full bg-canvas text-slate-900 antialiased">
         {children}
+        <Toaster />
       </body>
     </html>
-  );
+  )
 }

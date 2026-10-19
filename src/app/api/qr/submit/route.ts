@@ -1,173 +1,84 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createHash } from 'node:crypto'
 import prisma from '@/lib/prisma'
+import { clientIp } from '@/lib/auth'
+import { getCampagneOuverte, campagneEnCours, messageHorsPeriode } from '@/lib/campagne'
+import { estClientExterne } from '@/lib/criteres'
+import { agentsEvaluablesPar } from '@/lib/client-qr'
 
 /**
- * POST /api/qr/submit
- * Public route.
- * Submits client ratings for a specific agent.
+ * POST /api/qr/submit — route publique.
+ * Enregistre l'avis d'un client externe sur un agent : un seul avis par client, par agent et par campagne.
+ * (L'adresse IP n'est plus un critère de blocage : tous les clients d'un même bureau la partagent.)
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => null)
-    if (
-      !body ||
-      !Array.isArray(body.notes) ||
-      typeof body.clientId !== 'string' ||
-      typeof body.agentId !== 'string'
-    ) {
-      return NextResponse.json({ error: 'Corps de requête invalide' }, { status: 400 })
+    const clientId = typeof body?.clientId === 'string' ? body.clientId.trim() : ''
+    const agentId = typeof body?.agentId === 'string' ? body.agentId.trim() : ''
+    const notes: { critereId?: unknown; valeur?: unknown; commentaire?: unknown }[] = Array.isArray(body?.notes) ? body.notes : []
+
+    if (!clientId || !agentId || notes.length === 0) {
+      return NextResponse.json({ error: 'Requête incomplète.' }, { status: 400 })
     }
 
-    const clientId = body.clientId.trim()
-    const agentId = body.agentId.trim()
+    const campagne = await getCampagneOuverte()
+    if (!campagne) return NextResponse.json({ error: 'Aucune campagne active.' }, { status: 404 })
+    if (!campagneEnCours(campagne)) return NextResponse.json({ error: messageHorsPeriode(campagne) }, { status: 403 })
 
-    if (!clientId || !agentId) {
-      return NextResponse.json({ error: 'clientId et agentId sont requis' }, { status: 400 })
+    const client = await prisma.utilisateur.findFirst({ where: { id: clientId, role: 'EXTERNE' }, select: { id: true } })
+    if (!client) return NextResponse.json({ error: 'Client non reconnu.' }, { status: 403 })
+
+    const autorises = await agentsEvaluablesPar(clientId, campagne.id)
+    if (!autorises.some((a) => a.id === agentId)) {
+      return NextResponse.json({ error: 'Vous ne pouvez pas évaluer cet agent.' }, { status: 403 })
     }
 
-    // Find active campaign
-    const campagne = await prisma.campagne.findFirst({
-      where: { statut: 'OUVERTE' },
+    const dejaFait = await prisma.noteClient.findFirst({
+      where: { clientId, agentId, campagneId: campagne.id },
       select: { id: true },
     })
-
-    if (!campagne) {
-      return NextResponse.json({ error: 'Aucune campagne active' }, { status: 404 })
+    if (dejaFait) {
+      return NextResponse.json({ error: 'Vous avez déjà donné votre avis sur cet agent.' }, { status: 409 })
     }
 
-    // Check if client is EXTERNE
-    const clientUser = await prisma.utilisateur.findFirst({
-      where: { id: clientId, role: 'EXTERNE' },
-    })
-
-    if (!clientUser) {
-      return NextResponse.json({ error: 'Client non autorisé' }, { status: 403 })
-    }
-
-    // Check if agent has qrcodeActif
-    const agent = await prisma.utilisateur.findFirst({
-      where: { id: agentId, qrcodeActif: true },
-    })
-
-    if (!agent) {
-      return NextResponse.json({ error: 'Cet agent n’est pas configuré pour la notation par QR code.' }, { status: 404 })
-    }
-
-    // Check if restrictive affectations exist for this client in this campaign
-    const anyAffectationsForClient = await prisma.affectation.findFirst({
-      where: {
-        evaluateurId: clientId,
-        campagneId: campagne.id,
-      },
-    })
-
-    if (anyAffectationsForClient) {
-      const specificAffectation = await prisma.affectation.findFirst({
-        where: {
-          evaluateurId: clientId,
-          evalueId: agentId,
-          campagneId: campagne.id,
-        },
+    const criteres = (
+      await prisma.critere.findMany({
+        where: { campagneId: campagne.id },
+        select: { id: true, libelle: true, noteMaximale: true, typeEvaluateur: true, typeEvaluateurs: true },
       })
-      if (!specificAffectation) {
-        return NextResponse.json({ error: 'Vous n’êtes pas autorisé à évaluer cet agent.' }, { status: 403 })
+    ).filter(estClientExterne)
+
+    // Chaque critère client doit recevoir exactement une note dans le barème.
+    const parCritere = new Map(notes.map((n) => [n.critereId, n]))
+    const lignes = []
+    for (const c of criteres) {
+      const n = parCritere.get(c.id)
+      const valeur = Number(n?.valeur)
+      if (!n || !Number.isInteger(valeur) || valeur < 1 || valeur > c.noteMaximale) {
+        return NextResponse.json({ error: `Merci de noter « ${c.libelle} » (de 1 à ${c.noteMaximale}).` }, { status: 400 })
       }
+      const commentaire = typeof n.commentaire === 'string' ? n.commentaire.trim().slice(0, 2000) : ''
+      lignes.push({ critereId: c.id, valeur, commentaire: commentaire || null })
     }
 
-    // Check if client has already voted for this agent in this campaign
-    const existingByClient = await prisma.noteClient.findFirst({
-      where: { clientId, agentId, campagneId: campagne.id },
-    })
+    // L'empreinte IP est conservée à titre d'audit uniquement.
+    const ipHash = createHash('sha256').update(`${clientIp(request.headers) ?? 'inconnue'}:${agentId}:${campagne.id}`).digest('hex')
 
-    if (existingByClient) {
-      return NextResponse.json(
-        { error: 'Vous avez déjà soumis votre avis pour cet agent.' },
-        { status: 409 }
-      )
-    }
-
-    // IP deduplication (second layer)
-    const rawIp =
-      request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-      request.headers.get('x-real-ip') ||
-      'unknown'
-    const ipHash = createHash('sha256').update(`${rawIp}:${agentId}:${campagne.id}`).digest('hex')
-
-    const existingByIp = await prisma.noteClient.findFirst({
-      where: { ipHash, agentId, campagneId: campagne.id },
-    })
-
-    if (existingByIp) {
-      return NextResponse.json(
-        { error: 'Une évaluation a déjà été soumise depuis cet appareil pour cet agent.' },
-        { status: 409 }
-      )
-    }
-
-    const notes: { critereId: string; valeur: number; commentaire?: string }[] = body.notes
-    if (notes.length === 0) {
-      return NextResponse.json({ error: 'Aucune note fournie' }, { status: 400 })
-    }
-
-    // Validate criteria
-    const critereIds = notes.map((n) => n.critereId)
-    const criteres = await prisma.critere.findMany({
-      where: { id: { in: critereIds }, campagneId: campagne.id },
-      select: { id: true, noteMaximale: true },
-    })
-
-    const critereMap = new Map(criteres.map((c) => [c.id, c]))
-
-    for (const note of notes) {
-      const critere = critereMap.get(note.critereId)
-      if (!critere) {
-        return NextResponse.json({ error: `Critère invalide : ${note.critereId}` }, { status: 400 })
-      }
-      if (note.valeur < 1 || note.valeur > critere.noteMaximale) {
-        return NextResponse.json(
-          { error: `Note hors plage pour le critère ${note.critereId}` },
-          { status: 400 }
-        )
-      }
-    }
-
-    // Save in transaction: create NoteClient entries and update/create Affectation as TERMINEE
     await prisma.$transaction([
-      ...notes.map((note) =>
-        prisma.noteClient.create({
-          data: {
-            agentId,
-            campagneId: campagne.id,
-            critereId: note.critereId,
-            valeur: note.valeur,
-            commentaire: note.commentaire?.trim() || null,
-            ipHash,
-            clientId,
-          },
-        })
-      ),
+      prisma.noteClient.createMany({
+        data: lignes.map((l) => ({ ...l, agentId, campagneId: campagne.id, clientId, ipHash })),
+      }),
       prisma.affectation.upsert({
-        where: {
-          evaluateurId_evalueId_campagneId: {
-            evaluateurId: clientId,
-            evalueId: agentId,
-            campagneId: campagne.id,
-          },
-        },
+        where: { evaluateurId_evalueId_campagneId: { evaluateurId: clientId, evalueId: agentId, campagneId: campagne.id } },
         update: { statut: 'TERMINEE' },
-        create: {
-          evaluateurId: clientId,
-          evalueId: agentId,
-          campagneId: campagne.id,
-          statut: 'TERMINEE',
-        },
+        create: { evaluateurId: clientId, evalueId: agentId, campagneId: campagne.id, statut: 'TERMINEE' },
       }),
     ])
 
     return NextResponse.json({ success: true })
-  } catch (error: any) {
-    console.error('Submit global client error:', error)
-    return NextResponse.json({ error: 'Erreur serveur lors de la soumission' }, { status: 500 })
+  } catch (error) {
+    console.error('qr/submit error:', error)
+    return NextResponse.json({ error: 'Erreur serveur lors de l’envoi de votre avis.' }, { status: 500 })
   }
 }

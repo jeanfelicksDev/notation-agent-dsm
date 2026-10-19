@@ -1,133 +1,212 @@
-'use client'
-
-import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Users, Building2, ClipboardList, Trophy, Plus, ArrowRight, QrCode } from 'lucide-react'
+import { ArrowRight, CalendarClock, KeyRound, Lock, Trophy, UserX } from 'lucide-react'
+import prisma from '@/lib/prisma'
 import AdminHeader from '@/components/AdminHeader'
+import { getCampagneOuverte } from '@/lib/campagne'
 
-interface Stats {
-  totalUtilisateurs: number
-  totalSites: number
-  totalCampagnes: number
-  campagnesOuvertes: number
-}
+export const dynamic = 'force-dynamic'
 
-export default function AdminDashboard() {
-  const [stats, setStats] = useState<Stats>({
-    totalUtilisateurs: 0,
-    totalSites: 0,
-    totalCampagnes: 0,
-    campagnesOuvertes: 0
-  })
-  const [loading, setLoading] = useState(true)
+const fmt = (d: Date) => d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
 
-  useEffect(() => {
-    fetch('/api/admin/stats')
-      .then(res => res.json())
-      .then(data => setStats(data))
-      .finally(() => setLoading(false))
-  }, [])
+export default async function AdminDashboard() {
+  const campagne = await getCampagneOuverte()
+  const maintenant = new Date()
 
-  const cards = [
-    { title: 'Utilisateurs', value: stats.totalUtilisateurs, icon: Users, href: '/admin/utilisateurs', color: 'text-brand-500', bg: 'bg-brand-50' },
-    { title: 'Sites', value: stats.totalSites, icon: Building2, href: '/admin/sites', color: 'text-emerald-500', bg: 'bg-emerald-50' },
-    { title: 'Campagnes', value: stats.totalCampagnes, icon: ClipboardList, href: '/admin/campagnes', color: 'text-purple-500', bg: 'bg-purple-50' },
-    { title: 'Classement', value: '-', icon: Trophy, href: '/admin/classement', color: 'text-amber-500', bg: 'bg-amber-50' },
-  ]
+  const [agents, sites, campagnes, sansPin, verrouilles, avancement, sansEvaluateur, avisClients] = await Promise.all([
+    prisma.utilisateur.count({ where: { role: { in: ['UTILISATEUR', 'MANAGER'] } } }),
+    prisma.site.count(),
+    prisma.campagne.count(),
+    prisma.utilisateur.count({
+      where: { role: { in: ['UTILISATEUR', 'MANAGER'] }, NOT: [{ motDePasse: { startsWith: 'scrypt:' } }] },
+    }),
+    prisma.utilisateur.count({ where: { verrouilleJusqua: { gt: maintenant } } }),
+    campagne
+      ? prisma.affectation.groupBy({
+          by: ['statut'],
+          where: { campagneId: campagne.id, evaluateur: { role: { not: 'EXTERNE' } } },
+          _count: { _all: true },
+        })
+      : Promise.resolve([]),
+    campagne
+      ? prisma.utilisateur.count({
+          where: { role: 'UTILISATEUR', affectationsRecues: { none: { campagneId: campagne.id } } },
+        })
+      : Promise.resolve(0),
+    campagne
+      ? prisma.noteClient.findMany({ where: { campagneId: campagne.id }, distinct: ['clientId', 'agentId'], select: { id: true } })
+      : Promise.resolve([]),
+  ])
 
-  if (loading) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="h-12 w-12 rounded-full border-4 border-brand-100 border-t-brand-500 animate-spin"></div>
-      </div>
-    )
-  }
+  const compte = (s: string) => avancement.find((a) => a.statut === s)?._count._all ?? 0
+  const total = avancement.reduce((n, a) => n + a._count._all, 0)
+  const soumises = compte('TERMINEE')
+  const brouillons = compte('BROUILLON')
+  const taux = total ? Math.round((soumises / total) * 100) : 0
+  const joursRestants = campagne
+    ? Math.max(0, Math.ceil((new Date(campagne.dateFin).setHours(23, 59, 59) - maintenant.getTime()) / 86_400_000))
+    : 0
+
+  const alertes = [
+    sansPin > 0 && {
+      icon: KeyRound,
+      texte: `${sansPin} agent${sansPin > 1 ? 's n’ont' : ' n’a'} pas encore choisi de PIN`,
+      detail: 'Ils le définiront à leur première connexion.',
+      href: '/admin/utilisateurs?filtre=sans_pin',
+    },
+    verrouilles > 0 && {
+      icon: Lock,
+      texte: `${verrouilles} compte${verrouilles > 1 ? 's' : ''} verrouillé${verrouilles > 1 ? 's' : ''} temporairement`,
+      detail: 'Après 5 PIN erronés, pour 15 minutes.',
+      href: '/admin/utilisateurs?filtre=verrouilles',
+    },
+    sansEvaluateur > 0 && {
+      icon: UserX,
+      texte: `${sansEvaluateur} agent${sansEvaluateur > 1 ? 's' : ''} sans aucun évaluateur`,
+      detail: 'Ils n’auront pas de score pour cette campagne.',
+      href: campagne ? `/admin/campagnes/${campagne.id}?onglet=affectations` : '/admin/campagnes',
+    },
+  ].filter(Boolean) as { icon: typeof KeyRound; texte: string; detail: string; href: string }[]
 
   return (
-    <div className="flex-1 flex flex-col min-w-0">
-        <AdminHeader />
-        <div className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-7xl mx-auto space-y-8">
-            <div className="animate-fade-in">
-              <h2 className="text-3xl font-display font-bold text-slate-900 mb-2">Tableau de bord</h2>
-              <p className="text-slate-500 font-medium">Vue d'ensemble de la performance globale.</p>
-            </div>
+    <>
+      <AdminHeader title="Tableau de bord" subtitle={fmt(maintenant)} />
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {cards.map((card, index) => (
-                <Link key={card.href} href={card.href} className="animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
-                  <div className="glass card-hover rounded-2xl p-6 h-full border border-slate-200/50 shadow-sm flex flex-col">
-                    <div className={`${card.bg} ${card.color} w-12 h-12 rounded-xl flex items-center justify-center mb-4`}>
-                      <card.icon className="w-6 h-6" />
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-sm font-semibold text-slate-500 tracking-wide uppercase">{card.title}</p>
-                      <p className="text-3xl font-display font-bold text-slate-900">{card.value}</p>
-                    </div>
-                    <div className="mt-4 pt-4 border-t border-slate-100 flex items-center text-xs font-bold text-brand-600">
-                      Gérer <ArrowRight className="w-3 h-3 ml-1" />
-                    </div>
-                  </div>
+      <main className="mx-auto w-full max-w-7xl space-y-6 px-5 py-6 sm:px-8 sm:py-8">
+        {campagne ? (
+          <section className="rounded-[var(--radius-card)] bg-white p-6 shadow-card sm:p-8" aria-labelledby="campagne-titre">
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <p className="flex items-center gap-2 text-sm font-medium text-emerald-700">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden />
+                  Campagne ouverte
+                </p>
+                <h2 id="campagne-titre" className="mt-2 text-2xl font-semibold tracking-tight text-navy-900">
+                  {campagne.libelle}
+                </h2>
+                <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-600">
+                  <CalendarClock className="h-4 w-4 text-slate-400" aria-hidden />
+                  Du {fmt(campagne.dateDebut)} au {fmt(campagne.dateFin)}
+                  <span className="text-slate-400">·</span>
+                  <strong className="font-medium text-slate-800">
+                    {joursRestants === 0 ? 'dernier jour' : `${joursRestants} jour${joursRestants > 1 ? 's' : ''} restant${joursRestants > 1 ? 's' : ''}`}
+                  </strong>
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  href={`/admin/campagnes/${campagne.id}?onglet=suivi`}
+                  className="inline-flex items-center gap-2 rounded-lg bg-navy-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-navy-800"
+                >
+                  Suivre l’avancement
+                  <ArrowRight className="h-4 w-4" aria-hidden />
                 </Link>
+                <Link
+                  href={`/admin/classement?campagneId=${campagne.id}`}
+                  className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50"
+                >
+                  <Trophy className="h-4 w-4 text-gold-600" aria-hidden />
+                  Classement provisoire
+                </Link>
+              </div>
+            </div>
+
+            <div className="mt-8">
+              <div className="flex items-baseline justify-between gap-4">
+                <p className="text-sm font-medium text-slate-700">Évaluations internes soumises</p>
+                <p className="text-sm text-slate-600 tabular-nums">
+                  <strong className="text-2xl font-semibold text-navy-900">{taux} %</strong>
+                  <span className="ml-2">
+                    {soumises} / {total}
+                  </span>
+                </p>
+              </div>
+              <div
+                className="mt-3 flex h-2.5 overflow-hidden rounded-full bg-slate-100"
+                role="img"
+                aria-label={`${soumises} soumises, ${brouillons} en brouillon, ${total - soumises - brouillons} non commencées`}
+              >
+                <div className="bg-navy-800" style={{ width: `${total ? (soumises / total) * 100 : 0}%` }} />
+                <div className="bg-gold-400" style={{ width: `${total ? (brouillons / total) * 100 : 0}%` }} />
+              </div>
+              <dl className="mt-4 flex flex-wrap gap-x-8 gap-y-2 text-sm">
+                <Legende couleur="bg-navy-800" label="Soumises" valeur={soumises} />
+                <Legende couleur="bg-gold-400" label="En brouillon" valeur={brouillons} />
+                <Legende couleur="bg-slate-200" label="Non commencées" valeur={total - soumises - brouillons} />
+                <Legende couleur="bg-teal-500" label="Avis clients (QR)" valeur={avisClients.length} />
+              </dl>
+            </div>
+          </section>
+        ) : (
+          <section className="rounded-[var(--radius-card)] bg-white p-8 shadow-card">
+            <h2 className="text-lg font-semibold text-navy-900">Aucune campagne ouverte</h2>
+            <p className="mt-1 max-w-xl text-sm text-slate-600">
+              Les agents ne peuvent pas noter tant qu’aucune campagne n’est ouverte. Créez-en une, ou rouvrez une campagne existante.
+            </p>
+            <Link
+              href="/admin/campagnes/new"
+              className="mt-5 inline-flex items-center gap-2 rounded-lg bg-navy-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-navy-800"
+            >
+              Créer une campagne
+              <ArrowRight className="h-4 w-4" aria-hidden />
+            </Link>
+          </section>
+        )}
+
+        <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
+          <section className="rounded-[var(--radius-card)] bg-white shadow-card" aria-labelledby="alertes-titre">
+            <h2 id="alertes-titre" className="border-b border-slate-100 px-6 py-4 text-base font-semibold text-navy-900">
+              À surveiller
+            </h2>
+            {alertes.length === 0 ? (
+              <p className="px-6 py-8 text-sm text-slate-500">Rien à signaler : tous les comptes sont actifs et chaque agent a des évaluateurs.</p>
+            ) : (
+              <ul className="divide-y divide-slate-100">
+                {alertes.map((a) => (
+                  <li key={a.texte}>
+                    <Link href={a.href} className="group flex items-center gap-4 px-6 py-4 hover:bg-slate-50">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gold-50 text-gold-700">
+                        <a.icon className="h-4.5 w-4.5" aria-hidden />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-medium text-slate-900">{a.texte}</span>
+                        <span className="block text-sm text-slate-500">{a.detail}</span>
+                      </span>
+                      <ArrowRight className="h-4 w-4 text-slate-300 transition-colors group-hover:text-navy-700" aria-hidden />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section className="rounded-[var(--radius-card)] bg-white shadow-card" aria-label="Référentiel">
+            <ul className="divide-y divide-slate-100 text-sm">
+              {[
+                { label: 'Agents et managers', valeur: agents, href: '/admin/utilisateurs' },
+                { label: 'Sites', valeur: sites, href: '/admin/sites' },
+                { label: 'Campagnes', valeur: campagnes, href: '/admin/campagnes' },
+              ].map((r) => (
+                <li key={r.href}>
+                  <Link href={r.href} className="flex items-center justify-between px-6 py-4 hover:bg-slate-50">
+                    <span className="text-slate-700">{r.label}</span>
+                    <span className="font-semibold text-navy-900 tabular-nums">{r.valeur}</span>
+                  </Link>
+                </li>
               ))}
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-2 space-y-6 animate-fade-in" style={{ animationDelay: '400ms' }}>
-                <h3 className="text-xl font-display font-bold text-slate-800">Actions rapides</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <Link href="/admin/campagnes/new" className="group p-5 bg-white border border-slate-200 rounded-2xl hover:border-brand-500 transition-all card-hover">
-                    <div className="w-10 h-10 bg-brand-50 rounded-lg flex items-center justify-center mb-3 group-hover:bg-brand-500 group-hover:text-white transition-colors">
-                      <Plus className="w-5 h-5 text-brand-600 group-hover:text-white" />
-                    </div>
-                    <span className="font-bold text-slate-800 block mb-0.5 text-sm">Campagne</span>
-                    <span className="text-xs text-slate-500">Lancer une session</span>
-                  </Link>
-                  <Link href="/admin/utilisateurs/new" className="group p-5 bg-white border border-slate-200 rounded-2xl hover:border-emerald-500 transition-all card-hover">
-                    <div className="w-10 h-10 bg-emerald-50 rounded-lg flex items-center justify-center mb-3 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
-                      <Plus className="w-5 h-5 text-emerald-600 group-hover:text-white" />
-                    </div>
-                    <span className="font-bold text-slate-800 block mb-0.5 text-sm">Utilisateur</span>
-                    <span className="text-xs text-slate-500">Ajouter un agent</span>
-                  </Link>
-                  <Link href="/admin/sites/new" className="group p-5 bg-white border border-slate-200 rounded-2xl hover:border-purple-500 transition-all card-hover">
-                    <div className="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center mb-3 group-hover:bg-purple-500 group-hover:text-white transition-colors">
-                      <Plus className="w-5 h-5 text-purple-600 group-hover:text-white" />
-                    </div>
-                    <span className="font-bold text-slate-800 block mb-0.5 text-sm">Site</span>
-                    <span className="text-xs text-slate-500">Emplacement</span>
-                  </Link>
-                  <Link href="/qr" target="_blank" className="group p-5 bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-2xl hover:border-amber-400 transition-all card-hover">
-                    <div className="w-10 h-10 bg-amber-400 text-white rounded-lg flex items-center justify-center mb-3 shadow-sm group-hover:scale-110 transition-transform">
-                      <QrCode className="w-5 h-5 text-white" />
-                    </div>
-                    <span className="font-bold text-slate-800 block mb-0.5 text-sm">QR Code Unique</span>
-                    <span className="text-xs text-amber-700">Portail clients</span>
-                  </Link>
-                </div>
-              </div>
-
-              <div className="space-y-6 animate-fade-in" style={{ animationDelay: '500ms' }}>
-                <h3 className="text-xl font-display font-bold text-slate-800">État du système</h3>
-                <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-slate-600">Campagnes actives</span>
-                    <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full">
-                      {stats.campagnesOuvertes} En cours
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-slate-600">Base de données</span>
-                    <span className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
-                      <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
-                      Opérationnel
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+            </ul>
+          </section>
         </div>
+      </main>
+    </>
+  )
+}
+
+function Legende({ couleur, label, valeur }: { couleur: string; label: string; valeur: number }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className={`h-2.5 w-2.5 rounded-sm ${couleur}`} aria-hidden />
+      <dt className="text-slate-600">{label}</dt>
+      <dd className="font-semibold text-slate-900 tabular-nums">{valeur}</dd>
     </div>
   )
 }

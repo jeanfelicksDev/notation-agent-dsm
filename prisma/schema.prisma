@@ -29,6 +29,8 @@ model Utilisateur {
   siteId              String?
   qrcodeActif         Boolean       @default(false)
   qrToken             String?       @unique
+  tentativesEchouees  Int           @default(0)
+  verrouilleJusqua    DateTime?
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
   affectationsRecues  Affectation[] @relation("EvalueAffectations")
@@ -88,7 +90,7 @@ model Campagne {
   notes          Note[]
   notesClients   NoteClient[]
   scores          ScoreFinal[]
-  poidsClient     Int            @default(0)
+  poidsClient     Int            @default(25)
   prixDirection   String?        @default("Trophée d'Excellence + Dotation Spéciale")
   prixDepartement String?        @default("Certificat de Mérite + Prime")
   prixService     String?        @default("Diplôme d'Honneur + Prime")

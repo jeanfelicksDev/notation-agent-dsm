@@ -1,263 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { requireAdmin } from '@/lib/auth'
+import { attribuerRangs, calculerScores, enregistrerScores } from '@/lib/scores'
 
-async function calculateScoresForCampagne(campagneId: string) {
-  const campagne = await prisma.campagne.findUnique({
-    where: { id: campagneId },
-    include: {
-      criteres: true,
-    },
-  })
+export const dynamic = 'force-dynamic'
 
-  if (!campagne) return
+const NO_STORE = { 'Cache-Control': 'no-store' }
 
-  // 1. Récupérer toutes les notes internes et notes clients en parallèle
-  // 1. Récupérer toutes les notes internes et notes clients en parallèle
-  const [allNotes, allNotesClients] = await Promise.all([
-    prisma.note.findMany({
-      where: { campagneId: campagne.id },
-      include: {
-        critere: true,
-        evaluateur: {
-          select: { id: true, role: true, service: true },
-        },
-      },
-    }),
-    prisma.noteClient.findMany({
-      where: { campagneId: campagne.id },
-      include: { critere: true },
-    }),
-  ])
+/** Seuls les agents opérationnels figurent au classement. */
+const ROLES_CLASSES = new Set(['UTILISATEUR'])
 
-  if (allNotes.length === 0 && allNotesClients.length === 0) return
-
-  // 2. Grouper les notes par évalué en mémoire
-  const notesByEvalue = new Map<string, typeof allNotes>()
-  for (const note of allNotes) {
-    const list = notesByEvalue.get(note.evalueId) || []
-    list.push(note)
-    notesByEvalue.set(note.evalueId, list)
-  }
-
-  const clientNotesByAgent = new Map<string, typeof allNotesClients>()
-  for (const nc of allNotesClients) {
-    const list = clientNotesByAgent.get(nc.agentId) || []
-    list.push(nc)
-    clientNotesByAgent.set(nc.agentId, list)
-  }
-
-  // Obtenir tous les IDs d'agents évalués
-  const evalueIds = new Set<string>([
-    ...notesByEvalue.keys(),
-    ...clientNotesByAgent.keys(),
-  ])
-
-  const scoresToUpsert: Array<{
-    utilisateurId: string
-    campagneId: string
-    scoreCollegues: number
-    scoreManager: number
-    scoreClient: number
-    scoreTotal: number
-  }> = []
-
-  for (const evalueId of evalueIds) {
-    const notesRecues = notesByEvalue.get(evalueId) || []
-    const clientNotes = clientNotesByAgent.get(evalueId) || []
-
-    // 1. Notes attribuées par le/les Manager(s)
-    const notesManager = notesRecues.filter((n) => {
-      const isMgr = n.evaluateur?.role === 'MANAGER' || n.evaluateur?.role === 'ADMIN'
-      const types = n.critere.typeEvaluateurs && n.critere.typeEvaluateurs.length > 0
-        ? n.critere.typeEvaluateurs
-        : [n.critere.typeEvaluateur]
-      return isMgr || (types.includes('MANAGER') && !types.includes('COLLEGUE'))
-    })
-
-    // 2. Notes attribuées par les Collègues et Clients Internes (non-managers)
-    const notesCollegues = notesRecues.filter((n) => {
-      const isMgr = n.evaluateur?.role === 'MANAGER' || n.evaluateur?.role === 'ADMIN'
-      const types = n.critere.typeEvaluateurs && n.critere.typeEvaluateurs.length > 0
-        ? n.critere.typeEvaluateurs
-        : [n.critere.typeEvaluateur]
-      return !isMgr && (types.includes('COLLEGUE') || types.includes('CLIENT_INTERNE') || types.includes('TOUS'))
-    })
-
-    // 2.1 Calcul de la note Manager normalisée (sur base 100, destinée à peser sur 55 pts)
-    let scoreManagerBase100 = 0
-    let hasNotesManager = false
-    if (notesManager.length > 0) {
-      const notesParMgr: Record<string, number> = {}
-      const maxParMgr: Record<string, number> = {}
-      for (const note of notesManager) {
-        notesParMgr[note.evaluateurId] = (notesParMgr[note.evaluateurId] || 0) + note.valeur
-        maxParMgr[note.evaluateurId] = (maxParMgr[note.evaluateurId] || 0) + (note.critere.noteMaximale || 5)
-      }
-
-      const mgrRatios: number[] = []
-      for (const id of Object.keys(notesParMgr)) {
-        const val = notesParMgr[id]
-        const max = maxParMgr[id] || 1
-        mgrRatios.push(val / max)
-      }
-
-      if (mgrRatios.length > 0) {
-        scoreManagerBase100 = (mgrRatios.reduce((sum, r) => sum + r, 0) / mgrRatios.length) * 100
-        hasNotesManager = true
-      }
-    }
-
-    // 2.2 Calcul des notes Collègues & Clients Internes normalisées (base 100)
-    let scoreColleguesBase100 = 0
-    let hasNotesCollegues = false
-    if (notesCollegues.length > 0) {
-      const notesParEval: Record<string, number> = {}
-      const maxParEval: Record<string, number> = {}
-      for (const note of notesCollegues) {
-        notesParEval[note.evaluateurId] = (notesParEval[note.evaluateurId] || 0) + note.valeur
-        maxParEval[note.evaluateurId] = (maxParEval[note.evaluateurId] || 0) + (note.critere.noteMaximale || 5)
-      }
-
-      const peerRatios: number[] = []
-      for (const id of Object.keys(notesParEval)) {
-        const val = notesParEval[id]
-        const max = maxParEval[id] || 1
-        peerRatios.push(val / max)
-      }
-
-      if (peerRatios.length > 0) {
-        scoreColleguesBase100 = (peerRatios.reduce((sum, r) => sum + r, 0) / peerRatios.length) * 100
-        hasNotesCollegues = true
-      }
-    }
-
-    // 2.3 Calcul des notes Clients QR normalisées (base 100)
-    let scoreClientBase100 = 0
-    let hasNotesClients = false
-    if (clientNotes.length > 0) {
-      const notesParClient: Record<string, { val: number; max: number }> = {}
-      for (const nc of clientNotes) {
-        const key = nc.clientId || nc.ipHash || nc.id
-        if (!notesParClient[key]) notesParClient[key] = { val: 0, max: 0 }
-        notesParClient[key].val += nc.valeur
-        notesParClient[key].max += (nc.critere.noteMaximale || 5)
-      }
-
-      const clientRatios = Object.values(notesParClient)
-        .filter((c) => c.max > 0)
-        .map((c) => c.val / c.max)
-
-      if (clientRatios.length > 0) {
-        scoreClientBase100 = (clientRatios.reduce((sum, r) => sum + r, 0) / clientRatios.length) * 100
-        hasNotesClients = true
-      }
-    }
-
-    // 2.4 LE TOTAL DES NOTES COLLÈGUES + CLIENT INTERNE + CLIENT QR EST SUR 45 POINTS
-    // (Collègues: 20 pts, Clients QR: 25 pts)
-    // ET CELUI DES MANAGERS SUR 55 POINTS, QUELQUE SOIT LE NOMBRE DE CRITÈRES SOUMIS
-    let scoreNonManagerBase100 = 0
-    if (hasNotesCollegues && hasNotesClients) {
-      // Si l'agent a à la fois des collègues internes et des clients QR :
-      // Répartition : pairs internes (20 pts) + clients QR (25 pts) = 45 points au total
-      scoreNonManagerBase100 = (scoreColleguesBase100 * 20 + scoreClientBase100 * 25) / 45
-    } else if (hasNotesCollegues) {
-      // Uniquement des collègues / clients internes : 100% de la note attribuée sur les 45 points
-      scoreNonManagerBase100 = scoreColleguesBase100
-    } else if (hasNotesClients) {
-      // Uniquement des clients QR : 100% de la note attribuée sur les 45 points
-      scoreNonManagerBase100 = scoreClientBase100
-    }
-
-    const poidsColleguesTotal = campagne.poidsCollegues || 45
-    const poidsManagerTotal = campagne.poidsManager || 55
-
-    // Part globale Collègues + Client Interne + Client QR sur 45 points
-    const partNonManagerSur45 = (scoreNonManagerBase100 * poidsColleguesTotal) / 100
-
-    // Part globale Manager sur 55 points
-    const partManagerSur55 = (scoreManagerBase100 * poidsManagerTotal) / 100
-
-    // 2.5 Score total final sur 100 points
-    let scoreTotal = 0
-    if (hasNotesManager && (hasNotesCollegues || hasNotesClients)) {
-      scoreTotal = Math.round((partNonManagerSur45 + partManagerSur55) * 100) / 100
-    } else if (hasNotesManager) {
-      scoreTotal = Math.round(scoreManagerBase100 * 100) / 100
-    } else if (hasNotesCollegues || hasNotesClients) {
-      scoreTotal = Math.round(scoreNonManagerBase100 * 100) / 100
-    }
-
-    scoresToUpsert.push({
-      utilisateurId: evalueId,
-      campagneId: campagne.id,
-      scoreCollegues: Math.round(scoreColleguesBase100 * 100) / 100,
-      scoreManager: Math.round(scoreManagerBase100 * 100) / 100,
-      scoreClient: Math.round(scoreClientBase100 * 100) / 100,
-      scoreTotal,
-    })
-  }
-
-  // Trier par score décroissant pour assigner les rangs
-  scoresToUpsert.sort((a, b) => b.scoreTotal - a.scoreTotal)
-
-  // 3. Récupérer les scores existants pour comparer et éviter d'écrire inutilement
-  const existingScores = await prisma.scoreFinal.findMany({
-    where: { campagneId: campagne.id },
-  })
-
-  const existingMap = new Map<string, typeof existingScores[0]>()
-  for (const es of existingScores) {
-    existingMap.set(es.utilisateurId, es)
-  }
-
-  const changedScores = scoresToUpsert.filter((item, index) => {
-    const existing = existingMap.get(item.utilisateurId)
-    if (!existing) return true
-    const expectedRang = index + 1
-    return (
-      Math.abs(existing.scoreCollegues - item.scoreCollegues) > 0.001 ||
-      Math.abs(existing.scoreManager - item.scoreManager) > 0.001 ||
-      Math.abs(existing.scoreClient - item.scoreClient) > 0.001 ||
-      Math.abs(existing.scoreTotal - item.scoreTotal) > 0.001 ||
-      existing.rang !== expectedRang
-    )
-  })
-
-  // 4. Sauvegarder dans une transaction bulk seulement s'il y a des changements
-  if (changedScores.length > 0) {
-    await prisma.$transaction(
-      changedScores.map((item) => {
-        const globalIndex = scoresToUpsert.findIndex((s) => s.utilisateurId === item.utilisateurId)
-        const rank = globalIndex !== -1 ? globalIndex + 1 : 1
-        return prisma.scoreFinal.upsert({
-          where: {
-            utilisateurId_campagneId: {
-              utilisateurId: item.utilisateurId,
-              campagneId: item.campagneId,
-            },
-          },
-          update: {
-            scoreCollegues: item.scoreCollegues,
-            scoreManager: item.scoreManager,
-            scoreClient: item.scoreClient,
-            scoreTotal: item.scoreTotal,
-            rang: rank,
-          },
-          create: {
-            utilisateurId: item.utilisateurId,
-            campagneId: item.campagneId,
-            scoreCollegues: item.scoreCollegues,
-            scoreManager: item.scoreManager,
-            scoreClient: item.scoreClient,
-            scoreTotal: item.scoreTotal,
-            rang: rank,
-          },
-        })
-      })
-    )
-  }
+/** Libellés de repli = valeurs par défaut du schéma (jamais de montants inventés). */
+const PRIX_PAR_DEFAUT = {
+  prixGlobal: 'Super Lauréat DSM 360°',
+  prixDirection: "Trophée d'Excellence + Dotation Spéciale",
+  prixDepartement: 'Certificat de Mérite + Prime',
+  prixService: "Diplôme d'Honneur + Prime",
 }
 
 export interface RawAgentScore {
@@ -287,171 +45,148 @@ export interface RawAgentScore {
   totalInDirection: number
   totalInDepartement: number
   totalInService: number
+  /** Points obtenus et maxima par source, selon les pondérations de la campagne */
+  partManager: number
+  partCollegues: number
+  partClient: number
+  maxManager: number
+  maxCollegues: number
+  maxClient: number
+}
+
+type Poids = { poidsManager: number; poidsCollegues: number; poidsClient: number }
+const POIDS_PAR_DEFAUT: Poids = { poidsManager: 55, poidsCollegues: 45, poidsClient: 25 }
+
+/** Même répartition que le calcul du score (src/lib/scores.ts), exprimée en points. */
+function parts(s: { scoreCollegues: number; scoreManager: number; scoreClient: number }, p: Poids) {
+  const c = s.scoreCollegues > 0
+  const q = s.scoreClient > 0
+  const client = Math.min(p.poidsClient, p.poidsCollegues)
+  const maxCollegues = c && q ? p.poidsCollegues - client : c ? p.poidsCollegues : 0
+  const maxClient = c && q ? client : q ? p.poidsCollegues : 0
+  const r = (n: number) => Math.round(n * 10) / 10
+  return {
+    partManager: r((s.scoreManager * p.poidsManager) / 100),
+    partCollegues: r((s.scoreCollegues * maxCollegues) / 100),
+    partClient: r((s.scoreClient * maxClient) / 100),
+    maxManager: p.poidsManager,
+    maxCollegues: maxCollegues || p.poidsCollegues,
+    maxClient: maxClient || p.poidsCollegues,
+  }
+}
+
+type UtilisateurClasse = {
+  matricule: string
+  nom: string
+  prenom: string
+  role: string
+  direction: string | null
+  departement: string | null
+  service: string | null
+  site: { nom: string } | null
+}
+
+function versAgent(
+  utilisateurId: string,
+  u: UtilisateurClasse,
+  s: { scoreTotal: number; scoreCollegues: number; scoreManager: number; scoreClient: number },
+  poids: Poids,
+  arrondi = (n: number) => Math.round(n * 10) / 10
+): RawAgentScore {
+  const dir = u.direction?.trim() || u.site?.nom?.trim() || 'Direction DSM'
+  const dep = u.departement?.trim() || dir
+  const srv = u.service?.trim() || dep
+  return {
+    utilisateurId,
+    matricule: u.matricule,
+    nom: u.nom,
+    prenom: u.prenom,
+    direction: dir,
+    departement: dep,
+    service: srv,
+    siteNom: u.site?.nom?.trim() || dep,
+    scoreTotal: arrondi(s.scoreTotal),
+    scoreCollegues: arrondi(s.scoreCollegues),
+    scoreManager: arrondi(s.scoreManager),
+    scoreClient: arrondi(s.scoreClient),
+    // Une note vaut au minimum 1 : un score nul signifie « aucune évaluation de cette source ».
+    hasCollegues: s.scoreCollegues > 0,
+    hasManager: s.scoreManager > 0,
+    hasClient: s.scoreClient > 0,
+    rangGlobal: 0,
+    rangDirection: 0,
+    rangDepartement: 0,
+    rangService: 0,
+    isMajorGlobal: false,
+    isMajorDirection: false,
+    isMajorDepartement: false,
+    isMajorService: false,
+    totalInDirection: 0,
+    totalInDepartement: 0,
+    totalInService: 0,
+    ...parts(s, poids),
+  }
+}
+
+function grouper(list: RawAgentScore[], cle: (a: RawAgentScore) => string) {
+  const map = new Map<string, RawAgentScore[]>()
+  for (const a of list) map.set(cle(a), [...(map.get(cle(a)) ?? []), a])
+  return map
 }
 
 function computeRankings(rawList: RawAgentScore[]) {
-  // 2. Calcul du Rang Global (sur toute la campagne)
-  rawList.sort((a, b) => b.scoreTotal - a.scoreTotal || b.scoreManager - a.scoreManager || b.scoreCollegues - a.scoreCollegues)
-  rawList.forEach((agent, idx) => {
-    agent.rangGlobal = idx + 1
-    if (agent.rangGlobal === 1) {
-      agent.isMajorGlobal = true
-    }
+  const global = attribuerRangs(rawList, (a, rang) => {
+    a.rangGlobal = rang
+    a.isMajorGlobal = rang === 1
   })
 
-  // 3. Calcul des Rangs par Direction
-  const directionMap = new Map<string, RawAgentScore[]>()
-  for (const agent of rawList) {
-    const list = directionMap.get(agent.direction) || []
-    list.push(agent)
-    directionMap.set(agent.direction, list)
+  const classerGroupes = (
+    map: Map<string, RawAgentScore[]>,
+    appliquer: (a: RawAgentScore, rang: number, total: number) => void
+  ) => {
+    const out = new Map<string, RawAgentScore[]>()
+    for (const [nom, agents] of map) out.set(nom, attribuerRangs(agents, (a, rang) => appliquer(a, rang, agents.length)))
+    return out
   }
 
-  for (const [, agents] of directionMap.entries()) {
-    agents.sort((a, b) => b.scoreTotal - a.scoreTotal || b.scoreManager - a.scoreManager || b.scoreCollegues - a.scoreCollegues)
-    const count = agents.length
-    agents.forEach((agent, idx) => {
-      agent.rangDirection = idx + 1
-      agent.totalInDirection = count
-      if (agent.rangDirection === 1) {
-        agent.isMajorDirection = true
-      }
-    })
-  }
+  const parDirection = classerGroupes(grouper(global, (a) => a.direction), (a, rang, total) => {
+    a.rangDirection = rang
+    a.isMajorDirection = rang === 1
+    a.totalInDirection = total
+  })
+  const parDepartement = classerGroupes(grouper(global, (a) => a.departement), (a, rang, total) => {
+    a.rangDepartement = rang
+    a.isMajorDepartement = rang === 1
+    a.totalInDepartement = total
+  })
+  const parService = classerGroupes(grouper(global, (a) => a.service), (a, rang, total) => {
+    a.rangService = rang
+    a.isMajorService = rang === 1
+    a.totalInService = total
+  })
 
-  // 4. Calcul des Rangs par Département
-  const departementMap = new Map<string, RawAgentScore[]>()
-  for (const agent of rawList) {
-    const key = agent.departement
-    const list = departementMap.get(key) || []
-    list.push(agent)
-    departementMap.set(key, list)
-  }
+  const tri = <T extends { nom: string }>(arr: T[]) => arr.sort((a, b) => a.nom.localeCompare(b.nom, 'fr'))
 
-  for (const [, agents] of departementMap.entries()) {
-    agents.sort((a, b) => b.scoreTotal - a.scoreTotal || b.scoreManager - a.scoreManager || b.scoreCollegues - a.scoreCollegues)
-    const count = agents.length
-    agents.forEach((agent, idx) => {
-      agent.rangDepartement = idx + 1
-      agent.totalInDepartement = count
-      if (agent.rangDepartement === 1) {
-        agent.isMajorDepartement = true
-      }
-    })
-  }
-
-  // 5. Calcul des Rangs par Service / Cellule
-  const serviceMap = new Map<string, RawAgentScore[]>()
-  for (const agent of rawList) {
-    const key = agent.service
-    const list = serviceMap.get(key) || []
-    list.push(agent)
-    serviceMap.set(key, list)
-  }
-
-  for (const [, agents] of serviceMap.entries()) {
-    agents.sort((a, b) => b.scoreTotal - a.scoreTotal || b.scoreManager - a.scoreManager || b.scoreCollegues - a.scoreCollegues)
-    const count = agents.length
-    agents.forEach((agent, idx) => {
-      agent.rangService = idx + 1
-      agent.totalInService = count
-      if (agent.rangService === 1) {
-        agent.isMajorService = true
-      }
-    })
-  }
-
-  // 6. Construire les groupes hiérarchiques triés
-  const groupesDirection: Array<{
-    directionNom: string
-    scores: RawAgentScore[]
-    major: RawAgentScore | null
-  }> = []
-
-  for (const [directionNom, scores] of directionMap.entries()) {
-    groupesDirection.push({
-      directionNom,
+  const groupesDirection = tri([...parDirection].map(([nom, scores]) => ({ nom, scores })))
+    .map(({ nom, scores }) => ({ directionNom: nom, scores, major: scores[0] ?? null }))
+  const groupesDepartement = tri([...parDepartement].map(([nom, scores]) => ({ nom, scores })))
+    .map(({ nom, scores }) => ({ departementNom: nom, directionNom: scores[0]?.direction ?? '', scores, major: scores[0] ?? null }))
+  const groupesService = tri([...parService].map(([nom, scores]) => ({ nom, scores })))
+    .map(({ nom, scores }) => ({
+      serviceNom: nom,
+      departementNom: scores[0]?.departement ?? '',
+      directionNom: scores[0]?.direction ?? '',
       scores,
-      major: scores.length > 0 ? scores[0] : null,
-    })
-  }
-  groupesDirection.sort((a, b) => a.directionNom.localeCompare(b.directionNom))
-
-  const groupesDepartement: Array<{
-    departementNom: string
-    directionNom: string
-    scores: RawAgentScore[]
-    major: RawAgentScore | null
-  }> = []
-
-  for (const [departementNom, scores] of departementMap.entries()) {
-    const dirNom = scores[0]?.direction || ''
-    groupesDepartement.push({
-      departementNom,
-      directionNom: dirNom,
-      scores,
-      major: scores.length > 0 ? scores[0] : null,
-    })
-  }
-  groupesDepartement.sort((a, b) => a.departementNom.localeCompare(b.departementNom))
-
-  const groupesService: Array<{
-    serviceNom: string
-    departementNom: string
-    directionNom: string
-    scores: RawAgentScore[]
-    major: RawAgentScore | null
-  }> = []
-
-  for (const [serviceNom, scores] of serviceMap.entries()) {
-    const depNom = scores[0]?.departement || ''
-    const dirNom = scores[0]?.direction || ''
-    groupesService.push({
-      serviceNom,
-      departementNom: depNom,
-      directionNom: dirNom,
-      scores,
-      major: scores.length > 0 ? scores[0] : null,
-    })
-  }
-  groupesService.sort((a, b) => a.serviceNom.localeCompare(b.serviceNom))
-
-  // 7. Extraire la liste des Lauréats officiels
-  const majorGlobal = rawList.find((a) => a.rangGlobal === 1) || null
-
-  const majorsDirection = groupesDirection
-    .map((g) => ({
-      directionNom: g.directionNom,
-      major: g.major,
-      totalAgents: g.scores.length,
+      major: scores[0] ?? null,
     }))
-    .filter((m): m is { directionNom: string; major: RawAgentScore; totalAgents: number } => m.major !== null)
-
-  const majorsDepartement = groupesDepartement
-    .map((g) => ({
-      departementNom: g.departementNom,
-      directionNom: g.directionNom,
-      major: g.major,
-      totalAgents: g.scores.length,
-    }))
-    .filter((m): m is { departementNom: string; directionNom: string; major: RawAgentScore; totalAgents: number } => m.major !== null)
-
-  const majorsService = groupesService
-    .map((g) => ({
-      serviceNom: g.serviceNom,
-      departementNom: g.departementNom,
-      directionNom: g.directionNom,
-      major: g.major,
-      totalAgents: g.scores.length,
-    }))
-    .filter((m): m is { serviceNom: string; departementNom: string; directionNom: string; major: RawAgentScore; totalAgents: number } => m.major !== null)
 
   return {
+    tousLesScores: global,
     laureats: {
-      majorGlobal,
-      majorsDirection,
-      majorsDepartement,
-      majorsService,
+      majorGlobal: global[0] ?? null,
+      majorsDirection: groupesDirection.filter((g) => g.major).map((g) => ({ directionNom: g.directionNom, major: g.major!, totalAgents: g.scores.length })),
+      majorsDepartement: groupesDepartement.filter((g) => g.major).map((g) => ({ departementNom: g.departementNom, directionNom: g.directionNom, major: g.major!, totalAgents: g.scores.length })),
+      majorsService: groupesService.filter((g) => g.major).map((g) => ({ serviceNom: g.serviceNom, departementNom: g.departementNom, directionNom: g.directionNom, major: g.major!, totalAgents: g.scores.length })),
     },
     groupesDirection,
     groupesDepartement,
@@ -459,196 +194,90 @@ function computeRankings(rawList: RawAgentScore[]) {
   }
 }
 
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
+const SELECT_UTILISATEUR = {
+  matricule: true, nom: true, prenom: true, role: true,
+  direction: true, departement: true, service: true, site: { select: { nom: true } },
+} as const
 
-async function getFullClassementData(targetCampagneId?: string) {
-  const toutesLesCampagnes = await prisma.campagne.findMany({
-    select: {
-      id: true,
-      libelle: true,
-      statut: true,
-      dateDebut: true,
-      dateFin: true,
+async function listeCampagnes() {
+  const campagnes = await prisma.campagne.findMany({
+    select: { id: true, libelle: true, statut: true, dateDebut: true, dateFin: true },
+    orderBy: { dateDebut: 'desc' },
+  })
+  const annees = [...new Set(campagnes.map((c) => new Date(c.dateDebut).getFullYear()))].sort((a, b) => b - a)
+  const annuels = annees.map((annee) => ({
+    id: `ANNUEL_${annee}`,
+    libelle: `Palmarès annuel ${annee} (moyenne des campagnes)`,
+    statut: 'ANNUEL',
+    dateDebut: new Date(`${annee}-01-01`),
+    dateFin: new Date(`${annee}-12-31`),
+  }))
+  return { campagnes, toutesLesCampagnes: [...annuels, ...campagnes] }
+}
+
+async function palmaresAnnuel(annee: number, toutesLesCampagnes: unknown[]) {
+  // Seules les campagnes terminées entrent dans le palmarès annuel.
+  const campagnes = await prisma.campagne.findMany({
+    where: {
+      statut: { not: 'OUVERTE' },
+      dateDebut: { gte: new Date(`${annee}-01-01T00:00:00Z`), lte: new Date(`${annee}-12-31T23:59:59.999Z`) },
     },
-    orderBy: { createdAt: 'desc' },
+    select: { id: true },
+  })
+  const scores = await prisma.scoreFinal.findMany({
+    where: { campagneId: { in: campagnes.map((c) => c.id) } },
+    include: { utilisateur: { select: SELECT_UTILISATEUR } },
   })
 
-  const years = new Set(toutesLesCampagnes.map((c) => new Date(c.dateDebut).getFullYear()))
-  const sortedYears = Array.from(years).sort((a, b) => b - a)
-  const annualCampagnes = sortedYears.map(year => ({
-    id: `ANNUEL_${year}`,
-    libelle: `🏆 Palmarès Annuel ${year} (Moyenne)`,
-    statut: 'TERMINÉE' as any,
-    dateDebut: new Date(`${year}-01-01`),
-    dateFin: new Date(`${year}-12-31`),
-  }))
+  const parAgent = new Map<string, typeof scores>()
+  for (const s of scores) parAgent.set(s.utilisateurId, [...(parAgent.get(s.utilisateurId) ?? []), s])
 
-  const allCampagnesWithAnnual = [...annualCampagnes, ...toutesLesCampagnes]
+  const moy = (arr: typeof scores, k: 'scoreTotal' | 'scoreCollegues' | 'scoreManager' | 'scoreClient') =>
+    arr.reduce((acc, s) => acc + s[k], 0) / arr.length
 
-  const isAnnual = targetCampagneId?.startsWith('ANNUEL_')
-  const annualYear = isAnnual && targetCampagneId ? parseInt(targetCampagneId.split('_')[1]) : null
+  const rawList = [...parAgent]
+    .filter(([, arr]) => ROLES_CLASSES.has(arr[0].utilisateur.role))
+    .map(([id, arr]) =>
+      versAgent(id, arr[0].utilisateur, {
+        scoreTotal: moy(arr, 'scoreTotal'),
+        scoreCollegues: moy(arr, 'scoreCollegues'),
+        scoreManager: moy(arr, 'scoreManager'),
+        scoreClient: moy(arr, 'scoreClient'),
+      }, POIDS_PAR_DEFAUT)
+    )
 
-  if (isAnnual && annualYear) {
-    const campagnesOfYear = await prisma.campagne.findMany({
-      where: {
-        dateDebut: {
-          gte: new Date(`${annualYear}-01-01`),
-          lte: new Date(`${annualYear}-12-31T23:59:59.999Z`)
-        }
-      },
-      select: { id: true }
-    })
+  return {
+    campagne: {
+      id: `ANNUEL_${annee}`,
+      libelle: `Palmarès annuel ${annee}`,
+      statut: 'ANNUEL',
+      ...POIDS_PAR_DEFAUT,
+      nombreCampagnes: campagnes.length,
+      ...PRIX_PAR_DEFAUT,
+    },
+    provisoire: false,
+    toutesLesCampagnes,
+    ...computeRankings(rawList),
+  }
+}
 
-    const scoresFinales = await prisma.scoreFinal.findMany({
-      where: { campagneId: { in: campagnesOfYear.map(c => c.id) } },
-      include: {
-        utilisateur: {
-          include: { site: true }
-        }
-      }
-    })
+async function getFullClassementData(cible?: string) {
+  const { campagnes, toutesLesCampagnes } = await listeCampagnes()
 
-    const userMap = new Map<string, { scores: typeof scoresFinales, utilisateur: typeof scoresFinales[0]['utilisateur'] }>()
-    for (const sf of scoresFinales) {
-      if (!userMap.has(sf.utilisateurId)) {
-        userMap.set(sf.utilisateurId, { scores: [], utilisateur: sf.utilisateur })
-      }
-      userMap.get(sf.utilisateurId)!.scores.push(sf)
-    }
-
-    const rawList: RawAgentScore[] = []
-    for (const [userId, data] of userMap.entries()) {
-      const s = data.utilisateur
-      if (!s) continue
-      if (s.role === 'MANAGER' || s.role === 'EXTERNE' || s.role === 'ADMIN') continue
-
-      const count = data.scores.length
-      const sumTotal = data.scores.reduce((acc, curr) => acc + curr.scoreTotal, 0)
-      const sumCollegues = data.scores.reduce((acc, curr) => acc + curr.scoreCollegues, 0)
-      const sumManager = data.scores.reduce((acc, curr) => acc + curr.scoreManager, 0)
-      const sumClient = data.scores.reduce((acc, curr) => acc + curr.scoreClient, 0)
-
-      const dir = (s.direction && s.direction.trim()) || (s.site?.nom && s.site.nom.trim()) || 'Direction DSM'
-      const dep = (s.departement && s.departement.trim()) || dir || 'Département DSM'
-      const srv = (s.service && s.service.trim()) || dep || 'Service DSM'
-      const site = (s.site?.nom && s.site.nom.trim()) || dep || 'Siège DSM'
-
-      rawList.push({
-        utilisateurId: userId,
-        matricule: s.matricule,
-        nom: s.nom,
-        prenom: s.prenom,
-        direction: dir,
-        departement: dep,
-        service: srv,
-        siteNom: site,
-        scoreTotal: Math.round((sumTotal / count) * 10) / 10,
-        scoreCollegues: Math.round((sumCollegues / count) * 10) / 10,
-        scoreManager: Math.round((sumManager / count) * 10) / 10,
-        scoreClient: Math.round((sumClient / count) * 10) / 10,
-        hasCollegues: sumCollegues > 0,
-        hasManager: sumManager > 0,
-        hasClient: sumClient > 0,
-        rangGlobal: 0,
-        rangDirection: 0,
-        rangDepartement: 0,
-        rangService: 0,
-        isMajorGlobal: false,
-        isMajorDirection: false,
-        isMajorDepartement: false,
-        isMajorService: false,
-        totalInDirection: 0,
-        totalInDepartement: 0,
-        totalInService: 0,
-      })
-    }
-
-    const rankings = computeRankings(rawList)
-
-    return {
-      campagne: {
-        id: `ANNUEL_${annualYear}`,
-        libelle: `🏆 Palmarès Annuel ${annualYear}`,
-        statut: 'TERMINÉE',
-        poidsCollegues: 45,
-        poidsManager: 55,
-        prixGlobal: 'Super Lauréat Annuel (1 500 000 FCFA + Séjour)',
-        prixDirection: 'Super Lauréat Annuel (1 500 000 FCFA + Séjour)',
-        prixDepartement: 'Certificat de Mérite Annuel + Prime',
-        prixService: "Diplôme d'Honneur Annuel + Prime",
-      },
-      toutesLesCampagnes: allCampagnesWithAnnual as any,
-      laureats: rankings.laureats,
-      groupesDirection: rankings.groupesDirection,
-      groupesDepartement: rankings.groupesDepartement,
-      groupesService: rankings.groupesService,
-      tousLesScores: rawList,
-    }
+  if (cible?.startsWith('ANNUEL_')) {
+    const annee = Number.parseInt(cible.slice('ANNUEL_'.length), 10)
+    if (Number.isFinite(annee)) return palmaresAnnuel(annee, toutesLesCampagnes)
   }
 
-  let campagne = null
-  if (targetCampagneId) {
-    campagne = await prisma.campagne.findUnique({
-      where: { id: targetCampagneId },
-      include: {
-        scores: {
-          include: {
-            utilisateur: {
-              include: { site: true },
-            },
-          },
-          orderBy: { scoreTotal: 'desc' },
-        },
-      },
-    })
-  }
+  const choisie =
+    campagnes.find((c) => c.id === cible) ?? campagnes.find((c) => c.statut === 'OUVERTE') ?? campagnes[0]
 
-  // Si pas de campagne cible : Priorité absolue à la campagne en cours (OUVERTE)
-  if (!campagne) {
-    campagne = await prisma.campagne.findFirst({
-      where: { statut: 'OUVERTE' },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        scores: {
-          include: {
-            utilisateur: {
-              include: { site: true },
-            },
-          },
-          orderBy: { scoreTotal: 'desc' },
-        },
-      },
-    })
-  }
-
-  // Si pas de campagne OUVERTE, prendre la plus récente (tous statuts confondus)
-  if (!campagne) {
-    campagne = await prisma.campagne.findFirst({
-      orderBy: { createdAt: 'desc' },
-      include: {
-        scores: {
-          include: {
-            utilisateur: {
-              include: { site: true },
-            },
-          },
-          orderBy: { scoreTotal: 'desc' },
-        },
-      },
-    })
-  }
-
-  if (!campagne) {
+  if (!choisie) {
     return {
       campagne: null,
-      toutesLesCampagnes: allCampagnesWithAnnual as any,
-      laureats: {
-        majorGlobal: null,
-        majorsDirection: [],
-        majorsDepartement: [],
-        majorsService: [],
-      },
+      provisoire: false,
+      toutesLesCampagnes,
+      laureats: { majorGlobal: null, majorsDirection: [], majorsDepartement: [], majorsService: [] },
       groupesDirection: [],
       groupesDepartement: [],
       groupesService: [],
@@ -656,69 +285,22 @@ async function getFullClassementData(targetCampagneId?: string) {
     }
   }
 
-  // Calculer/Mettre à jour les scores automatiquement
-  await calculateScoresForCampagne(campagne.id)
+  const campagne = await prisma.campagne.findUniqueOrThrow({ where: { id: choisie.id } })
 
-  const updatedCampagne = await prisma.campagne.findUnique({
-    where: { id: campagne.id },
-    include: {
-      scores: {
-        include: {
-          utilisateur: {
-            include: { site: true },
-          },
-        },
-        orderBy: { scoreTotal: 'desc' },
-      },
-    },
+  // Campagne ouverte, ou close sans calcul enregistré : classement calculé à la volée, sans écriture.
+  const enregistres = await prisma.scoreFinal.findMany({ where: { campagneId: campagne.id } })
+  const provisoire = campagne.statut === 'OUVERTE' || enregistres.length === 0
+  const scores = provisoire ? await calculerScores(campagne.id) : enregistres
+
+  const utilisateurs = await prisma.utilisateur.findMany({
+    where: { id: { in: scores.map((s) => s.utilisateurId) } },
+    select: { id: true, ...SELECT_UTILISATEUR },
   })
+  const parId = new Map(utilisateurs.map((u) => [u.id, u]))
 
-  if (updatedCampagne) {
-    campagne = updatedCampagne
-  }
-
-  // 1. Extraire et normaliser les données de tous les agents évalués
-
-
-  const rawList: RawAgentScore[] = (campagne.scores || [])
-    .filter((s) => s.utilisateur && s.utilisateur.role !== 'MANAGER' && s.utilisateur.role !== 'EXTERNE' && s.utilisateur.role !== 'ADMIN')
-    .map((s) => {
-      const dir = (s.utilisateur.direction && s.utilisateur.direction.trim()) || (s.utilisateur.site?.nom && s.utilisateur.site.nom.trim()) || 'Direction DSM'
-      const dep = (s.utilisateur.departement && s.utilisateur.departement.trim()) || dir || 'Département DSM'
-      const srv = (s.utilisateur.service && s.utilisateur.service.trim()) || dep || 'Service DSM'
-      const site = (s.utilisateur.site?.nom && s.utilisateur.site.nom.trim()) || dep || 'Siège DSM'
-
-      return {
-        utilisateurId: s.utilisateurId,
-        matricule: s.utilisateur.matricule,
-        nom: s.utilisateur.nom,
-        prenom: s.utilisateur.prenom,
-        direction: dir,
-        departement: dep,
-        service: srv,
-        siteNom: site,
-        scoreTotal: Math.round(s.scoreTotal * 10) / 10,
-        scoreCollegues: Math.round(s.scoreCollegues * 10) / 10,
-        scoreManager: Math.round(s.scoreManager * 10) / 10,
-        scoreClient: Math.round(s.scoreClient * 10) / 10,
-        hasCollegues: s.scoreCollegues > 0,
-        hasManager: s.scoreManager > 0,
-        hasClient: s.scoreClient > 0,
-        rangGlobal: 0,
-        rangDirection: 0,
-        rangDepartement: 0,
-        rangService: 0,
-        isMajorGlobal: false,
-        isMajorDirection: false,
-        isMajorDepartement: false,
-        isMajorService: false,
-        totalInDirection: 0,
-        totalInDepartement: 0,
-        totalInService: 0,
-      }
-    })
-
-  const rankings = computeRankings(rawList)
+  const rawList = scores
+    .filter((s) => ROLES_CLASSES.has(parId.get(s.utilisateurId)?.role ?? ''))
+    .map((s) => versAgent(s.utilisateurId, parId.get(s.utilisateurId)!, s, campagne))
 
   return {
     campagne: {
@@ -727,17 +309,15 @@ async function getFullClassementData(targetCampagneId?: string) {
       statut: campagne.statut,
       poidsCollegues: campagne.poidsCollegues,
       poidsManager: campagne.poidsManager,
-      prixGlobal: campagne.prixGlobal || 'Super Lauréat Direction DSM (1 500 000 FCFA + Séjour familial & Gala AGL)',
-      prixDirection: campagne.prixDirection || 'Super Lauréat Direction DSM (1 500 000 FCFA + Séjour familial & Gala AGL)',
-      prixDepartement: campagne.prixDepartement || 'Certificat de Mérite + Prime (1 000 000 FCFA)',
-      prixService: campagne.prixService || "Diplôme d'Honneur + Prime (500 000 FCFA)",
+      poidsClient: campagne.poidsClient,
+      prixGlobal: campagne.prixGlobal || PRIX_PAR_DEFAUT.prixGlobal,
+      prixDirection: campagne.prixDirection || PRIX_PAR_DEFAUT.prixDirection,
+      prixDepartement: campagne.prixDepartement || PRIX_PAR_DEFAUT.prixDepartement,
+      prixService: campagne.prixService || PRIX_PAR_DEFAUT.prixService,
     },
-    laureats: rankings.laureats,
-    toutesLesCampagnes: allCampagnesWithAnnual as any,
-    groupesDirection: rankings.groupesDirection,
-    groupesDepartement: rankings.groupesDepartement,
-    groupesService: rankings.groupesService,
-    tousLesScores: rawList,
+    provisoire,
+    toutesLesCampagnes,
+    ...computeRankings(rawList),
   }
 }
 
@@ -746,64 +326,41 @@ export async function GET(request: NextRequest) {
   if (!admin) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
 
   try {
-    const { searchParams } = new URL(request.url)
-    const campagneId = searchParams.get('campagneId') || undefined
-    const data = await getFullClassementData(campagneId)
-    return NextResponse.json(data, {
-      headers: {
-        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0',
-      },
-    })
+    const campagneId = request.nextUrl.searchParams.get('campagneId') || undefined
+    return NextResponse.json(await getFullClassementData(campagneId), { headers: NO_STORE })
   } catch (error) {
-    console.error('Error fetching scores:', error)
+    console.error('GET /api/admin/classement error:', error)
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
   }
 }
 
+/**
+ * POST /api/admin/classement — enregistre le classement d'une campagne.
+ * Une campagne clôturée passe à CALCULEE ; une campagne ouverte garde son statut.
+ */
 export async function POST(request: NextRequest) {
   const admin = await requireAdmin()
   if (!admin) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
 
   try {
     const body = await request.json().catch(() => null)
-    let campagneId = body?.campagneId
-
-    if (!campagneId) {
-      const latest = await prisma.campagne.findFirst({ orderBy: { createdAt: 'desc' } })
-      campagneId = latest?.id
+    const campagneId = typeof body?.campagneId === 'string' ? body.campagneId : ''
+    const campagne = campagneId ? await prisma.campagne.findUnique({ where: { id: campagneId } }) : null
+    if (!campagne) {
+      return NextResponse.json({ error: 'Campagne introuvable' }, { status: 404 })
     }
 
-    if (!campagneId) {
-      return NextResponse.json({ error: 'Aucune campagne trouvée' }, { status: 404 })
+    await enregistrerScores(campagne.id)
+    if (campagne.statut === 'CLOTUREE') {
+      await prisma.campagne.update({ where: { id: campagne.id }, data: { statut: 'CALCULEE' } })
     }
-
-    await calculateScoresForCampagne(campagneId)
-
-    await prisma.campagne.update({
-      where: { id: campagneId },
-      data: { statut: 'CALCULEE' },
-    })
-
-    const freshData = await getFullClassementData(campagneId)
 
     return NextResponse.json(
-      {
-        success: true,
-        message: 'Classement recalculé et synchronisé avec succès',
-        ...freshData,
-      },
-      {
-        headers: {
-          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0',
-        },
-      }
+      { success: true, message: 'Classement recalculé et enregistré.', ...(await getFullClassementData(campagne.id)) },
+      { headers: NO_STORE }
     )
   } catch (error) {
-    console.error('Error in POST /api/admin/classement:', error)
+    console.error('POST /api/admin/classement error:', error)
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
   }
 }

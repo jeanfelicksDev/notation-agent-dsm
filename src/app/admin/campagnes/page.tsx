@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Plus, Calendar, CheckCircle, Clock, XCircle, ChevronRight, BarChart3, Users2, ClipboardList, Trophy } from 'lucide-react'
+import { ChevronRight, ClipboardList, Plus, Trophy } from 'lucide-react'
 import AdminHeader from '@/components/AdminHeader'
 
 interface Campagne {
@@ -16,218 +16,148 @@ interface Campagne {
   _count: { criteres: number; affectations: number }
 }
 
+const STATUTS: Record<string, { label: string; className: string }> = {
+  OUVERTE: { label: 'Ouverte', className: 'bg-emerald-50 text-emerald-800 ring-emerald-200' },
+  CLOTUREE: { label: 'Clôturée', className: 'bg-slate-100 text-slate-700 ring-slate-200' },
+  CALCULEE: { label: 'Classement enregistré', className: 'bg-navy-50 text-navy-800 ring-navy-200' },
+}
+
+const fmt = (d: string) => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
+
 export default function CampagnesPage() {
   const [campagnes, setCampagnes] = useState<Campagne[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
+  const [erreur, setErreur] = useState('')
+  const [annee, setAnnee] = useState<number>(new Date().getFullYear())
 
   useEffect(() => {
     fetch('/api/admin/campagnes')
-      .then(res => {
+      .then(async (res) => {
         if (res.status === 401) {
-          window.location.href = '/api/auth/login'
-          return null
+          window.location.href = '/?reason=admin_required'
+          return
         }
-        return res.json()
+        const data = await res.json()
+        if (Array.isArray(data)) setCampagnes(data)
+        else setErreur(data.error || 'Impossible de charger les campagnes.')
       })
-      .then(data => {
-        if (!data) return
-        if (Array.isArray(data)) {
-          setCampagnes(data)
-        } else {
-          console.error("API Error:", data)
-          setCampagnes([])
-        }
-      })
-      .catch(err => {
-        console.error("Fetch error:", err)
-        setCampagnes([])
-      })
+      .catch(() => setErreur('Connexion au serveur impossible.'))
       .finally(() => setLoading(false))
   }, [])
 
-  const sortedYears = useMemo(() => {
-    const years = Array.from(new Set(campagnes
-      .map(c => c.dateDebut ? new Date(c.dateDebut).getFullYear() : null)
-      .filter((y): y is number => y !== null && !isNaN(y))
-    ))
-    return years.length > 0 ? years.sort((a, b) => b - a) : [new Date().getFullYear()]
+  const annees = useMemo(() => {
+    const ys = [...new Set(campagnes.map((c) => new Date(c.dateDebut).getFullYear()))].sort((a, b) => b - a)
+    return ys.length ? ys : [new Date().getFullYear()]
   }, [campagnes])
 
-  // Met à jour l'année par défaut quand les campagnes sont chargées
-  useEffect(() => {
-    if (sortedYears.length > 0 && !sortedYears.includes(selectedYear)) {
-      setSelectedYear(sortedYears[0])
-    }
-  }, [sortedYears, selectedYear])
-
-  const getStatutBadge = (statut: string) => {
-    switch (statut) {
-      case 'OUVERTE':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-600 border border-emerald-100">
-            <Clock className="w-3.5 h-3.5" /> OUVERTE
-          </span>
-        )
-      case 'CLOTUREE':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-red-50 text-red-600 border border-red-100">
-            <XCircle className="w-3.5 h-3.5" /> CLÔTURÉE
-          </span>
-        )
-      case 'CALCULEE':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-600 border border-blue-100">
-            <CheckCircle className="w-3.5 h-3.5" /> CALCULÉE
-          </span>
-        )
-      default:
-        return null
-    }
-  }
-
-  const formatDate = (date: string) => {
-    try {
-      return new Date(date).toLocaleDateString('fr-FR', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric'
-      })
-    } catch {
-      return date
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="flex-1 flex flex-col min-w-0">
-        <AdminHeader title="Gestion des Campagnes" />
-        <div className="flex-1 flex items-center justify-center p-12">
-          <div className="h-12 w-12 rounded-full border-4 border-brand-100 border-t-brand-500 animate-spin"></div>
-        </div>
-      </div>
-    )
-  }
+  const anneeEffective = annees.includes(annee) ? annee : annees[0]
 
   return (
-    <div className="flex-1 flex flex-col min-w-0">
-        <AdminHeader title="Gestion des Campagnes" />
-        
-        <main className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-7xl mx-auto space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fade-in">
-              <div>
-                <p className="text-slate-500 font-medium">Suivez et configurez vos sessions d'évaluation.</p>
-              </div>
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="flex items-center bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-                  <select 
-                    value={selectedYear}
-                    onChange={(e) => setSelectedYear(Number(e.target.value))}
-                    className="px-4 py-2.5 bg-transparent text-sm font-bold text-slate-700 outline-none cursor-pointer border-r border-slate-200 hover:bg-slate-50"
-                  >
-                    {sortedYears.map(year => (
-                      <option key={year} value={year}>{year}</option>
-                    ))}
-                  </select>
-                  <Link 
-                    href={`/admin/classement?campagneId=ANNUEL_${selectedYear}`}
-                    className="inline-flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-4 py-2.5 font-bold transition-all active:scale-95"
-                    title="Générer le palmarès annuel"
-                  >
-                    <Trophy className="w-4 h-4" /> 
-                    <span className="hidden sm:inline">Palmarès Annuel</span>
-                  </Link>
-                </div>
-                <Link 
-                  href="/admin/campagnes/new" 
-                  className="inline-flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-brand-100 transition-all active:scale-95"
-                >
-                  <Plus className="w-5 h-5" /> Nouvelle campagne
-                </Link>
-              </div>
+    <>
+      <AdminHeader
+        title="Campagnes"
+        subtitle="Une seule campagne peut être ouverte à la fois."
+        actions={
+          <>
+            <div className="flex items-center overflow-hidden rounded-lg bg-white ring-1 ring-slate-300">
+              <label htmlFor="annee" className="sr-only">
+                Année du palmarès
+              </label>
+              <select
+                id="annee"
+                value={anneeEffective}
+                onChange={(e) => setAnnee(Number(e.target.value))}
+                className="h-10 border-r border-slate-200 bg-transparent px-3 text-sm text-slate-700 outline-none"
+              >
+                {annees.map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+              </select>
+              <Link
+                href={`/admin/classement?campagneId=ANNUEL_${anneeEffective}`}
+                className="inline-flex h-10 items-center gap-2 px-3.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                <Trophy className="h-4 w-4 text-gold-600" aria-hidden />
+                Palmarès annuel
+              </Link>
             </div>
+            <Link
+              href="/admin/campagnes/new"
+              className="inline-flex h-10 items-center gap-2 rounded-lg bg-navy-900 px-4 text-sm font-semibold text-white hover:bg-navy-800"
+            >
+              <Plus className="h-4 w-4" aria-hidden />
+              Nouvelle campagne
+            </Link>
+          </>
+        }
+      />
 
-            <div className="grid grid-cols-1 gap-6">
-              {campagnes.map((campagne, index) => (
-                <div 
-                  key={campagne.id} 
-                  className="animate-fade-in group"
-                  style={{ animationDelay: `${index * 100}ms` }}
-                >
-                  <div className="glass card-hover rounded-2xl border border-slate-200/50 p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-6 overflow-hidden relative">
-                    {/* Background accent */}
-                    <div className="absolute top-0 left-0 w-1.5 h-full premium-gradient opacity-80"></div>
-                    
-                    <div className="flex-1 space-y-4">
-                      <div className="flex flex-wrap items-center gap-3">
-                        <h3 className="text-xl font-display font-bold text-slate-900">{campagne.libelle}</h3>
-                        {getStatutBadge(campagne.statut)}
-                      </div>
-                      
-                      <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-                        <div className="flex items-center gap-2 text-slate-500">
-                          <Calendar className="w-4 h-4 text-slate-400" />
-                          <span className="text-sm font-medium">{formatDate(campagne.dateDebut)} — {formatDate(campagne.dateFin)}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-slate-500">
-                          <BarChart3 className="w-4 h-4 text-slate-400" />
-                          <span className="text-sm font-medium">{campagne._count?.criteres ?? 0} critères d'évaluation</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-slate-500">
-                          <Users2 className="w-4 h-4 text-slate-400" />
-                          <span className="text-sm font-medium">{campagne._count?.affectations ?? 0} agents concernés</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-8 lg:border-l border-slate-100 lg:pl-8">
-                      <div className="hidden sm:block">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Pondération</p>
-                        <div className="flex items-center gap-2">
-                          <div className="flex flex-col">
-                            <span className="text-sm font-bold text-slate-700">Collègues</span>
-                            <span className="text-xs text-brand-500">{campagne.poidsCollegues}%</span>
-                          </div>
-                          <div className="w-px h-6 bg-slate-200 mx-1"></div>
-                          <div className="flex flex-col">
-                            <span className="text-sm font-bold text-slate-700">Manager</span>
-                            <span className="text-xs text-amber-500">{campagne.poidsManager}%</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <Link 
-                        href={`/admin/campagnes/${campagne.id}`} 
-                        className="inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-xl font-bold text-sm shadow-md transition-all active:scale-95 whitespace-nowrap"
-                      >
-                        Gérer la session <ChevronRight className="w-4 h-4" />
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              ))}
-
-              {campagnes.length === 0 && (
-                <div className="glass rounded-2xl border border-dashed border-slate-300 p-12 text-center animate-fade-in">
-                  <div className="flex flex-col items-center gap-4 opacity-30">
-                    <ClipboardList className="w-16 h-16" />
-                    <div className="space-y-1">
-                      <p className="text-xl font-display font-bold">Aucune campagne</p>
-                      <p className="text-slate-500 font-medium">Commencez par créer votre première session d'évaluation.</p>
-                    </div>
-                  </div>
-                  <Link 
-                    href="/admin/campagnes/new" 
-                    className="mt-8 inline-flex items-center gap-2 text-brand-600 font-bold hover:underline"
-                  >
-                    <Plus className="w-5 h-5" /> Créer une campagne
-                  </Link>
-                </div>
-              )}
-            </div>
+      <main className="mx-auto w-full max-w-7xl px-5 py-6 sm:px-8 sm:py-8">
+        {loading ? (
+          <div className="space-y-3" aria-busy="true">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="h-24 animate-pulse rounded-[var(--radius-card)] bg-white" />
+            ))}
           </div>
-        </main>
-    </div>
+        ) : erreur ? (
+          <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-800">
+            {erreur}
+          </p>
+        ) : campagnes.length === 0 ? (
+          <div className="rounded-[var(--radius-card)] bg-white px-6 py-16 text-center shadow-card">
+            <ClipboardList className="mx-auto h-10 w-10 text-slate-300" aria-hidden />
+            <h2 className="mt-4 text-lg font-semibold text-navy-900">Aucune campagne pour le moment</h2>
+            <p className="mx-auto mt-1 max-w-sm text-sm text-slate-600">
+              Une campagne regroupe les critères, les affectations et le classement d’une période d’évaluation.
+            </p>
+            <Link
+              href="/admin/campagnes/new"
+              className="mt-6 inline-flex items-center gap-2 rounded-lg bg-navy-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-navy-800"
+            >
+              <Plus className="h-4 w-4" aria-hidden />
+              Créer la première campagne
+            </Link>
+          </div>
+        ) : (
+          <ul className="divide-y divide-slate-100 overflow-hidden rounded-[var(--radius-card)] bg-white shadow-card">
+            {campagnes.map((c) => {
+              const statut = STATUTS[c.statut]
+              return (
+                <li key={c.id}>
+                  <Link
+                    href={`/admin/campagnes/${c.id}`}
+                    className="group flex flex-col gap-3 px-6 py-5 transition-colors hover:bg-slate-50 sm:flex-row sm:items-center"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2.5">
+                        <h2 className="text-base font-semibold text-navy-900">{c.libelle}</h2>
+                        {statut && (
+                          <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ${statut.className}`}>{statut.label}</span>
+                        )}
+                      </div>
+                      <p className="mt-1 text-sm text-slate-600">
+                        {fmt(c.dateDebut)} – {fmt(c.dateFin)}
+                        <span className="text-slate-300"> · </span>
+                        {c._count.criteres} critères
+                        <span className="text-slate-300"> · </span>
+                        {c._count.affectations} affectations
+                      </p>
+                    </div>
+                    <p className="text-sm text-slate-600 tabular-nums sm:text-right">
+                      Manager <strong className="font-semibold text-slate-900">{c.poidsManager}</strong>
+                      <span className="text-slate-300"> / </span>
+                      Collègues & clients <strong className="font-semibold text-slate-900">{c.poidsCollegues}</strong>
+                    </p>
+                    <ChevronRight className="hidden h-5 w-5 text-slate-300 transition-colors group-hover:text-navy-700 sm:block" aria-hidden />
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </main>
+    </>
   )
 }

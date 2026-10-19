@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { codePrisma } from '@/lib/erreurs'
 import { requireAdmin } from '@/lib/auth'
 
 export async function GET(
@@ -39,7 +40,12 @@ export async function PATCH(
 
   try {
     const { id } = await params
-    const { nom, ville } = await request.json()
+    const body = await request.json().catch(() => ({}))
+    const nom = typeof body.nom === 'string' ? body.nom.trim() : ''
+    const ville = typeof body.ville === 'string' && body.ville.trim() ? body.ville.trim() : null
+    if (!nom) {
+      return NextResponse.json({ error: 'Le nom du site est requis' }, { status: 400 })
+    }
 
     const site = await prisma.site.update({
       where: { id },
@@ -49,6 +55,9 @@ export async function PATCH(
     return NextResponse.json(site)
   } catch (error) {
     console.error('Error:', error)
+    if (codePrisma(error) === 'P2002') {
+      return NextResponse.json({ error: 'Un site porte déjà ce nom.' }, { status: 409 })
+    }
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
   }
 }
@@ -75,8 +84,8 @@ export async function DELETE(
     })
 
     return NextResponse.json({ message: 'Site supprimé avec succès' })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error deleting site:', error)
-    return NextResponse.json({ error: 'Erreur lors de la suppression: ' + (error?.message || 'Erreur serveur') }, { status: 500 })
+    return NextResponse.json({ error: 'Erreur lors de la suppression du site' }, { status: 500 })
   }
 }

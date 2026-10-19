@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { codePrisma } from '@/lib/erreurs'
 import { requireAdmin } from '@/lib/auth'
 
 export async function GET() {
@@ -25,7 +26,9 @@ export async function POST(request: NextRequest) {
   if (!admin) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
 
   try {
-    const { nom, ville } = await request.json()
+    const body = await request.json().catch(() => ({}))
+    const nom = typeof body.nom === 'string' ? body.nom.trim() : ''
+    const ville = typeof body.ville === 'string' && body.ville.trim() ? body.ville.trim() : null
 
     if (!nom) {
       return NextResponse.json({ error: 'Le nom du site est requis' }, { status: 400 })
@@ -38,6 +41,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(site)
   } catch (error) {
     console.error('Error:', error)
+    if (codePrisma(error) === 'P2002') {
+      return NextResponse.json({ error: 'Un site porte déjà ce nom.' }, { status: 409 })
+    }
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
   }
 }

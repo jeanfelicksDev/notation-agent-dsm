@@ -1,14 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { requireAdmin } from '@/lib/auth'
-import { Resend } from 'resend'
+import { emailConfigure, emailEstReel, envoyerRelance } from '@/lib/email'
 
-const RESEND_API_KEY = process.env.RESEND_API_KEY
-const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev'
-const APP_NAME = 'Notation DSM Premium'
-
-const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null
-
+/** POST — relance par email les évaluateurs internes qui n'ont pas soumis leurs évaluations. */
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -23,12 +18,10 @@ export async function POST(
       where: { id },
       include: {
         affectations: {
-          where: {
-            statut: { in: ['EN_ATTENTE', 'BROUILLON'] },
-          },
+          where: { statut: { in: ['EN_ATTENTE', 'BROUILLON'] }, evaluateur: { role: { not: 'EXTERNE' } } },
           include: {
-            evaluateur: true,
-            evalue: true,
+            evaluateur: { select: { id: true, email: true, prenom: true, nom: true } },
+            evalue: { select: { prenom: true, nom: true } },
           },
         },
       },
@@ -37,82 +30,55 @@ export async function POST(
     if (!campagne) {
       return NextResponse.json({ error: 'Campagne introuvable' }, { status: 404 })
     }
-
+    if (campagne.statut !== 'OUVERTE') {
+      return NextResponse.json({ error: 'Les relances ne concernent que la campagne ouverte.' }, { status: 400 })
+    }
     if (campagne.affectations.length === 0) {
-      return NextResponse.json({
-        success: true,
-        message: 'Toutes les évaluations de cette campagne sont déjà finalisées ! Aucune relance nécessaire.',
-        count: 0,
-      })
+      return NextResponse.json({ success: true, message: 'Toutes les évaluations sont soumises : aucune relance nécessaire.', count: 0 })
+    }
+    if (!emailConfigure) {
+      return NextResponse.json(
+        { error: "L'envoi d'emails n'est pas configuré (RESEND_API_KEY manquante). Aucune relance n'a été envoyée." },
+        { status: 503 }
+      )
     }
 
-    // Grouper les affectations en attente par évaluateur
-    const mapByEvaluateur = new Map<
-      string,
-      {
-        evaluateur: (typeof campagne.affectations)[0]['evaluateur']
-        evalues: string[]
-      }
-    >()
-
-    for (const aff of campagne.affectations) {
-      const entry = mapByEvaluateur.get(aff.evaluateurId) || {
-        evaluateur: aff.evaluateur,
-        evalues: [],
-      }
-      entry.evalues.push(`${aff.evalue.prenom} ${aff.evalue.nom}`)
-      mapByEvaluateur.set(aff.evaluateurId, entry)
+    const parEvaluateur = new Map<string, { evaluateur: (typeof campagne.affectations)[0]['evaluateur']; noms: string[] }>()
+    for (const a of campagne.affectations) {
+      const entree = parEvaluateur.get(a.evaluateurId) ?? { evaluateur: a.evaluateur, noms: [] }
+      entree.noms.push(`${a.evalue.prenom} ${a.evalue.nom}`)
+      parEvaluateur.set(a.evaluateurId, entree)
     }
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin || 'http://localhost:3000'
-    let sentCount = 0
+    const url = `${process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin}/evaluer`
+    let envoyes = 0
+    let sansEmail = 0
+    let echecs = 0
 
-    for (const [, item] of mapByEvaluateur.entries()) {
-      const toEmail = item.evaluateur.email
-      const recipientName = `${item.evaluateur.prenom} ${item.evaluateur.nom}`
-      const pendingCount = item.evalues.length
-
-      if (resend && toEmail) {
-        try {
-          await resend.emails.send({
-            from: `${APP_NAME} <${FROM_EMAIL}>`,
-            to: toEmail,
-            subject: `[Rappel] Vos évaluations DSM TAMIS en attente (${campagne.libelle})`,
-            html: `
-              <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 16px;">
-                <h2 style="color: #004180;">Rappel d'évaluation DSM TAMIS</h2>
-                <p>Bonjour <strong>${recipientName}</strong>,</p>
-                <p>La campagne <strong>${campagne.libelle}</strong> est actuellement en cours et nous constatons que vous avez encore <strong>${pendingCount} évaluation(s) en attente</strong> :</p>
-                <ul style="background: #f8fafc; padding: 16px 24px; border-radius: 8px; color: #334155;">
-                  ${item.evalues.slice(0, 8).map((name) => `<li>${name}</li>`).join('')}
-                  ${item.evalues.length > 8 ? `<li>... et ${item.evalues.length - 8} autre(s)</li>` : ''}
-                </ul>
-                <p style="margin: 24px 0;">
-                  <a href="${appUrl}/evaluer" style="background: #0a84ff; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
-                    Compléter mes notations
-                  </a>
-                </p>
-                <p style="font-size: 12px; color: #64748b;">Date limite de la campagne : ${new Date(campagne.dateFin).toLocaleDateString('fr-FR')}</p>
-              </div>
-            `,
-          })
-          sentCount++
-        } catch (e) {
-          console.error(`Erreur d'envoi relance email à ${toEmail}:`, e)
-        }
-      } else {
-        // En mode console/dev
-        sentCount++
+    for (const { evaluateur, noms } of parEvaluateur.values()) {
+      if (!emailEstReel(evaluateur.email)) {
+        sansEmail++
+        continue
       }
+      const ok = await envoyerRelance({
+        to: evaluateur.email,
+        prenom: evaluateur.prenom,
+        nom: evaluateur.nom,
+        campagne: campagne.libelle,
+        dateFin: campagne.dateFin,
+        collaborateurs: noms,
+        url,
+      }).catch(() => false)
+      if (ok) envoyes++
+      else echecs++
     }
 
-    return NextResponse.json({
-      success: true,
-      message: `${sentCount} évaluateur(s) relancé(s) pour un total de ${campagne.affectations.length} évaluation(s) restante(s).`,
-      count: sentCount,
-      totalPending: campagne.affectations.length,
-    })
-  } catch (error: any) {
+    const details = [`${envoyes} évaluateur(s) relancé(s)`]
+    if (sansEmail) details.push(`${sansEmail} sans adresse email valide`)
+    if (echecs) details.push(`${echecs} envoi(s) en échec`)
+
+    return NextResponse.json({ success: true, message: `${details.join(', ')}.`, count: envoyes, sansEmail, echecs })
+  } catch (error) {
     console.error('Erreur lors des relances:', error)
     return NextResponse.json({ error: 'Erreur serveur lors des relances' }, { status: 500 })
   }

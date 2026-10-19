@@ -1,13 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import prisma, { Prisma } from '@/lib/prisma'
+import prisma from '@/lib/prisma'
 import { getSessionUser } from '@/lib/auth'
+import { ErreurNotation, preparerNotation, type NoteEntrante } from '@/lib/notation'
 
-type IncomingNote = {
-  critereId: string
-  valeur: number
-  commentaire?: string | null
-}
-
+/** POST /api/evaluation/save — enregistre le brouillon d'un collaborateur. */
 export async function POST(request: NextRequest) {
   try {
     const sessionUser = await getSessionUser()
@@ -16,121 +12,42 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json().catch(() => null)
-    if (!body || typeof body !== 'object') {
-      return NextResponse.json({ error: 'Corps invalide' }, { status: 400 })
-    }
-
-    const evalueId = typeof body.evalueId === 'string' ? body.evalueId : ''
-    const notes: IncomingNote[] = Array.isArray(body.notes) ? body.notes : []
-
+    const evalueId = typeof body?.evalueId === 'string' ? body.evalueId : ''
+    const notes: NoteEntrante[] = Array.isArray(body?.notes) ? body.notes : []
     if (!evalueId) {
-      return NextResponse.json({ error: 'evalueId requis' }, { status: 400 })
+      return NextResponse.json({ error: 'Collaborateur manquant' }, { status: 400 })
     }
 
-    // Interdire formellement l'auto-évaluation
-    if (evalueId === sessionUser.id) {
-      return NextResponse.json(
-        { error: "L'auto-évaluation est strictement interdite" },
-        { status: 403 }
-      )
-    }
+    const { campagne, valider } = await preparerNotation(sessionUser.id, [evalueId])
+    const valides = valider(notes.map((n) => ({ ...n, evalueId })))
 
-    const campagne = await prisma.campagne.findFirst({
-      where: { statut: 'OUVERTE' },
-    })
-
-    if (!campagne) {
-      return NextResponse.json({ error: 'Aucune campagne ouverte' }, { status: 404 })
-    }
-
-    // S'assurer que l'évaluateur a bien été affecté à cet évalué pour cette campagne
-    const affectation = await prisma.affectation.findUnique({
-      where: {
-        evaluateurId_evalueId_campagneId: {
-          evaluateurId: sessionUser.id,
-          evalueId,
-          campagneId: campagne.id,
-        },
-      },
-    })
-
-    if (!affectation) {
-      return NextResponse.json(
-        { error: 'Vous n\'êtes pas affecté à cette évaluation' },
-        { status: 403 }
-      )
-    }
-
-    if (affectation.statut === 'TERMINEE') {
-      return NextResponse.json(
-        { error: 'Cette évaluation a déjà été soumise et est verrouillée' },
-        { status: 409 }
-      )
-    }
-
-    const existingNotes = await prisma.note.findMany({
-      where: {
-        evaluateurId: sessionUser.id,
-        evalueId,
-        campagneId: campagne.id,
-      },
-    })
-    const existingMap = new Map(existingNotes.map((n: any) => [n.critereId, n]))
-
-    const operations: Prisma.PrismaPromise<unknown>[] = []
-
-    for (const note of notes) {
-      if (typeof note?.critereId !== 'string') continue
-      if (typeof note.valeur !== 'number' || note.valeur <= 0) continue
-
-      const existing = existingMap.get(note.critereId) as any
-
-      // Upsert : idempotent même en cas de sauvegardes concurrentes
-      operations.push(
+    await prisma.$transaction([
+      ...valides.map((n) =>
         prisma.note.upsert({
           where: {
             evaluateurId_evalueId_critereId_campagneId: {
               evaluateurId: sessionUser.id,
               evalueId,
-              critereId: note.critereId,
+              critereId: n.critereId,
               campagneId: campagne.id,
             },
           },
-          update: {
-            valeur: note.valeur,
-            commentaire: note.commentaire ?? null,
-          },
-          create: {
-            valeur: note.valeur,
-            commentaire: note.commentaire ?? null,
-            evaluateurId: sessionUser.id,
-            evalueId,
-            critereId: note.critereId,
-            campagneId: campagne.id,
-          },
+          update: { valeur: n.valeur, commentaire: n.commentaire },
+          create: { ...n, evaluateurId: sessionUser.id, campagneId: campagne.id },
         })
-      )
-    }
-
-    operations.push(
+      ),
       prisma.affectation.update({
-        where: {
-          evaluateurId_evalueId_campagneId: {
-            evaluateurId: sessionUser.id,
-            evalueId,
-            campagneId: campagne.id,
-          },
-        },
+        where: { evaluateurId_evalueId_campagneId: { evaluateurId: sessionUser.id, evalueId, campagneId: campagne.id } },
         data: { statut: 'BROUILLON' },
-      })
-    )
+      }),
+    ])
 
-    await prisma.$transaction(operations)
-
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, savedAt: new Date().toISOString() })
   } catch (error) {
-    console.error('Error saving draft:', error)
-    const msg = error instanceof Error ? error.message : 'Inconnue'
-    return NextResponse.json({ error: 'Erreur serveur: ' + msg }, { status: 500 })
+    if (error instanceof ErreurNotation) {
+      return NextResponse.json({ error: error.message }, { status: error.status })
+    }
+    console.error('evaluation/save error:', error)
+    return NextResponse.json({ error: "Le brouillon n'a pas pu être enregistré." }, { status: 500 })
   }
 }

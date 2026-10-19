@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { requireAdmin } from '@/lib/auth'
+import { codePrisma } from '@/lib/erreurs'
+import { normalizeMatricule, requireAdmin } from '@/lib/auth'
 import * as XLSX from 'xlsx'
 
-function getFieldValue(row: any, fieldKeys: string[]): string {
+function getFieldValue(row: Record<string, unknown>, fieldKeys: string[]): string {
   for (const key of fieldKeys) {
     if (row[key] !== undefined && row[key] !== null && String(row[key]).trim() !== '') {
       return String(row[key]).trim()
@@ -28,13 +29,17 @@ export async function POST(req: NextRequest) {
     const workbook = XLSX.read(buffer, { type: 'array' })
     const sheetName = workbook.SheetNames[0]
     const sheet = workbook.Sheets[sheetName]
-    const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet)
+    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet)
 
     if (!rows || rows.length === 0) {
       return NextResponse.json({ error: 'Fichier vide ou format non reconnu' }, { status: 400 })
     }
 
-    let processedCount = 0
+    let crees = 0
+    let misAJour = 0
+    let ignores = 0
+    const erreurs: string[] = []
+    const sitesCache = new Map<string, { id: string }>()
 
     // PASS 1: Create or Update users and sites
     for (const row of rows) {
@@ -81,21 +86,21 @@ export async function POST(req: NextRequest) {
         'Matricule(collaborateurs)',
       ])
 
-      if (!matriculeOrTel) continue
-
-      const finalMatricule = matriculeOrTel
-      const telephoneValue = role === 'EXTERNE' 
-        ? matriculeOrTel 
-        : (getFieldValue(row, ['Téléphone', 'Telephone', 'Tel', 'Téléphone (client externe)', 'Telephone (client externe)']) || undefined)
-
-      let email = getFieldValue(row, ['Email *', 'Email', 'EMAIL', 'email', 'E-mail'])
-      if (!email) {
-        const cleanMatricule = finalMatricule.toLowerCase().replace(/[^a-z0-9]/g, '')
-        email = `${cleanMatricule || 'user-' + Date.now()}@dsm.local`
+      if (!matriculeOrTel) {
+        ignores++
+        continue
       }
 
+      const finalMatricule = normalizeMatricule(matriculeOrTel)
+      const telephoneValue = role === 'EXTERNE'
+        ? matriculeOrTel
+        : (getFieldValue(row, ['Téléphone', 'Telephone', 'Tel', 'Téléphone (client externe)', 'Telephone (client externe)']) || undefined)
+
+      const emailFourni = getFieldValue(row, ['Email *', 'Email', 'EMAIL', 'email', 'E-mail']).toLowerCase()
+      const emailParDefaut = `${finalMatricule.toLowerCase().replace(/[^a-z0-9]/g, '') || 'user-' + Date.now()}@dsm.local`
+
       const service = getFieldValue(row, ['Service', 'SERVICE', 'service', 'Service / Département'])
-      
+
       const departement = getFieldValue(row, [
         'Département',
         'Departement',
@@ -113,53 +118,77 @@ export async function POST(req: NextRequest) {
         'direction'
       ])
 
-      const siteNom = departement || direction || 'Siège'
+      // Une colonne « Site » explicite prime ; à défaut on garde l'ancien regroupement.
+      const siteNom = getFieldValue(row, ['Site', 'SITE', 'site', 'Localisation']) || departement || direction || 'Siège'
 
-      // Find or create Site
-      let site = await prisma.site.findUnique({ where: { nom: siteNom } })
+      let site = sitesCache.get(siteNom)
       if (!site) {
-        site = await prisma.site.create({ data: { nom: siteNom } })
+        site = await prisma.site.upsert({ where: { nom: siteNom }, update: {}, create: { nom: siteNom } })
+        sitesCache.set(siteNom, site)
       }
 
-      // Upsert User
-      await prisma.utilisateur.upsert({
-        where: { matricule: finalMatricule },
-        update: {
-          nom,
-          prenom,
-          email,
-          service,
-          departement,
-          direction,
-          role,
-          site: { connect: { id: site.id } },
-          telephone: telephoneValue,
-        },
-        create: {
-          matricule: finalMatricule,
-          nom,
-          prenom,
-          email,
-          motDePasse: '123456', // Default password
-          service,
-          departement,
-          direction,
-          role,
-          site: { connect: { id: site.id } },
-          telephone: telephoneValue,
-        },
-      })
+      try {
+        const existant = await prisma.utilisateur.findFirst({
+          where: { matricule: { equals: finalMatricule, mode: 'insensitive' } },
+          select: { id: true, role: true },
+        })
 
-      processedCount++
+        if (existant) {
+          await prisma.utilisateur.update({
+            where: { id: existant.id },
+            data: {
+              nom,
+              prenom,
+              // On n'écrase jamais un email réel par un email généré.
+              ...(emailFourni ? { email: emailFourni } : {}),
+              service: service || null,
+              departement: departement || null,
+              direction: direction || null,
+              // Un administrateur n'est jamais rétrogradé par un import.
+              ...(existant.role === 'ADMIN' ? {} : { role }),
+              site: { connect: { id: site.id } },
+              ...(telephoneValue ? { telephone: telephoneValue } : {}),
+            },
+          })
+          misAJour++
+        } else {
+          await prisma.utilisateur.create({
+            data: {
+              matricule: finalMatricule,
+              nom,
+              prenom,
+              email: emailFourni || emailParDefaut,
+              motDePasse: '', // PIN à définir par l'agent à sa première connexion
+              service: service || null,
+              departement: departement || null,
+              direction: direction || null,
+              role: role === 'ADMIN' ? 'UTILISATEUR' : role,
+              site: { connect: { id: site.id } },
+              telephone: telephoneValue,
+            },
+          })
+          crees++
+        }
+      } catch (err) {
+        erreurs.push(`${finalMatricule} : ${codePrisma(err) === 'P2002' ? 'email déjà utilisé par un autre agent' : 'ligne invalide'}`)
+      }
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      message: `${processedCount} participants importés / mis à jour.` 
+    const parts = [`${crees} créé(s)`, `${misAJour} mis à jour`]
+    if (ignores) parts.push(`${ignores} ligne(s) sans matricule ignorée(s)`)
+    if (erreurs.length) parts.push(`${erreurs.length} en erreur`)
+
+    return NextResponse.json({
+      success: true,
+      message: `Import terminé : ${parts.join(', ')}.`,
+      crees,
+      misAJour,
+      ignores,
+      erreurs: erreurs.slice(0, 50),
     })
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Import error:', error)
-    return NextResponse.json({ error: 'Erreur lors de l\'importation: ' + error.message }, { status: 500 })
+    return NextResponse.json({ error: "Erreur lors de l'importation : vérifiez le format du fichier." }, { status: 500 })
   }
 }

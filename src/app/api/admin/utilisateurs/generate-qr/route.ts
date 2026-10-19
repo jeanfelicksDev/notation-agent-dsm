@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { randomBytes } from 'node:crypto'
 import prisma from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
 import { requireAdmin } from '@/lib/auth'
 
 /**
@@ -18,15 +19,15 @@ export async function POST(request: NextRequest) {
     const { userIds, forceRegenerate, enableAllAgents } = body
 
     if (enableAllAgents) {
-      // Enable qrcodeActif for all non-admin agents
+      // Active la notation QR pour tous les agents internes (ni administrateurs, ni clients externes)
       await prisma.utilisateur.updateMany({
-        where: { role: { not: 'ADMIN' } },
+        where: { role: { in: ['UTILISATEUR', 'MANAGER'] } },
         data: { qrcodeActif: true }
       })
     }
 
     // Find users with qrcodeActif: true
-    const whereClause: any = { qrcodeActif: true }
+    const whereClause: Prisma.UtilisateurWhereInput = { qrcodeActif: true }
     if (Array.isArray(userIds) && userIds.length > 0) {
       whereClause.id = { in: userIds }
     } else if (!forceRegenerate) {
@@ -60,8 +61,8 @@ export async function POST(request: NextRequest) {
       generatedCount,
       totalActive: targetUsers.length
     })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error generating QR codes:', error)
-    return NextResponse.json({ error: 'Erreur lors de la génération des codes QR: ' + error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Erreur lors de la génération des codes QR' }, { status: 500 })
   }
 }

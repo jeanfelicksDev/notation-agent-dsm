@@ -13,11 +13,9 @@ export default async function AdminLayout({
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
-      <Sidebar />
-      <div className="flex-1 dsm-page-with-sidebar flex flex-col min-w-0">
-        {children}
-      </div>
+    <div className="min-h-screen bg-canvas">
+      <Sidebar admin={{ prenom: admin.prenom, nom: admin.nom }} />
+      <div className="dsm-page-with-sidebar flex min-h-screen min-w-0 flex-col">{children}</div>
     </div>
   )
 }

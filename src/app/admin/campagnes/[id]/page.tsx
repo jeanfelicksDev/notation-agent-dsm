@@ -10,8 +10,8 @@ import {
   RefreshCw, Loader2, Target, UserCheck, ArrowLeftRight, FileSpreadsheet, 
   ExternalLink, Building2, FolderGit2, Sparkles, Crown, ListOrdered, Eye, EyeOff, Filter
 } from 'lucide-react'
-import Sidebar from '@/components/Sidebar'
 import AdminHeader from '@/components/AdminHeader'
+import { confirmer, toast } from '@/components/ui/feedback'
 import { getAppreciationInfo } from '@/lib/default-criteres'
 
 interface Critere {
@@ -49,6 +49,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
     dateFin: '',
     poidsCollegues: 45,
     poidsManager: 55,
+    poidsClient: 25,
     statut: 'OUVERTE',
     prixGlobal: '',
     prixDirection: '',
@@ -76,19 +77,26 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
   const [calculating, setCalculating] = useState(false)
 
   const handleSeedOfficialCriteres = async () => {
-    if (!confirm('Rétablir la grille officielle DSM standard (15 critères) pour cette campagne ?')) return
+    const ok = await confirmer({
+      titre: 'Remplacer les critères par la grille officielle ?',
+      message: 'Tous les critères actuels seront supprimés, ainsi que toutes les notes déjà données sur cette campagne. Cette action est irréversible.',
+      confirmer: 'Remplacer les critères',
+      danger: true,
+      saisieRequise: 'REMPLACER',
+    })
+    if (!ok) return
     setSeedingCriteres(true)
     try {
       const res = await fetch(`/api/admin/campagnes/${id}/seed-criteres`, { method: 'POST' })
       const data = await res.json()
       if (res.ok && data.criteres) {
         setCriteres(data.criteres)
-        alert('Grille officielle des 15 critères DSM rétablie avec succès !')
+        toast.success(data.message)
       } else {
-        alert(data.error || 'Erreur lors du rétablissement')
+        toast.error(data.error || 'La grille officielle n’a pas pu être appliquée.')
       }
     } catch {
-      alert('Erreur réseau')
+      toast.error('Connexion au serveur impossible.')
     } finally {
       setSeedingCriteres(false)
     }
@@ -114,6 +122,13 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
   }
 
   useEffect(() => {
+    const onglet = new URLSearchParams(window.location.search).get('onglet')
+    if (onglet && ['config', 'criteres', 'affectations', 'suivi', 'prix', 'classement'].includes(onglet)) {
+      setActiveTab(onglet as typeof activeTab)
+    }
+  }, [])
+
+  useEffect(() => {
     fetch(`/api/admin/campagnes/${id}`)
       .then(res => res.json())
       .then(data => {
@@ -126,11 +141,12 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
             dateFin: data.dateFin ? new Date(data.dateFin).toISOString().split('T')[0] : '',
             poidsCollegues: data.poidsCollegues ?? 45,
             poidsManager: data.poidsManager ?? 55,
+            poidsClient: data.poidsClient ?? 25,
             statut: data.statut || 'OUVERTE',
-            prixGlobal: data.prixGlobal ?? 'Dotation Spéciale + Prime (250 000 FCFA)',
-            prixDirection: data.prixDirection ?? "Dotation Spéciale + Prime (250 000 FCFA)",
-            prixDepartement: data.prixDepartement ?? "Tableau d'honneur + Prime (100 000 FCFA)",
-            prixService: data.prixService ?? "Tableau d'honneur"
+            prixGlobal: data.prixGlobal ?? '',
+            prixDirection: data.prixDirection ?? '',
+            prixDepartement: data.prixDepartement ?? '',
+            prixService: data.prixService ?? ''
           })
         }
       })
@@ -170,23 +186,36 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
   }
 
   const handleDelete = async () => {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer cette campagne ?')) return
+    const ok = await confirmer({
+      titre: `Supprimer la campagne « ${formData.libelle} » ?`,
+      message: 'Ses critères, affectations, notes et scores seront définitivement supprimés.',
+      confirmer: 'Supprimer la campagne',
+      danger: true,
+      saisieRequise: 'SUPPRIMER',
+    })
+    if (!ok) return
 
     try {
       const res = await fetch(`/api/admin/campagnes/${id}`, { method: 'DELETE' })
       if (res.ok) {
+        toast.success('Campagne supprimée.')
         router.push('/admin/campagnes')
       } else {
-        const data = await res.json()
-        alert(data.error || 'Erreur lors de la suppression')
+        const data = await res.json().catch(() => ({}))
+        toast.error(data.error || 'La suppression a échoué.')
       }
-    } catch (err) {
-      alert('Erreur de connexion')
+    } catch {
+      toast.error('Connexion au serveur impossible.')
     }
   }
 
   const handleCloture = async () => {
-    if (!confirm('Voulez-vous vraiment clôturer cette campagne ? Les votes seront figés et les scores seront calculés.')) return
+    const ok = await confirmer({
+      titre: 'Clôturer la campagne ?',
+      message: 'Les évaluateurs ne pourront plus noter. Le classement sera calculé et enregistré à partir des seules évaluations soumises.',
+      confirmer: 'Clôturer et calculer',
+    })
+    if (!ok) return
     setClosing(true)
     setError('')
     try {
@@ -195,22 +224,21 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ statut: 'CLOTUREE' })
       })
+      const data = await res.json().catch(() => ({}))
       if (res.ok) {
-        setFormData(prev => ({ ...prev, statut: 'CLOTUREE' }))
-        await handleCalculScores(false)
-        alert('Campagne clôturée et scores calculés avec succès !')
+        setFormData(prev => ({ ...prev, statut: data.statut ?? 'CALCULEE' }))
+        toast.success('Campagne clôturée, classement enregistré.')
       } else {
-        const data = await res.json()
-        setError(data.error || 'Erreur lors de la clôture')
+        setError(data.error || 'La clôture a échoué.')
       }
     } catch {
-      setError('Erreur de connexion')
+      setError('Connexion au serveur impossible.')
     } finally {
       setClosing(false)
     }
   }
 
-  const handleCalculScores = async (showAlert = true) => {
+  const handleCalculScores = async () => {
     setCalculating(true)
     setError('')
     try {
@@ -219,29 +247,27 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ campagneId: id })
       })
+      const data = await res.json().catch(() => ({}))
       if (res.ok) {
-        await fetch(`/api/admin/campagnes/${id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ statut: 'CALCULEE' })
-        })
-        setFormData(prev => ({ ...prev, statut: 'CALCULEE' }))
-        if (showAlert) {
-          alert('Scores et palmarès de la campagne calculés avec succès !')
-        }
+        if (data.campagne?.statut) setFormData(prev => ({ ...prev, statut: data.campagne.statut }))
+        toast.success('Classement recalculé et enregistré.')
       } else {
-        const data = await res.json()
-        setError(data.error || 'Erreur lors du calcul des scores')
+        setError(data.error || 'Le calcul des scores a échoué.')
       }
     } catch {
-      setError('Erreur de connexion')
+      setError('Connexion au serveur impossible.')
     } finally {
       setCalculating(false)
     }
   }
 
   const handleRouvrir = async () => {
-    if (!confirm('Voulez-vous rouvrir cette campagne ? La notation redeviendra active pour les évaluateurs.')) return
+    const ok = await confirmer({
+      titre: 'Rouvrir la campagne ?',
+      message: 'Les évaluateurs pourront de nouveau noter. Le classement redeviendra provisoire jusqu’à la prochaine clôture.',
+      confirmer: 'Rouvrir',
+    })
+    if (!ok) return
     setSaving(true)
     setError('')
     try {
@@ -252,13 +278,13 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
       })
       if (res.ok) {
         setFormData(prev => ({ ...prev, statut: 'OUVERTE' }))
-        alert('La campagne est de nouveau ouverte !')
+        toast.success('La campagne est de nouveau ouverte.')
       } else {
-        const data = await res.json()
-        setError(data.error || 'Erreur lors de la réouverture')
+        const data = await res.json().catch(() => ({}))
+        setError(data.error || 'La réouverture a échoué.')
       }
     } catch {
-      setError('Erreur de connexion')
+      setError('Connexion au serveur impossible.')
     } finally {
       setSaving(false)
     }
@@ -272,33 +298,52 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
 
   const handleCritereSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!critereForm.libelle) return
+    if (!critereForm.libelle.trim()) return
 
     try {
       const method = editingCritere ? 'PATCH' : 'POST'
-      const url = editingCritere 
+      const url = editingCritere
         ? `/api/admin/campagnes/${id}/criteres/${editingCritere}`
         : `/api/admin/campagnes/${id}/criteres`
 
-      await fetch(url, {
+      const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(critereForm)
       })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        toast.error(data.error || 'Le critère n’a pas pu être enregistré.')
+        return
+      }
+      toast.success(editingCritere ? 'Critère modifié.' : 'Critère ajouté.')
       resetCritereForm()
       loadCriteres()
-    } catch (err) {
-      alert('Erreur lors de l\'enregistrement du critère')
+    } catch {
+      toast.error('Connexion au serveur impossible.')
     }
   }
 
   const handleDeleteCritere = async (critereId: string) => {
-    if (!confirm('Supprimer ce critère ?')) return
+    const critere = criteres.find((c) => c.id === critereId)
+    const ok = await confirmer({
+      titre: `Supprimer le critère « ${critere?.libelle ?? ''} » ?`,
+      message: 'Toutes les notes déjà données sur ce critère seront supprimées.',
+      confirmer: 'Supprimer le critère',
+      danger: true,
+    })
+    if (!ok) return
     try {
-      await fetch(`/api/admin/campagnes/${id}/criteres/${critereId}`, { method: 'DELETE' })
+      const res = await fetch(`/api/admin/campagnes/${id}/criteres/${critereId}`, { method: 'DELETE' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error(data.error || 'La suppression a échoué.')
+        return
+      }
+      toast.success(data.notesSupprimees ? `Critère supprimé (${data.notesSupprimees} note(s) supprimée(s)).` : 'Critère supprimé.')
       loadCriteres()
-    } catch (err) {
-      alert('Erreur lors de la suppression')
+    } catch {
+      toast.error('Connexion au serveur impossible.')
     }
   }
 
@@ -325,7 +370,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="h-12 w-12 rounded-full border-4 border-brand-100 border-t-brand-500 animate-spin"></div>
+        <div className="h-12 w-12 rounded-full border-4 border-navy-100 border-t-brand-500 animate-spin"></div>
       </div>
     )
   }
@@ -339,15 +384,14 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
-      <Sidebar />
+    <div className="contents">
       <div className="flex-1 flex flex-col min-w-0">
         <AdminHeader title={formData.libelle || 'Détails Campagne'} />
         
         <main className="flex-1 overflow-y-auto p-6">
           <div className="max-w-[1780px] w-full mx-auto space-y-6">
             {/* Header / Actions */}
-            <div className="flex items-center justify-between animate-fade-in">
+            <div className="flex items-center justify-between">
               <Link href="/admin/campagnes" className="group flex items-center gap-2 text-slate-500 hover:text-slate-800 font-bold transition-colors">
                 <ArrowLeft className="w-5 h-5 transition-transform group-hover:-translate-x-1" /> Retour
               </Link>
@@ -360,35 +404,35 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
             </div>
 
             {/* Navigation Tabs (Compacte, sans élargissement artificiel) */}
-            <div className="flex items-center justify-start overflow-x-auto pb-1 animate-fade-in">
+            <div className="flex items-center justify-start overflow-x-auto pb-1">
               <div className="inline-flex items-center gap-1.5 bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm">
                 <button 
                   onClick={() => setActiveTab('config')}
-                  className={`flex items-center gap-2 py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition-all ${activeTab === 'config' ? 'bg-brand-500 text-white shadow-md shadow-brand-100' : 'text-slate-600 hover:bg-slate-50'}`}
+                  className={`flex items-center gap-2 py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition-all ${activeTab === 'config' ? 'bg-navy-700 text-white shadow-md shadow-navy-100' : 'text-slate-600 hover:bg-slate-50'}`}
                 >
                   <Settings2 className="w-4 h-4" /> Configuration
                 </button>
                 <button 
                   onClick={() => setActiveTab('criteres')}
-                  className={`flex items-center gap-2 py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition-all ${activeTab === 'criteres' ? 'bg-brand-500 text-white shadow-md shadow-brand-100' : 'text-slate-600 hover:bg-slate-50'}`}
+                  className={`flex items-center gap-2 py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition-all ${activeTab === 'criteres' ? 'bg-navy-700 text-white shadow-md shadow-navy-100' : 'text-slate-600 hover:bg-slate-50'}`}
                 >
                   <ClipboardList className="w-4 h-4" /> Critères ({criteres.length})
                 </button>
                 <button 
                   onClick={() => setActiveTab('affectations')}
-                  className={`flex items-center gap-2 py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition-all ${activeTab === 'affectations' ? 'bg-brand-500 text-white shadow-md shadow-brand-100' : 'text-slate-600 hover:bg-slate-50'}`}
+                  className={`flex items-center gap-2 py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition-all ${activeTab === 'affectations' ? 'bg-navy-700 text-white shadow-md shadow-navy-100' : 'text-slate-600 hover:bg-slate-50'}`}
                 >
                   <Users2 className="w-4 h-4" /> Affectations
                 </button>
                 <button 
                   onClick={() => setActiveTab('suivi')}
-                  className={`flex items-center gap-2 py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition-all ${activeTab === 'suivi' ? 'bg-brand-500 text-white shadow-md shadow-brand-100' : 'text-slate-600 hover:bg-slate-50'}`}
+                  className={`flex items-center gap-2 py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition-all ${activeTab === 'suivi' ? 'bg-navy-700 text-white shadow-md shadow-navy-100' : 'text-slate-600 hover:bg-slate-50'}`}
                 >
                   <Activity className="w-4 h-4" /> Suivi
                 </button>
                 <button 
                   onClick={() => setActiveTab('prix')}
-                  className={`flex items-center gap-2 py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition-all ${activeTab === 'prix' ? 'bg-brand-500 text-white shadow-md shadow-brand-100' : 'text-slate-600 hover:bg-slate-50'}`}
+                  className={`flex items-center gap-2 py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition-all ${activeTab === 'prix' ? 'bg-navy-700 text-white shadow-md shadow-navy-100' : 'text-slate-600 hover:bg-slate-50'}`}
                 >
                   <Gift className="w-4 h-4" /> Prix & Distinctions
                 </button>
@@ -396,35 +440,35 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                   onClick={() => setActiveTab('classement')}
                   className={`flex items-center gap-2 py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition-all ${
                     activeTab === 'classement' 
-                      ? 'bg-[#002B49] text-[#D4AF37] shadow-md border border-[#D4AF37]/30' 
-                      : 'text-[#002B49] hover:bg-amber-50/50 font-black'
+                      ? 'bg-navy-900 text-gold-500 shadow-md border border-gold-500/30' 
+                      : 'text-navy-900 hover:bg-amber-50/50 font-black'
                   }`}
                 >
-                  <Trophy className="w-4 h-4 text-[#D4AF37]" /> Classement & Palmarès
+                  <Trophy className="w-4 h-4 text-gold-500" /> Classement & Palmarès
                 </button>
               </div>
             </div>
 
             {saveSuccess && (
-              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3 text-emerald-800 animate-fade-in shadow-sm">
+              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3 text-emerald-800 shadow-sm">
                 <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
                 <p className="font-bold">Modifications enregistrées avec succès !</p>
               </div>
             )}
 
             {error && (
-              <div className="p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 text-red-700 animate-fade-in">
+              <div className="p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 text-red-700">
                 <AlertCircle className="w-5 h-5 flex-shrink-0" />
                 <p className="font-bold">{error}</p>
               </div>
             )}
 
             {/* Tab Content */}
-            <div className="animate-fade-in" key={activeTab}>
+            <div key={activeTab}>
               {activeTab === 'config' && (
-                <div className="glass rounded-3xl p-8 border border-slate-200/50 shadow-sm space-y-8">
+                <div className="bg-white shadow-card rounded-3xl p-8 border border-slate-200/50 shadow-sm space-y-8">
                   <div className="space-y-1">
-                    <h3 className="text-xl font-display font-bold text-slate-900">Paramètres Généraux</h3>
+                    <h3 className="text-xl font-bold text-slate-900">Paramètres Généraux</h3>
                     <p className="text-slate-500 text-sm font-medium">Définissez les bases de votre campagne d'évaluation.</p>
                   </div>
 
@@ -434,7 +478,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                       <input
                         type="text"
                         required
-                        className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-brand-100 focus:border-brand-500 focus:bg-white transition-all outline-none font-bold text-slate-800"
+                        className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 focus:bg-white transition-all outline-none font-bold text-slate-800"
                         value={formData.libelle}
                         onChange={e => setFormData({ ...formData, libelle: e.target.value })}
                       />
@@ -446,7 +490,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                         <input
                           type="date"
                           required
-                          className="w-full px-5 py-3.5 pl-12 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-brand-100 focus:border-brand-500 focus:bg-white transition-all outline-none font-bold text-slate-800"
+                          className="w-full px-5 py-3.5 pl-12 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 focus:bg-white transition-all outline-none font-bold text-slate-800"
                           value={formData.dateDebut}
                           onChange={e => setFormData({ ...formData, dateDebut: e.target.value })}
                         />
@@ -460,7 +504,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                         <input
                           type="date"
                           required
-                          className="w-full px-5 py-3.5 pl-12 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-brand-100 focus:border-brand-500 focus:bg-white transition-all outline-none font-bold text-slate-800"
+                          className="w-full px-5 py-3.5 pl-12 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 focus:bg-white transition-all outline-none font-bold text-slate-800"
                           value={formData.dateFin}
                           onChange={e => setFormData({ ...formData, dateFin: e.target.value })}
                         />
@@ -471,7 +515,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Statut Actuel</label>
                       <select
-                        className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-brand-100 focus:border-brand-500 focus:bg-white transition-all outline-none font-bold text-slate-800 cursor-pointer"
+                        className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 focus:bg-white transition-all outline-none font-bold text-slate-800 cursor-pointer"
                         value={formData.statut}
                         onChange={e => setFormData({ ...formData, statut: e.target.value })}
                       >
@@ -484,7 +528,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                     <div className="space-y-4 md:col-span-2 pt-4">
                       <div className="flex items-center justify-between">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Répartition des poids</label>
-                        <span className="text-sm font-bold text-brand-600 bg-brand-50 px-3 py-1 rounded-full">Total 100%</span>
+                        <span className="text-sm font-bold text-navy-800 bg-navy-50 px-3 py-1 rounded-full">Total 100%</span>
                       </div>
                       <div className="grid grid-cols-2 gap-4 bg-slate-50 p-6 rounded-3xl border border-slate-100">
                         <div className="space-y-2">
@@ -493,7 +537,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                             type="number"
                             min="0"
                             max="100"
-                            className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-brand-100 focus:border-brand-500 transition-all outline-none font-black text-brand-600 text-xl"
+                            className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-black text-navy-800 text-xl"
                             value={formData.poidsCollegues}
                             onChange={e => {
                               const val = Math.min(100, Math.max(0, parseInt(e.target.value) || 0))
@@ -507,13 +551,35 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                             type="number"
                             min="0"
                             max="100"
-                            className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-brand-100 focus:border-brand-500 transition-all outline-none font-black text-amber-600 text-xl"
+                            className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-black text-amber-600 text-xl"
                             value={formData.poidsManager}
                             onChange={e => {
                               const val = Math.min(100, Math.max(0, parseInt(e.target.value) || 0))
                               setFormData({ ...formData, poidsManager: val, poidsCollegues: 100 - val })
                             }}
                           />
+                        </div>
+                        <div className="col-span-2 space-y-2 border-t border-slate-200 pt-4">
+                          <label htmlFor="poids-client" className="block text-xs font-bold text-slate-600">
+                            Dont clients QR (points pris sur la part collègues)
+                          </label>
+                          <input
+                            id="poids-client"
+                            type="number"
+                            min="0"
+                            max={formData.poidsCollegues}
+                            className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-semibold text-navy-800 text-lg"
+                            value={formData.poidsClient}
+                            onChange={e => {
+                              const val = Math.min(formData.poidsCollegues, Math.max(0, parseInt(e.target.value) || 0))
+                              setFormData({ ...formData, poidsClient: val })
+                            }}
+                          />
+                          <p className="text-xs text-slate-500">
+                            Quand un agent a des avis de collègues et de clients : collègues {formData.poidsCollegues - formData.poidsClient} pts,
+                            clients {formData.poidsClient} pts. Sinon, la source présente prend les {formData.poidsCollegues} pts.
+                            Une source absente compte pour 0.
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -533,9 +599,9 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleCalculScores(true)}
+                              onClick={() => handleCalculScores()}
                               disabled={calculating}
-                              className="bg-blue-600 hover:bg-blue-700 text-white px-7 py-3.5 rounded-2xl font-black transition-all active:scale-[0.98] shadow-lg shadow-blue-600/20 disabled:opacity-50 flex items-center gap-2.5 text-sm"
+                              className="bg-navy-700 hover:bg-navy-800 text-white px-7 py-3.5 rounded-2xl font-black transition-all active:scale-[0.98] shadow-lg shadow-navy-700/20 disabled:opacity-50 flex items-center gap-2.5 text-sm"
                             >
                               {calculating ? <Loader2 className="w-4 h-4 animate-spin" /> : <BarChart3 className="w-4 h-4" />}
                               Calculer les scores
@@ -546,7 +612,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                           <>
                             <button
                               type="button"
-                              onClick={() => handleCalculScores(true)}
+                              onClick={() => handleCalculScores()}
                               disabled={calculating}
                               className="bg-emerald-600 hover:bg-emerald-700 text-white px-7 py-3.5 rounded-2xl font-black transition-all active:scale-[0.98] shadow-lg shadow-emerald-600/20 disabled:opacity-50 flex items-center gap-2.5 text-sm"
                             >
@@ -577,7 +643,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleCalculScores(true)}
+                              onClick={() => handleCalculScores()}
                               disabled={calculating}
                               className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3.5 rounded-2xl font-black transition-all active:scale-[0.98] shadow-lg shadow-emerald-600/20 disabled:opacity-50 flex items-center gap-2 text-sm"
                             >
@@ -586,7 +652,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                             </button>
                             <Link
                               href={`/admin/classement?campagneId=${id}`}
-                              className="bg-[#002B49] hover:bg-[#001d33] text-[#D4AF37] border border-[#D4AF37]/40 px-6 py-3.5 rounded-2xl font-black text-sm transition-all shadow-md flex items-center gap-2"
+                              className="bg-navy-900 hover:bg-navy-950 text-gold-500 border border-gold-500/40 px-6 py-3.5 rounded-2xl font-black text-sm transition-all shadow-md flex items-center gap-2"
                             >
                               <Trophy className="w-4 h-4" />
                               Voir le classement
@@ -616,12 +682,12 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
               )}
 
               {activeTab === 'criteres' && (
-                <div className="space-y-6 animate-fade-in">
+                <div className="space-y-6">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                       <div className="flex items-center gap-2">
-                        <h3 className="text-2xl font-display font-bold text-slate-900">Critères d'évaluation</h3>
-                        <span className="bg-brand-50 text-brand-700 text-xs font-black px-2.5 py-0.5 rounded-full border border-brand-100">
+                        <h3 className="text-2xl font-bold text-slate-900">Critères d'évaluation</h3>
+                        <span className="bg-navy-50 text-navy-900 text-xs font-black px-2.5 py-0.5 rounded-full border border-navy-100">
                           {criteres.length} critère{criteres.length > 1 ? 's' : ''}
                         </span>
                       </div>
@@ -634,13 +700,13 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                         disabled={seedingCriteres}
                         className="text-xs font-bold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 px-4 py-2.5 rounded-xl transition-all border border-slate-200 shadow-sm flex items-center gap-2 disabled:opacity-50"
                       >
-                        {seedingCriteres ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4 text-brand-600" />}
+                        {seedingCriteres ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4 text-navy-800" />}
                         <span>Rétablir grille DSM (15 critères)</span>
                       </button>
                       {!showCritereForm && (
                         <button
                           onClick={() => { resetCritereForm(); setShowCritereForm(true) }}
-                          className="flex items-center gap-2 bg-brand-500 hover:bg-brand-600 text-white px-5 py-2.5 rounded-xl font-bold text-xs shadow-md shadow-brand-100 transition-all active:scale-95"
+                          className="flex items-center gap-2 bg-navy-700 hover:bg-navy-800 text-white px-5 py-2.5 rounded-xl font-bold text-xs shadow-md shadow-navy-100 transition-all active:scale-95"
                         >
                           <Plus className="w-4 h-4" /> Ajouter un critère
                         </button>
@@ -649,8 +715,8 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                   </div>
 
                   {showCritereForm && (
-                    <div className="glass rounded-3xl p-8 border border-brand-200 shadow-lg animate-fade-in relative overflow-hidden">
-                      <div className="absolute top-0 left-0 w-1.5 h-full bg-brand-500"></div>
+                    <div className="bg-white shadow-card rounded-3xl p-8 border border-navy-200 shadow-lg relative overflow-hidden">
+                      <div className="absolute top-0 left-0 w-1.5 h-full bg-navy-700"></div>
                       <form onSubmit={handleCritereSubmit} className="space-y-6">
                         <div className="flex items-center justify-between mb-2">
                           <h4 className="text-lg font-bold text-slate-900">{editingCritere ? 'Modifier le critère' : 'Nouveau critère'}</h4>
@@ -665,7 +731,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                             <input
                               type="text"
                               required
-                              className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-brand-100 focus:border-brand-500 outline-none font-bold"
+                              className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 outline-none font-bold"
                               value={critereForm.libelle}
                               onChange={e => setCritereForm({ ...critereForm, libelle: e.target.value })}
                               placeholder="Ex: Ponctualité et assiduité"
@@ -678,7 +744,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                               type="number"
                               min="1"
                               max="20"
-                              className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-brand-100 focus:border-brand-500 outline-none font-bold"
+                              className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 outline-none font-bold"
                               value={critereForm.noteMaximale}
                               onChange={e => setCritereForm({ ...critereForm, noteMaximale: parseInt(e.target.value) || 5 })}
                             />
@@ -688,7 +754,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Description détaillée</label>
                             <textarea
                               rows={3}
-                              className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-brand-100 focus:border-brand-500 outline-none font-medium text-slate-600"
+                              className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 outline-none font-medium text-slate-600"
                               value={critereForm.description}
                               onChange={e => setCritereForm({ ...critereForm, description: e.target.value })}
                               placeholder="Décrivez ce que ce critère évalue précisément..."
@@ -707,7 +773,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                                 <label key={role.id} className="flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition-colors">
                                   <input 
                                     type="checkbox"
-                                    className="w-4 h-4 text-brand-600 rounded focus:ring-brand-500"
+                                    className="w-4 h-4 text-navy-800 rounded focus:ring-navy-700"
                                     checked={critereForm.typeEvaluateurs.includes(role.id)}
                                     onChange={(e) => {
                                       const checked = e.target.checked;
@@ -752,7 +818,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                       <input 
                         type="text"
                         placeholder="Filtrer les critères..."
-                        className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 focus:bg-white outline-none text-xs font-semibold"
+                        className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-navy-700 focus:bg-white outline-none text-xs font-semibold"
                         value={critereSearch}
                         onChange={e => setCritereSearch(e.target.value)}
                       />
@@ -773,8 +839,8 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                         onClick={() => setCritereFilter('TOUS')}
                         className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
                           critereFilter === 'TOUS'
-                            ? 'bg-brand-600 text-white shadow-sm'
-                            : 'bg-brand-50 text-brand-700 hover:bg-brand-100'
+                            ? 'bg-navy-800 text-white shadow-sm'
+                            : 'bg-navy-50 text-navy-900 hover:bg-navy-100'
                         }`}
                       >
                         Tous évaluateurs ({criteres.filter(c => c.typeEvaluateur === 'TOUS').length})
@@ -783,8 +849,8 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                         onClick={() => setCritereFilter('COLLEGUE')}
                         className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
                           critereFilter === 'COLLEGUE'
-                            ? 'bg-blue-600 text-white shadow-sm'
-                            : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                            ? 'bg-navy-700 text-white shadow-sm'
+                            : 'bg-navy-50 text-navy-800 hover:bg-navy-100'
                         }`}
                       >
                         Collègues ({criteres.filter(c => c.typeEvaluateur === 'COLLEGUE').length})
@@ -793,8 +859,8 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                         onClick={() => setCritereFilter('MANAGER')}
                         className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
                           critereFilter === 'MANAGER'
-                            ? 'bg-purple-600 text-white shadow-sm'
-                            : 'bg-purple-50 text-purple-700 hover:bg-purple-100'
+                            ? 'bg-teal-600 text-white shadow-sm'
+                            : 'bg-teal-50 text-teal-700 hover:bg-teal-100'
                         }`}
                       >
                         Managers ({criteres.filter(c => c.typeEvaluateur === 'MANAGER').length})
@@ -823,7 +889,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                   </div>
 
                   {/* Conteneur avec ascenseur (scrollbar visible) */}
-                  <div className="space-y-3.5 max-h-[580px] overflow-y-auto pr-2 custom-scrollbar">
+                  <div className="space-y-3.5 max-h-[580px] overflow-y-auto pr-2">
                     {criteres
                       .filter(c => {
                         const matchesSearch =
@@ -837,23 +903,23 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                       .map((critere, index) => (
                         <div 
                           key={critere.id} 
-                          className="glass card-hover rounded-2xl border border-slate-200/70 p-5 flex items-center justify-between group animate-fade-in shadow-sm bg-white"
-                          style={{ animationDelay: `${index * 30}ms` }}
+                          className="bg-white shadow-card rounded-2xl border border-slate-200/70 p-5 flex items-center justify-between group shadow-sm bg-white"
+                         
                         >
                           <div className="flex-1 pr-4">
                             <div className="flex flex-wrap items-center gap-2.5">
                               <h4 className="text-base font-bold text-slate-900">{critere.libelle}</h4>
-                              <span className="px-2.5 py-0.5 rounded-full bg-brand-50 text-brand-600 text-xs font-black border border-brand-100">
+                              <span className="px-2.5 py-0.5 rounded-full bg-navy-50 text-navy-800 text-xs font-black border border-navy-100">
                                 Note: 0 à {critere.noteMaximale}
                               </span>
                               <span className={`px-2.5 py-0.5 rounded-full text-xs font-black ${
                                 critere.typeEvaluateur === 'MANAGER'
-                                  ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                                  ? 'bg-teal-100 text-teal-800 border border-teal-200'
                                   : critere.typeEvaluateur === 'CLIENT'
                                   ? 'bg-amber-100 text-amber-800 border border-amber-200'
                                   : critere.typeEvaluateur === 'TOUS'
                                   ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                                  : 'bg-blue-100 text-blue-800 border border-blue-200'
+                                  : 'bg-navy-100 text-navy-900 border border-navy-200'
                               }`}>
                                 {typeLabels[critere.typeEvaluateur] || critere.typeEvaluateur}
                               </span>
@@ -865,14 +931,14 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                           <div className="flex items-center gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity flex-shrink-0">
                             <button
                               onClick={() => startEditCritere(critere)}
-                              className="p-2 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-xl transition-all"
+                              className="p-2 text-slate-400 hover:text-navy-800 hover:bg-navy-50 rounded-xl transition-all"
                               title="Modifier ce critère"
                             >
                               <Pencil className="w-4 h-4" />
                             </button>
                             <button
                               onClick={() => handleDeleteCritere(critere.id)}
-                              className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                              className="p-2 text-red-700/60 hover:text-red-700 hover:bg-red-50 rounded-xl transition-all"
                               title="Supprimer ce critère"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -881,7 +947,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                         </div>
                       ))}
                     {criteres.length === 0 && !showCritereForm && (
-                      <div className="text-center py-16 bg-white rounded-3xl border border-dashed border-slate-300 animate-fade-in">
+                      <div className="text-center py-16 bg-white rounded-3xl border border-dashed border-slate-300">
                         <div className="flex flex-col items-center gap-3 opacity-40">
                           <ClipboardList className="w-12 h-12" />
                           <div className="space-y-1">
@@ -909,13 +975,13 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
               )}
 
               {activeTab === 'prix' && (
-                <div className="glass rounded-3xl p-8 border border-slate-200/50 shadow-sm space-y-8 animate-fade-in">
+                <div className="bg-white shadow-card rounded-3xl p-8 border border-slate-200/50 shadow-sm space-y-8">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2 text-amber-500 font-extrabold text-xs uppercase tracking-widest">
                         <Trophy className="w-4 h-4" /> Récompenses & Palmarès Officiels
                       </div>
-                      <h3 className="text-2xl font-display font-bold text-slate-900">Grille des Prix & Distinctions</h3>
+                      <h3 className="text-2xl font-bold text-slate-900">Grille des Prix & Distinctions</h3>
                       <p className="text-slate-500 text-sm font-medium">Définissez les 3 paliers officiels de distinctions : Direction (Super Lauréat), Département et Service.</p>
                     </div>
 
@@ -924,7 +990,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                   {/* Summary preview cards (3 Paliers Officiels) */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {/* 1. Super Lauréat Direction */}
-                    <div className="bg-gradient-to-br from-amber-500/15 via-yellow-500/10 to-amber-500/25 border border-amber-300/80 rounded-2xl p-5 flex flex-col justify-between shadow-sm relative overflow-hidden">
+                    <div className="bg-gold-50 border border-gold-200 rounded-2xl p-5 flex flex-col justify-between shadow-sm relative overflow-hidden">
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 text-amber-700 font-black text-xs uppercase tracking-wider">
                           <Trophy className="w-4 h-4 text-amber-600 flex-shrink-0" /> Super Lauréat Direction DSM
@@ -937,20 +1003,20 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                     </div>
 
                     {/* 2. Prix Département */}
-                    <div className="bg-gradient-to-br from-purple-500/10 via-purple-500/5 to-pink-500/20 border border-purple-300/60 rounded-2xl p-5 flex flex-col justify-between shadow-sm">
+                    <div className="bg-teal-50 border border-teal-200 rounded-2xl p-5 flex flex-col justify-between shadow-sm">
                       <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-purple-700 font-black text-xs uppercase tracking-wider">
-                          <Medal className="w-4 h-4 text-purple-600 flex-shrink-0" /> Meilleur Agent par Département
+                        <div className="flex items-center gap-2 text-teal-700 font-black text-xs uppercase tracking-wider">
+                          <Medal className="w-4 h-4 text-teal-600 flex-shrink-0" /> Meilleur Agent par Département
                         </div>
-                        <p className="text-sm font-bold text-purple-950 mt-2 line-clamp-2">
+                        <p className="text-sm font-bold text-teal-950 mt-2 line-clamp-2">
                           {formData.prixDepartement || "Non configuré"}
                         </p>
                       </div>
-                      <span className="text-[10px] text-purple-700 font-black mt-3 bg-purple-100 px-2.5 py-1 rounded-md w-fit">2ème Prix • Niveau Département</span>
+                      <span className="text-[10px] text-teal-700 font-black mt-3 bg-teal-100 px-2.5 py-1 rounded-md w-fit">2ème Prix • Niveau Département</span>
                     </div>
 
                     {/* 3. Prix Service / Cellule */}
-                    <div className="bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-teal-500/20 border border-emerald-300/60 rounded-2xl p-5 flex flex-col justify-between shadow-sm">
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 flex flex-col justify-between shadow-sm">
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 text-emerald-700 font-black text-xs uppercase tracking-wider">
                           <Gift className="w-4 h-4 text-emerald-600 flex-shrink-0" /> Meilleur Agent de Service
@@ -967,7 +1033,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                     {/* Form Cards (3 Paliers) */}
                     <div className="grid grid-cols-1 gap-6">
                       {/* 1. Super Lauréat Direction */}
-                      <div className="p-6 bg-white rounded-2xl border border-amber-200/80 shadow-sm space-y-3 relative overflow-hidden bg-gradient-to-r from-amber-50/40 to-transparent">
+                      <div className="p-6 bg-white rounded-2xl border border-amber-200/80 shadow-sm space-y-3 relative overflow-hidden">
                         <div className="flex items-center gap-3">
                           <div className="w-11 h-11 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold flex-shrink-0 shadow-sm">
                             <Trophy className="w-6 h-6" />
@@ -977,7 +1043,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                               <h4 className="font-black text-slate-900 text-base">Super Lauréat de la Direction (Meilleur Agent Direction DSM)</h4>
                               <span className="text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full border border-amber-200">Palier 1</span>
                             </div>
-                            <p className="text-xs text-slate-500">Major de la Direction • Dotation de référence DSM (250 000 FCFA)</p>
+                            <p className="text-xs text-slate-500">Premier de la direction</p>
                           </div>
                         </div>
                         <div className="space-y-1.5 pt-2">
@@ -985,7 +1051,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                           <input
                             type="text"
                             className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-amber-100 focus:border-amber-500 focus:bg-white transition-all outline-none font-bold text-slate-800"
-                            placeholder="Ex: Dotation Spéciale + Prime (250 000 FCFA)"
+                            placeholder="Ex. : Trophée d’excellence + prime"
                             value={formData.prixDirection || formData.prixGlobal}
                             onChange={e => {
                               const val = e.target.value
@@ -999,23 +1065,23 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                         {/* 2. Prix Département */}
                         <div className="p-6 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-3 relative overflow-hidden">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold flex-shrink-0">
+                            <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center font-bold flex-shrink-0">
                               <Medal className="w-5 h-5" />
                             </div>
                             <div>
                               <div className="flex items-center gap-2">
                                 <h4 className="font-bold text-slate-900 text-base">Meilleur Agent par Département</h4>
-                                <span className="text-[10px] font-black uppercase tracking-wider bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full">Palier 2</span>
+                                <span className="text-[10px] font-black uppercase tracking-wider bg-teal-100 text-teal-800 px-2 py-0.5 rounded-full">Palier 2</span>
                               </div>
-                              <p className="text-xs text-slate-500">Major de chaque Département (100 000 FCFA)</p>
+                              <p className="text-xs text-slate-500">Premier de chaque département</p>
                             </div>
                           </div>
                           <div className="space-y-1.5 pt-2">
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Description du Prix & Dotation Département</label>
                             <input
                               type="text"
-                              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-purple-100 focus:border-purple-500 focus:bg-white transition-all outline-none font-bold text-slate-800"
-                              placeholder="Ex: Tableau d'honneur + Prime (100 000 FCFA)"
+                              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-teal-100 focus:border-teal-500 focus:bg-white transition-all outline-none font-bold text-slate-800"
+                              placeholder="Ex. : Certificat de mérite + prime"
                               value={formData.prixDepartement}
                               onChange={e => setFormData({ ...formData, prixDepartement: e.target.value })}
                             />
@@ -1068,7 +1134,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                 <ClassementCampagneView 
                   campagneId={id} 
                   formData={formData} 
-                  onRecalculate={() => handleCalculScores(false)} 
+                  onRecalculate={() => handleCalculScores()} 
                 />
               )}
             </div>
@@ -1124,13 +1190,13 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
   const getCategoryLabel = (role: string) => {
     switch (role) {
       case 'MANAGER':
-        return { label: 'Manager', badge: 'bg-purple-100 text-purple-800 border-purple-200' }
+        return { label: 'Manager', badge: 'bg-teal-100 text-teal-800 border-teal-200' }
       case 'EXTERNE':
         return { label: 'Client Ext.', badge: 'bg-amber-100 text-amber-800 border-amber-200' }
       case 'ADMIN':
         return { label: 'Admin', badge: 'bg-red-100 text-red-800 border-red-200' }
       default:
-        return { label: 'Pair (Collaborateur)', badge: 'bg-blue-100 text-blue-800 border-blue-200' }
+        return { label: 'Pair (Collaborateur)', badge: 'bg-navy-100 text-navy-900 border-navy-200' }
     }
   }
 
@@ -1242,7 +1308,7 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
       const cleanTargets = targets.filter(tId => tId !== selectedUser.id)
 
       if (perspective === 'BY_EVALUE') {
-        await fetch(`/api/admin/campagnes/${campagneId}/affectations`, {
+        const r = await fetch(`/api/admin/campagnes/${campagneId}/affectations`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1251,8 +1317,9 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
             evaluateurIds: cleanTargets
           })
         })
+        if (!r.ok) throw new Error()
       } else {
-        await fetch(`/api/admin/campagnes/${campagneId}/affectations`, {
+        const r = await fetch(`/api/admin/campagnes/${campagneId}/affectations`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1261,23 +1328,24 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
             evalueIds: cleanTargets
           })
         })
+        if (!r.ok) throw new Error()
       }
       onUpdate()
-      alert('Affectations enregistrées avec succès !')
-    } catch (err) {
-      alert('Erreur lors de la sauvegarde')
+      toast.success('Affectations enregistrées.')
+    } catch {
+      toast.error('Les affectations n’ont pas pu être enregistrées.')
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <div className="space-y-5 animate-fade-in text-slate-800">
+    <div className="space-y-5 text-slate-800">
       {/* ⇄ Barre de Permutation des Colonnes (Notants ↔ Notés) & Agrandissement x1.2 */}
       <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-3.5 w-full md:w-auto">
           <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-white shadow-md transition-all ${
-            perspective === 'BY_EVALUE' ? 'bg-brand-600 shadow-brand-200' : 'bg-slate-900 shadow-slate-300'
+            perspective === 'BY_EVALUE' ? 'bg-navy-800 shadow-navy-200' : 'bg-slate-900 shadow-slate-300'
           }`}>
             <ArrowLeftRight className="w-6 h-6" />
           </div>
@@ -1290,9 +1358,9 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
             </div>
             <h3 className="text-base sm:text-lg font-black text-slate-900 leading-tight">
               {perspective === 'BY_EVALUE' ? (
-                <>Colonne gauche : <span className="text-brand-600">COLLABORATEURS NOTÉS</span> ➔ Colonne droite : <span className="text-slate-600">LEURS NOTANTS</span></>
+                <>Colonne gauche : <span className="text-navy-800">COLLABORATEURS NOTÉS</span> ➔ Colonne droite : <span className="text-slate-600">LEURS NOTANTS</span></>
               ) : (
-                <>Colonne gauche : <span className="text-slate-900">ÉVALUATEURS NOTANTS</span> ➔ Colonne droite : <span className="text-brand-600">PERSONNES QU'ILS NOTENT</span></>
+                <>Colonne gauche : <span className="text-slate-900">ÉVALUATEURS NOTANTS</span> ➔ Colonne droite : <span className="text-navy-800">PERSONNES QU'ILS NOTENT</span></>
               )}
             </h3>
           </div>
@@ -1311,7 +1379,7 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
               }}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all ${
                 perspective === 'BY_EVALUE'
-                  ? 'bg-brand-600 text-white shadow-md'
+                  ? 'bg-navy-800 text-white shadow-md'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
               }`}
             >
@@ -1345,10 +1413,10 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
               setPerspective(prev => prev === 'BY_EVALUE' ? 'BY_EVALUATEUR' : 'BY_EVALUE')
               setSelectedUser(null)
             }}
-            className="flex items-center gap-2.5 px-5 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white rounded-2xl text-xs sm:text-sm font-black shadow-md shadow-amber-500/20 active:scale-95 transition-all cursor-pointer"
+            className="flex items-center gap-2.5 px-5 py-2.5 bg-navy-900 hover:bg-navy-800 text-white rounded-2xl text-xs sm:text-sm font-black shadow-md shadow-amber-500/20 active:scale-95 transition-all cursor-pointer"
             title="Permuter les colonnes (Notants ↔ Notés)"
           >
-            <ArrowLeftRight className="w-4 h-4 animate-pulse" />
+            <ArrowLeftRight className="w-4 h-4" />
             <span>Permuter les colonnes</span>
           </button>
         </div>
@@ -1361,7 +1429,7 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 {perspective === 'BY_EVALUE' ? (
-                  <Target className="w-5 h-5 text-brand-600" />
+                  <Target className="w-5 h-5 text-navy-800" />
                 ) : (
                   <UserCheck className="w-5 h-5 text-slate-700" />
                 )}
@@ -1391,8 +1459,8 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
                   onClick={() => setCategoryFilter('PAIR')}
                   className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all ${
                     categoryFilter === 'PAIR'
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                      ? 'bg-navy-700 text-white shadow-sm'
+                      : 'bg-navy-50 text-navy-800 hover:bg-navy-100'
                   }`}
                 >
                   Pairs ({countPairs})
@@ -1401,8 +1469,8 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
                   onClick={() => setCategoryFilter('MANAGER')}
                   className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all ${
                     categoryFilter === 'MANAGER'
-                      ? 'bg-purple-600 text-white shadow-sm'
-                      : 'bg-purple-50 text-purple-700 hover:bg-purple-100'
+                      ? 'bg-teal-600 text-white shadow-sm'
+                      : 'bg-teal-50 text-teal-700 hover:bg-teal-100'
                   }`}
                 >
                   Managers ({countManagers})
@@ -1435,7 +1503,7 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
                 <input 
                   type="text" 
                   placeholder={perspective === 'BY_EVALUE' ? "Rechercher par nom, matricule, service..." : "Rechercher un notant..."}
-                  className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 focus:bg-white outline-none text-xs sm:text-sm font-semibold"
+                  className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-navy-700 focus:bg-white outline-none text-xs sm:text-sm font-semibold"
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                 />
@@ -1455,7 +1523,7 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
             </div>
           </div>
           
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden max-h-[700px] overflow-y-auto custom-scrollbar divide-y divide-slate-100">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden max-h-[700px] overflow-y-auto divide-y divide-slate-100">
             {filteredLeftUsers.length === 0 ? (
               <div className="p-10 text-center text-slate-400 text-sm font-medium">
                 Aucun collaborateur ne correspond à votre filtre.
@@ -1473,21 +1541,21 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
                     key={user.id}
                     onClick={() => setSelectedUser(user)}
                     className={`w-full text-left p-4 sm:p-4.5 flex items-center justify-between group transition-all ${
-                      isSelected ? 'bg-brand-50/90 border-l-4 border-brand-500' : 'hover:bg-slate-50'
+                      isSelected ? 'bg-navy-50 ring-1 ring-inset ring-navy-200' : 'hover:bg-slate-50'
                     }`}
                   >
                     <div className="flex items-center gap-3.5 min-w-0">
                       <div className={`w-11 h-11 rounded-2xl flex items-center justify-center font-bold text-sm flex-shrink-0 shadow-sm ${
                         user.role === 'MANAGER'
-                          ? 'bg-purple-100 text-purple-800'
+                          ? 'bg-teal-100 text-teal-800'
                           : user.role === 'EXTERNE'
                           ? 'bg-amber-100 text-amber-800'
-                          : 'bg-blue-100 text-blue-800'
+                          : 'bg-navy-100 text-navy-900'
                       }`}>
                         {user.nom[0]}{user.prenom[0]}
                       </div>
                       <div className="min-w-0">
-                        <p className={`font-black text-sm sm:text-base truncate ${isSelected ? 'text-brand-950' : 'text-slate-900'}`}>
+                        <p className={`font-black text-sm sm:text-base truncate ${isSelected ? 'text-navy-950' : 'text-slate-900'}`}>
                           {user.nom} {user.prenom}
                         </p>
                         <div className="flex items-center gap-2 mt-1 flex-wrap">
@@ -1513,7 +1581,7 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
                           0
                         </span>
                       )}
-                      <ChevronRight className={`w-4 h-4 transition-transform ${isSelected ? 'text-brand-600 translate-x-1' : 'text-slate-300'}`} />
+                      <ChevronRight className={`w-4 h-4 transition-transform ${isSelected ? 'text-navy-800 translate-x-1' : 'text-slate-300'}`} />
                     </div>
                   </button>
                 )
@@ -1535,9 +1603,9 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
                     </span>
                     <h4 className="text-lg sm:text-xl font-black text-slate-900">
                       {perspective === 'BY_EVALUE' ? (
-                        <>Ceux qui notent <span className="text-brand-600">{selectedUser.prenom} {selectedUser.nom}</span></>
+                        <>Ceux qui notent <span className="text-navy-800">{selectedUser.prenom} {selectedUser.nom}</span></>
                       ) : (
-                        <>Les agents notés par <span className="text-brand-600">{selectedUser.prenom} {selectedUser.nom}</span></>
+                        <>Les agents notés par <span className="text-navy-800">{selectedUser.prenom} {selectedUser.nom}</span></>
                       )}
                     </h4>
                   </div>
@@ -1579,8 +1647,8 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
                         onClick={() => setTargetCategory('PAIR')}
                         className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
                           targetCategory === 'PAIR'
-                            ? 'bg-blue-600 text-white shadow-sm'
-                            : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                            ? 'bg-navy-700 text-white shadow-sm'
+                            : 'bg-navy-50 text-navy-800 hover:bg-navy-100'
                         }`}
                       >
                         Pairs / Collègues
@@ -1589,8 +1657,8 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
                         onClick={() => setTargetCategory('MANAGER')}
                         className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
                           targetCategory === 'MANAGER'
-                            ? 'bg-purple-600 text-white shadow-sm'
-                            : 'bg-purple-50 text-purple-700 hover:bg-purple-100'
+                            ? 'bg-teal-600 text-white shadow-sm'
+                            : 'bg-teal-50 text-teal-700 hover:bg-teal-100'
                         }`}
                       >
                         Managers
@@ -1617,7 +1685,7 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
                   <div className="flex items-center gap-3">
                     <button
                       onClick={handleSelectAllFiltered}
-                      className="text-xs font-bold text-brand-600 hover:underline"
+                      className="text-xs font-bold text-navy-800 hover:underline"
                     >
                       Tout cocher ({filteredRightUsers.length})
                     </button>
@@ -1637,7 +1705,7 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
                     <input 
                       type="text" 
                       placeholder={perspective === 'BY_EVALUE' ? "Rechercher qui doit le noter..." : "Rechercher un agent par nom, service..."}
-                      className="w-full pl-10 pr-3.5 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-xs sm:text-sm font-semibold"
+                      className="w-full pl-10 pr-3.5 py-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-navy-700 outline-none text-xs sm:text-sm font-semibold"
                       value={targetSearch}
                       onChange={e => setTargetSearch(e.target.value)}
                     />
@@ -1657,7 +1725,7 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
                     <label className="flex items-center gap-2 cursor-pointer select-none">
                       <div 
                         onClick={() => setShowSelectedOnly(!showSelectedOnly)}
-                        className={`w-5 h-5 rounded-lg border flex items-center justify-center transition-all ${showSelectedOnly ? 'bg-brand-500 border-brand-500 text-white' : 'border-slate-300 bg-white'}`}
+                        className={`w-5 h-5 rounded-lg border flex items-center justify-center transition-all ${showSelectedOnly ? 'bg-navy-700 border-navy-700 text-white' : 'border-slate-300 bg-white'}`}
                       >
                         {showSelectedOnly && <Check className="w-3.5 h-3.5 stroke-[3]" />}
                       </div>
@@ -1670,7 +1738,7 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
               </div>
 
               {/* Liste des personnes à cocher (Grille 2 colonnes avec ascenseur agrandie x1.2) */}
-              <div className="flex-1 overflow-y-auto p-4 sm:p-5 max-h-[680px] custom-scrollbar">
+              <div className="flex-1 overflow-y-auto p-4 sm:p-5 max-h-[680px]">
                 {filteredRightUsers.length === 0 ? (
                   <div className="p-10 text-center text-slate-400 text-sm font-medium">
                     Aucun collaborateur trouvé avec les filtres sélectionnés.
@@ -1694,10 +1762,10 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
                           <div className="flex items-center gap-3 min-w-0">
                             <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-xs sm:text-sm flex-shrink-0 shadow-sm ${
                               user.role === 'MANAGER'
-                                ? 'bg-purple-100 text-purple-800'
+                                ? 'bg-teal-100 text-teal-800'
                                 : user.role === 'EXTERNE'
                                 ? 'bg-amber-100 text-amber-800'
-                                : 'bg-blue-100 text-blue-800'
+                                : 'bg-navy-100 text-navy-900'
                             }`}>
                               {user.nom[0]}{user.prenom[0]}
                             </div>
@@ -1802,7 +1870,7 @@ function SuiviDashboard({ affectations, users }: { affectations: any[], users: U
   const total = filteredTracking.length
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6">
       {/* Stat Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center">
@@ -1851,7 +1919,7 @@ function SuiviDashboard({ affectations, users }: { affectations: any[], users: U
               <button
                 onClick={() => setSuiviCategory('PAIR')}
                 className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
-                  suiviCategory === 'PAIR' ? 'bg-blue-600 text-white' : 'text-blue-700 hover:bg-blue-50'
+                  suiviCategory === 'PAIR' ? 'bg-navy-700 text-white' : 'text-navy-800 hover:bg-navy-50'
                 }`}
               >
                 Pairs
@@ -1859,7 +1927,7 @@ function SuiviDashboard({ affectations, users }: { affectations: any[], users: U
               <button
                 onClick={() => setSuiviCategory('MANAGER')}
                 className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
-                  suiviCategory === 'MANAGER' ? 'bg-purple-600 text-white' : 'text-purple-700 hover:bg-purple-50'
+                  suiviCategory === 'MANAGER' ? 'bg-teal-600 text-white' : 'text-teal-700 hover:bg-teal-50'
                 }`}
               >
                 Managers
@@ -1898,10 +1966,10 @@ function SuiviDashboard({ affectations, users }: { affectations: any[], users: U
               <div className="flex items-center gap-4">
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs ${
                   data.user.role === 'MANAGER'
-                    ? 'bg-purple-100 text-purple-800'
+                    ? 'bg-teal-100 text-teal-800'
                     : data.user.role === 'EXTERNE'
                     ? 'bg-amber-100 text-amber-800'
-                    : 'bg-blue-100 text-blue-800'
+                    : 'bg-navy-100 text-navy-900'
                 }`}>
                   {data.user.nom?.[0] || '?'}{data.user.prenom?.[0] || '?'}
                 </div>
@@ -1910,10 +1978,10 @@ function SuiviDashboard({ affectations, users }: { affectations: any[], users: U
                     <p className="font-bold text-slate-900">{data.user.prenom} {data.user.nom}</p>
                     <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${
                       data.user.role === 'MANAGER'
-                        ? 'bg-purple-100 text-purple-800'
+                        ? 'bg-teal-100 text-teal-800'
                         : data.user.role === 'EXTERNE'
                         ? 'bg-amber-100 text-amber-800'
-                        : 'bg-blue-100 text-blue-800'
+                        : 'bg-navy-100 text-navy-900'
                     }`}>
                       {data.user.role === 'MANAGER' ? 'Manager' : data.user.role === 'EXTERNE' ? 'Client Ext.' : 'Pair'}
                     </span>
@@ -2020,7 +2088,7 @@ function ClassementCampagneView({
     if (data.laureats?.majorGlobal) {
       const mg = data.laureats.majorGlobal
       palmaresData.push({
-        Distinction: '🏆 SUPER LAURÉAT DIRECTION DSM',
+        Distinction: 'Premier toutes entités',
         Entité: mg.direction,
         Matricule: mg.matricule,
         Nom: mg.nom,
@@ -2028,12 +2096,12 @@ function ClassementCampagneView({
         Service: mg.service,
         Département: mg.departement,
         'Score Total (%)': mg.scoreTotal,
-        Dotation: formData.prixDirection || formData.prixGlobal || 'Dotation Spéciale + Prime (250 000 FCFA)',
+        Dotation: formData.prixDirection || formData.prixGlobal || '—',
       })
     }
     data.laureats?.majorsDepartement?.forEach((md: any) => {
       palmaresData.push({
-        Distinction: '🎖️ MEILLEUR DÉPARTEMENT',
+        Distinction: 'Premier de département',
         Entité: `${md.departementNom} (${md.directionNom})`,
         Matricule: md.major.matricule,
         Nom: md.major.nom,
@@ -2041,12 +2109,12 @@ function ClassementCampagneView({
         Service: md.major.service,
         Département: md.departementNom,
         'Score Total (%)': md.major.scoreTotal,
-        Dotation: formData.prixDepartement || "Tableau d'honneur + Prime (100 000 FCFA)",
+        Dotation: formData.prixDepartement || '—',
       })
     })
     data.laureats?.majorsService?.forEach((ms: any) => {
       palmaresData.push({
-        Distinction: '🥇 MEILLEUR SERVICE',
+        Distinction: 'Premier de service',
         Entité: `${ms.serviceNom} (${ms.departementNom})`,
         Matricule: ms.major.matricule,
         Nom: ms.major.nom,
@@ -2062,22 +2130,12 @@ function ClassementCampagneView({
 
     // 2. Feuille Tous les scores
     const allData = data.tousLesScores.map((s: any, idx: number) => {
-      const hasColl = s.hasCollegues ?? (s.scoreCollegues > 0)
       const hasCli = s.hasClient ?? (s.scoreClient > 0)
-      const clientVal = s.scoreClient || 0
-      const partManager = Math.round(s.scoreManager * 0.55 * 10) / 10
-      const partCollegues = hasColl && hasCli
-        ? Math.round(s.scoreCollegues * 0.20 * 10) / 10
-        : hasColl
-        ? Math.round(s.scoreCollegues * 0.45 * 10) / 10
-        : 0
-      const maxCollegues = hasColl && hasCli ? 20 : 45
-      const partClients = hasColl && hasCli
-        ? Math.round(clientVal * 0.25 * 10) / 10
-        : hasCli
-        ? Math.round(clientVal * 0.45 * 10) / 10
-        : 0
-      const maxClients = hasColl && hasCli ? 25 : 45
+      const partManager = s.partManager
+      const partCollegues = s.partCollegues
+      const maxCollegues = s.maxCollegues
+      const partClients = s.partClient
+      const maxClients = s.maxClient
       const partNonManager = Math.round((partCollegues + partClients) * 10) / 10
 
       return {
@@ -2090,8 +2148,8 @@ function ClassementCampagneView({
         Service: s.service,
         'Part Collègues (pts)': `${partCollegues}/${maxCollegues}`,
         'Part Clients QR (pts)': hasCli ? `${partClients}/${maxClients}` : 'Non concerné',
-        'Total Collègues & Clients (45 pts)': `${partNonManager}/45`,
-        'Part Manager (55 pts)': `${partManager}/55`,
+        'Total collègues & clients (pts)': `${partNonManager}/${formData.poidsCollegues}`,
+        'Part manager (pts)': `${partManager}/${s.maxManager}`,
         'Score Total (/100)': s.scoreTotal,
         Appréciation: getAppreciationInfo(s.scoreTotal).appreciation,
       }
@@ -2105,7 +2163,7 @@ function ClassementCampagneView({
   if (loading) {
     return (
       <div className="bg-white rounded-3xl p-16 border border-slate-200 shadow-sm flex flex-col items-center justify-center space-y-4">
-        <div className="w-12 h-12 rounded-full border-4 border-amber-100 border-t-[#D4AF37] animate-spin"></div>
+        <div className="w-12 h-12 rounded-full border-4 border-amber-100 border-t-gold-500 animate-spin"></div>
         <p className="text-slate-600 font-bold text-sm">Chargement des résultats et palmarès de la campagne...</p>
       </div>
     )
@@ -2136,19 +2194,19 @@ function ClassementCampagneView({
   })
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6">
       {/* Header Banner Classement de la Session */}
-      <div className="bg-gradient-to-r from-[#001D33] via-[#002B49] to-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-white/10 relative overflow-hidden">
+      <div className="bg-navy-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-white/10 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 relative z-10">
           <div>
             <div className="flex items-center gap-2 mb-2 flex-wrap">
-              <span className="text-[#D4AF37] font-black text-xs uppercase tracking-widest flex items-center gap-1.5">
-                <Trophy className="w-4 h-4 text-[#D4AF37]" /> Session DSM TAMIS
+              <span className="text-gold-500 font-black text-xs uppercase tracking-widest flex items-center gap-1.5">
+                <Trophy className="w-4 h-4 text-gold-500" /> Session DSM TAMIS
               </span>
               {formData.statut === 'OUVERTE' && (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                   Notation active
                 </span>
               )}
@@ -2159,7 +2217,7 @@ function ClassementCampagneView({
                 </span>
               )}
               {formData.statut === 'CALCULEE' && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-blue-500/20 text-blue-300 border border-blue-400/30">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-navy-600/20 text-navy-300 border border-navy-400/30">
                   <CheckCircle2 className="w-3 h-3" />
                   Scores définitifs
                 </span>
@@ -2176,7 +2234,7 @@ function ClassementCampagneView({
               type="button"
               onClick={handleTriggerRecalculate}
               disabled={calculating}
-              className="flex items-center gap-2 px-4 py-2.5 bg-[#D4AF37] hover:bg-[#c49f2f] text-[#002B49] rounded-xl text-xs font-black transition-all shadow-md active:scale-95 disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2.5 bg-gold-500 hover:bg-gold-600 text-navy-900 rounded-xl text-xs font-black transition-all shadow-md active:scale-95 disabled:opacity-50"
             >
               <RefreshCw className={`w-4 h-4 ${calculating ? 'animate-spin' : ''}`} />
               <span>{calculating ? 'Calcul en cours...' : 'Recalculer'}</span>
@@ -2218,7 +2276,7 @@ function ClassementCampagneView({
             type="button"
             onClick={handleTriggerRecalculate}
             disabled={calculating}
-            className="px-6 py-3 bg-[#002B49] text-[#D4AF37] border border-[#D4AF37]/40 rounded-xl text-xs font-black transition-all hover:bg-[#001D33] shadow-md"
+            className="px-6 py-3 bg-navy-900 text-gold-500 border border-gold-500/40 rounded-xl text-xs font-black transition-all hover:bg-navy-950 shadow-md"
           >
             {calculating ? 'Calcul en cours...' : 'Calculer les scores maintenant'}
           </button>
@@ -2232,7 +2290,7 @@ function ClassementCampagneView({
                 onClick={() => setSubTab('palmares')}
                 className={`flex items-center gap-2 py-2 px-3.5 rounded-xl font-bold text-xs whitespace-nowrap transition-all ${
                   subTab === 'palmares'
-                    ? 'bg-[#002B49] text-[#D4AF37] shadow-sm'
+                    ? 'bg-navy-900 text-gold-500 shadow-sm'
                     : 'text-slate-600 hover:bg-slate-50'
                 }`}
               >
@@ -2242,7 +2300,7 @@ function ClassementCampagneView({
                 onClick={() => setSubTab('global')}
                 className={`flex items-center gap-2 py-2 px-3.5 rounded-xl font-bold text-xs whitespace-nowrap transition-all ${
                   subTab === 'global'
-                    ? 'bg-blue-600 text-white shadow-sm'
+                    ? 'bg-navy-700 text-white shadow-sm'
                     : 'text-slate-600 hover:bg-slate-50'
                 }`}
               >
@@ -2262,7 +2320,7 @@ function ClassementCampagneView({
                 onClick={() => setSubTab('departement')}
                 className={`flex items-center gap-2 py-2 px-3.5 rounded-xl font-bold text-xs whitespace-nowrap transition-all ${
                   subTab === 'departement'
-                    ? 'bg-purple-600 text-white shadow-sm'
+                    ? 'bg-teal-600 text-white shadow-sm'
                     : 'text-slate-600 hover:bg-slate-50'
                 }`}
               >
@@ -2285,7 +2343,7 @@ function ClassementCampagneView({
                 onClick={() => setAnonymized(!anonymized)}
                 className="flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold shadow-sm transition-all"
               >
-                {anonymized ? <Eye className="w-4 h-4 text-brand-600" /> : <EyeOff className="w-4 h-4 text-slate-400" />}
+                {anonymized ? <Eye className="w-4 h-4 text-navy-800" /> : <EyeOff className="w-4 h-4 text-slate-400" />}
                 <span>{anonymized ? 'Noms visibles' : 'Anonymiser'}</span>
               </button>
             )}
@@ -2293,18 +2351,18 @@ function ClassementCampagneView({
 
           {/* TAB 1: PALMARÈS & LAURÉATS */}
           {subTab === 'palmares' && (
-            <div className="space-y-6 animate-fade-in">
+            <div className="space-y-6">
               {/* Super Lauréat Direction DSM Card */}
               {majorGlobal ? (
-                <div className="bg-gradient-to-r from-amber-500/20 via-yellow-500/10 to-amber-500/25 border-2 border-[#D4AF37] rounded-3xl p-6 sm:p-8 shadow-xl relative overflow-hidden">
+                <div className="bg-gold-50 ring-1 ring-gold-300 rounded-3xl p-6 sm:p-8 shadow-xl relative overflow-hidden">
                   <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10">
                     <div className="flex items-center gap-5">
-                      <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#D4AF37] to-amber-600 text-[#002B49] font-black text-2xl flex items-center justify-center shadow-lg border-2 border-white">
+                      <div className="w-20 h-20 rounded-2xl bg-gold-500 text-navy-900 font-black text-2xl flex items-center justify-center shadow-lg border-2 border-white">
                         <Crown className="w-10 h-10 text-white drop-shadow" />
                       </div>
                       <div className="space-y-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-[10px] font-black uppercase tracking-widest bg-[#002B49] text-[#D4AF37] px-3 py-0.5 rounded-full border border-[#D4AF37]/30 flex items-center gap-1">
+                          <span className="text-[10px] font-black uppercase tracking-widest bg-navy-900 text-gold-500 px-3 py-0.5 rounded-full border border-gold-500/30 flex items-center gap-1">
                             <Trophy className="w-3 h-3" /> Super Lauréat Direction DSM
                           </span>
                           <span className="text-xs font-bold text-amber-900">Palier 1</span>
@@ -2318,16 +2376,16 @@ function ClassementCampagneView({
                       </div>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 bg-white/80 backdrop-blur-md p-4 rounded-2xl border border-amber-200">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 bg-white/80 p-4 rounded-2xl border border-amber-200">
                       <div className="text-left sm:text-right">
                         <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Score TAMIS Final</span>
                         <span className="text-3xl font-black text-emerald-600">{majorGlobal.scoreTotal}%</span>
                       </div>
                       <div className="h-10 w-px bg-slate-200 hidden sm:block"></div>
                       <div className="text-left">
-                        <span className="text-[10px] font-black uppercase tracking-wider text-[#002B49] block">Dotation Officielle</span>
+                        <span className="text-[10px] font-black uppercase tracking-wider text-navy-900 block">Dotation Officielle</span>
                         <span className="text-xs font-black text-amber-900">
-                          {formData.prixDirection || formData.prixGlobal || 'Dotation Spéciale + Prime (250 000 FCFA)'}
+                          {formData.prixDirection || formData.prixGlobal || '—'}
                         </span>
                       </div>
                     </div>
@@ -2339,10 +2397,10 @@ function ClassementCampagneView({
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Medal className="w-5 h-5 text-purple-600" />
+                    <Medal className="w-5 h-5 text-teal-600" />
                     <h4 className="font-black text-slate-900 text-base">Meilleurs Agents par Département</h4>
-                    <span className="text-[10px] font-black bg-purple-100 text-purple-800 px-2.5 py-0.5 rounded-full">
-                      Palier 2 • {formData.prixDepartement || "Tableau d'honneur + Prime (100 000 FCFA)"}
+                    <span className="text-[10px] font-black bg-teal-100 text-teal-800 px-2.5 py-0.5 rounded-full">
+                      Palier 2 • {formData.prixDepartement || '—'}
                     </span>
                   </div>
                   <span className="text-xs font-bold text-slate-400">{majorsDepartement.length} lauréats</span>
@@ -2350,9 +2408,9 @@ function ClassementCampagneView({
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {majorsDepartement.map((md: any, idx: number) => (
-                    <div key={idx} className="bg-white rounded-2xl p-5 border border-purple-100 shadow-sm hover:shadow-md transition-all space-y-3">
+                    <div key={idx} className="bg-white rounded-2xl p-5 border border-teal-100 shadow-sm hover:shadow-md transition-all space-y-3">
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-black text-purple-700 bg-purple-50 px-2.5 py-1 rounded-lg uppercase">
+                        <span className="text-[10px] font-black text-teal-700 bg-teal-50 px-2.5 py-1 rounded-lg uppercase">
                           {md.departementNom}
                         </span>
                         <span className="text-sm font-black text-emerald-600">{md.major.scoreTotal}%</span>
@@ -2367,7 +2425,7 @@ function ClassementCampagneView({
                       </div>
                       <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] font-bold text-slate-400">
                         <span>Sur {md.totalAgents} agents</span>
-                        <span className="text-purple-700">1 000 000 FCFA</span>
+                        <span className="text-teal-700">{formData.prixDepartement || '—'}</span>
                       </div>
                     </div>
                   ))}
@@ -2381,7 +2439,7 @@ function ClassementCampagneView({
                     <Gift className="w-5 h-5 text-emerald-600" />
                     <h4 className="font-black text-slate-900 text-base">Meilleurs Agents par Service / Cellule</h4>
                     <span className="text-[10px] font-black bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full">
-                      Palier 3 • {formData.prixService || '500 000 FCFA'}
+                      Palier 3 • {formData.prixService || '—'}
                     </span>
                   </div>
                   <span className="text-xs font-bold text-slate-400">{majorsService.length} lauréats</span>
@@ -2417,7 +2475,7 @@ function ClassementCampagneView({
 
           {/* TAB 2: CLASSEMENT GÉNÉRAL INTÉGRAL */}
           {subTab === 'global' && (
-            <div className="space-y-4 animate-fade-in">
+            <div className="space-y-4">
               {/* Filtres de recherche */}
               <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap items-center gap-3">
                 <div className="relative flex-1 min-w-[200px]">
@@ -2427,7 +2485,7 @@ function ClassementCampagneView({
                     placeholder="Rechercher par nom, matricule ou service..."
                     value={search}
                     onChange={e => setSearch(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-brand-500"
+                    className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-navy-700"
                   />
                 </div>
 
@@ -2483,35 +2541,26 @@ function ClassementCampagneView({
                           const rang = score.rangGlobal || idx + 1
                           const hasColl = score.hasCollegues ?? (score.scoreCollegues > 0)
                           const hasCli = score.hasClient ?? (score.scoreClient > 0)
-                          const clientVal = score.scoreClient || 0
-                          const partManager = Math.round(score.scoreManager * 0.55 * 10) / 10
-                          const partCollegues = hasColl && hasCli
-                            ? Math.round(score.scoreCollegues * 0.20 * 10) / 10
-                            : hasColl
-                            ? Math.round(score.scoreCollegues * 0.45 * 10) / 10
-                            : 0
-                          const maxCollegues = hasColl && hasCli ? 20 : 45
-                          const partClients = hasColl && hasCli
-                            ? Math.round(clientVal * 0.25 * 10) / 10
-                            : hasCli
-                            ? Math.round(clientVal * 0.45 * 10) / 10
-                            : 0
-                          const maxClients = hasColl && hasCli ? 25 : 45
+                          const partManager = score.partManager
+                          const partCollegues = score.partCollegues
+                          const maxCollegues = score.maxCollegues
+                          const partClients = score.partClient
+                          const maxClients = score.maxClient
 
                           return (
                             <tr key={score.utilisateurId || idx} className="hover:bg-slate-50/80 transition-colors">
                               <td className="py-3.5 px-4 text-center font-black">
                                 {rang === 1 ? (
                                   <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-100 text-amber-800 font-black text-xs border border-amber-300">
-                                    🥇
+                                    1
                                   </span>
                                 ) : rang === 2 ? (
                                   <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-200 text-slate-800 font-black text-xs">
-                                    🥈
+                                    2
                                   </span>
                                 ) : rang === 3 ? (
                                   <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-700/20 text-amber-900 font-black text-xs">
-                                    🥉
+                                    3
                                   </span>
                                 ) : (
                                   <span className="text-slate-500 font-bold">#{rang}</span>
@@ -2532,7 +2581,7 @@ function ClassementCampagneView({
                                   <div>
                                     <span className="font-bold text-slate-800">{partCollegues}</span>
                                     <span className="text-[10px] text-slate-400">/{maxCollegues} pts</span>
-                                    <span className="text-[10px] text-blue-600 block font-normal">({score.scoreCollegues.toFixed(0)}%)</span>
+                                    <span className="text-[10px] text-navy-700 block font-normal">({score.scoreCollegues.toFixed(0)}%)</span>
                                   </div>
                                 ) : (
                                   <span className="text-slate-400 text-xs">Non noté</span>
@@ -2543,7 +2592,7 @@ function ClassementCampagneView({
                                   <div>
                                     <span className="font-bold text-slate-800">{partManager}</span>
                                     <span className="text-[10px] text-slate-400">/55 pts</span>
-                                    <span className="text-[10px] text-indigo-600 block font-normal">({score.scoreManager.toFixed(0)}%)</span>
+                                    <span className="text-[10px] text-navy-700 block font-normal">({score.scoreManager.toFixed(0)}%)</span>
                                   </div>
                                 ) : (
                                   <span className="text-slate-400 text-xs">Non noté</span>
@@ -2554,7 +2603,7 @@ function ClassementCampagneView({
                                   <div>
                                     <span className="font-bold text-slate-800">{partClients}</span>
                                     <span className="text-[10px] text-slate-400">/{maxClients} pts</span>
-                                    <span className="text-[10px] text-amber-600 block font-normal">({clientVal.toFixed(0)}%)</span>
+                                    <span className="text-[10px] text-amber-600 block font-normal">({score.scoreClient.toFixed(0)}%)</span>
                                   </div>
                                 ) : (
                                   <span className="text-slate-400 text-xs font-medium">Non concerné</span>
@@ -2581,7 +2630,7 @@ function ClassementCampagneView({
 
           {/* TAB 3: PAR DIRECTION */}
           {subTab === 'direction' && (
-            <div className="space-y-4 animate-fade-in">
+            <div className="space-y-4">
               {groupesDirection.map((g: any, idx: number) => (
                 <div key={idx} className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-4">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -2610,12 +2659,12 @@ function ClassementCampagneView({
 
           {/* TAB 4: PAR DÉPARTEMENT */}
           {subTab === 'departement' && (
-            <div className="space-y-4 animate-fade-in">
+            <div className="space-y-4">
               {groupesDepartement.map((g: any, idx: number) => (
                 <div key={idx} className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-4">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                     <div className="flex items-center gap-2.5">
-                      <FolderGit2 className="w-5 h-5 text-purple-600" />
+                      <FolderGit2 className="w-5 h-5 text-teal-600" />
                       <div>
                         <h4 className="font-black text-slate-900 text-base">{g.departementNom}</h4>
                         <p className="text-[10px] text-slate-400 font-bold">{g.directionNom}</p>
@@ -2624,11 +2673,11 @@ function ClassementCampagneView({
                     <span className="text-xs font-bold text-slate-400">{g.scores.length} collaborateurs</span>
                   </div>
                   {g.major && (
-                    <div className="bg-purple-50/60 border border-purple-200 rounded-2xl p-4 flex items-center justify-between">
+                    <div className="bg-teal-50/60 border border-teal-200 rounded-2xl p-4 flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <Medal className="w-6 h-6 text-purple-600" />
+                        <Medal className="w-6 h-6 text-teal-600" />
                         <div>
-                          <span className="text-[10px] font-black text-purple-800 uppercase">Major Département</span>
+                          <span className="text-[10px] font-black text-teal-800 uppercase">Major Département</span>
                           <p className="font-black text-slate-900 text-sm">{g.major.prenom} {g.major.nom} ({g.major.service})</p>
                         </div>
                       </div>
@@ -2642,7 +2691,7 @@ function ClassementCampagneView({
 
           {/* TAB 5: PAR SERVICE */}
           {subTab === 'service' && (
-            <div className="space-y-4 animate-fade-in">
+            <div className="space-y-4">
               {groupesService.map((g: any, idx: number) => (
                 <div key={idx} className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-4">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-3">
