@@ -20,9 +20,7 @@ export async function GET(
         criteres: { orderBy: { createdAt: 'asc' } },
         scores: {
           include: {
-            utilisateur: {
-              include: { site: true }
-            }
+            utilisateur: true
           },
           orderBy: { scoreTotal: 'desc' }
         },

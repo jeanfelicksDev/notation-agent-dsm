@@ -43,7 +43,7 @@ interface Affectation {
     nom: string
     prenom: string
     service: string | null
-    site: { nom: string } | null
+    emploi: string | null
   }
 }
 
@@ -738,7 +738,7 @@ function EnteteCollaborateur({
           <h1 className="truncate text-xl font-semibold tracking-tight text-navy-900 sm:text-2xl">{nomComplet(aff)}</h1>
           <p className="truncate text-sm text-slate-600">
             {aff.evalue.service || 'Service non renseigné'}
-            {aff.evalue.site?.nom && <> · {aff.evalue.site.nom}</>}
+            {aff.evalue.emploi && <> · {aff.evalue.emploi}</>}
             <span className="text-slate-400"> · {aff.evalue.matricule}</span>
           </p>
         </div>

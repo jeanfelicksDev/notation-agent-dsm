@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { randomBytes } from 'node:crypto'
 import prisma from '@/lib/prisma'
 import { codePrisma } from '@/lib/erreurs'
+import { normaliserSexe } from '@/lib/agents'
 import { requireAdmin, hashPassword, pinEstDefini, normalizeEmail, normalizeMatricule } from '@/lib/auth'
 
 export async function GET() {
@@ -18,22 +19,17 @@ export async function GET() {
         email: true,
         telephone: true,
         role: true,
+        sexe: true,
+        nationalite: true,
+        emploi: true,
         service: true,
         departement: true,
         direction: true,
-        siteId: true,
         qrcodeActif: true,
         qrToken: true,
         motDePasse: true,
         verrouilleJusqua: true,
         createdAt: true,
-        site: {
-          select: {
-            id: true,
-            nom: true,
-            ville: true,
-          }
-        },
       },
       orderBy: { nom: 'asc' }
     })
@@ -52,7 +48,7 @@ export async function POST(request: NextRequest) {
   if (!admin) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
 
   try {
-    const { matricule, nom, prenom, email, telephone, motDePasse, role, service, departement, direction, siteId, qrcodeActif } = await request.json()
+    const { matricule, nom, prenom, email, telephone, motDePasse, role, sexe, nationalite, emploi, service, departement, direction, qrcodeActif } = await request.json()
 
     if (!matricule || !nom || !prenom || !email) {
       return NextResponse.json({ error: 'Tous les champs obligatoires doivent être remplis' }, { status: 400 })
@@ -76,10 +72,12 @@ export async function POST(request: NextRequest) {
         telephone: telephone ? String(telephone).trim() : null,
         motDePasse: finalRole === 'ADMIN' ? hashPassword(mdp) : '',
         role: finalRole,
+        sexe: normaliserSexe(sexe),
+        nationalite: nationalite || null,
+        emploi: emploi || null,
         service: service || null,
         departement: departement || null,
         direction: direction || null,
-        ...(siteId ? { site: { connect: { id: siteId } } } : {}),
         qrcodeActif: isQrActive,
         qrToken: isQrActive ? randomBytes(20).toString('hex') : undefined,
       },

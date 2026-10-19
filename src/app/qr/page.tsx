@@ -16,7 +16,7 @@ interface Agent {
   nom: string
   prenom: string
   service: string | null
-  site: string | null
+  emploi: string | null
   hasRated: boolean
 }
 
@@ -205,7 +205,7 @@ export default function PortailClient() {
                         <span className="block truncate font-medium text-slate-900">
                           {a.prenom} {a.nom}
                         </span>
-                        <span className="block truncate text-sm text-slate-500">{[a.service, a.site].filter(Boolean).join(' · ') || 'DSM'}</span>
+                        <span className="block truncate text-sm text-slate-500">{[a.emploi, a.service].filter(Boolean).join(' · ') || 'DSM'}</span>
                       </span>
                       <span className={`shrink-0 text-sm ${a.hasRated ? 'text-emerald-700' : 'font-medium text-navy-800'}`}>
                         {a.hasRated ? 'Avis donné' : 'Évaluer'}

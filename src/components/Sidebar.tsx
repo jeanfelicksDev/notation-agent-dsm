@@ -4,7 +4,6 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  Building2,
   ClipboardList,
   ExternalLink,
   LayoutDashboard,
@@ -21,7 +20,6 @@ const navItems = [
   { label: 'Tableau de bord', href: '/admin', icon: LayoutDashboard, exact: true },
   { label: 'Campagnes', href: '/admin/campagnes', icon: ClipboardList },
   { label: 'Agents', href: '/admin/utilisateurs', icon: Users },
-  { label: 'Sites', href: '/admin/sites', icon: Building2 },
   { label: 'Classement', href: '/admin/classement', icon: Trophy },
 ]
 

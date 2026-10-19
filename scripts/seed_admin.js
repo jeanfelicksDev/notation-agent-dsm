@@ -72,11 +72,6 @@ async function main() {
   console.log(`Email     : ${email}`)
   console.log(`Rôle      : ADMIN`)
 
-  let site = await prisma.site.findFirst({ where: { nom: 'Siège Social' } })
-  if (!site) {
-    site = await prisma.site.create({ data: { nom: 'Siège Social', ville: 'Abidjan' } })
-  }
-
   const hashedPassword = hashPassword(password)
 
   const existing = await prisma.utilisateur.findFirst({
@@ -96,7 +91,6 @@ async function main() {
         email,
         motDePasse: hashedPassword,
         role: 'ADMIN',
-        siteId: site.id,
       },
     })
     console.log(`\nCompte existant mis à jour avec succès : ID ${updated.id}`)
@@ -109,7 +103,6 @@ async function main() {
         email,
         motDePasse: hashedPassword,
         role: 'ADMIN',
-        siteId: site.id,
       },
     })
     console.log(`\nNouveau compte administrateur créé avec succès : ID ${created.id}`)

@@ -16,7 +16,7 @@ export async function GET() {
         where: { id: sessionUser.id },
         select: {
           id: true, matricule: true, nom: true, prenom: true, email: true,
-          service: true, role: true, site: { select: { nom: true } },
+          service: true, role: true,
         },
       }),
       getCampagneOuverte(),
@@ -42,7 +42,7 @@ export async function GET() {
         select: {
           id: true, evalueId: true, statut: true,
           evalue: {
-            select: { id: true, matricule: true, nom: true, prenom: true, service: true, site: { select: { nom: true } } },
+            select: { id: true, matricule: true, nom: true, prenom: true, service: true, emploi: true },
           },
         },
         orderBy: [{ evalue: { nom: 'asc' } }, { evalue: { prenom: 'asc' } }],

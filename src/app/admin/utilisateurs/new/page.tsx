@@ -3,19 +3,14 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Save, AlertCircle, User, Mail, Shield, Building2, Briefcase, Loader2, QrCode } from 'lucide-react'
+import { ArrowLeft, Save, AlertCircle, User, Mail, Shield, Briefcase, Loader2, QrCode } from 'lucide-react'
 import AdminHeader from '@/components/AdminHeader'
-
-interface Site {
-  id: string
-  nom: string
-}
+import { SEXES } from '@/lib/agents'
 
 export default function NewUtilisateurPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [sites, setSites] = useState<Site[]>([])
   const [formData, setFormData] = useState({
     matricule: '',
     nom: '',
@@ -23,17 +18,14 @@ export default function NewUtilisateurPage() {
     email: '',
     motDePasse: '',
     role: 'UTILISATEUR',
+    sexe: '',
+    nationalite: '',
+    emploi: '',
     service: '',
-    siteId: '',
+    departement: '',
+    direction: '',
     qrcodeActif: false,
   })
-
-  useEffect(() => {
-    fetch('/api/admin/sites')
-      .then(res => res.json())
-      .then(sitesData => setSites(sitesData))
-      .catch(err => console.error('Error fetching initial data:', err))
-  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -144,13 +136,77 @@ export default function NewUtilisateurPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Service / Département</label>
+                    <label htmlFor="sexe" className="ml-1 block text-sm font-medium text-slate-700">Sexe</label>
+                    <select
+                      id="sexe"
+                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
+                      value={formData.sexe}
+                      onChange={e => setFormData({ ...formData, sexe: e.target.value })}
+                    >
+                      <option value="">Non renseigné</option>
+                      {SEXES.map(s => (
+                        <option key={s.valeur} value={s.valeur}>{s.libelle}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label htmlFor="nationalite" className="ml-1 block text-sm font-medium text-slate-700">Nationalité</label>
                     <input
+                      id="nationalite"
+                      type="text"
+                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
+                      value={formData.nationalite}
+                      onChange={e => setFormData({ ...formData, nationalite: e.target.value })}
+                      placeholder="Ex : Ivoirienne"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label htmlFor="emploi" className="ml-1 block text-sm font-medium text-slate-700">Emploi</label>
+                    <input
+                      id="emploi"
+                      type="text"
+                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
+                      value={formData.emploi}
+                      onChange={e => setFormData({ ...formData, emploi: e.target.value })}
+                      placeholder="Ex : Agent de transit"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label htmlFor="service" className="ml-1 block text-sm font-medium text-slate-700">Service</label>
+                    <input
+                      id="service"
                       type="text"
                       className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
                       value={formData.service}
                       onChange={e => setFormData({ ...formData, service: e.target.value })}
-                      placeholder="Ex: Comptabilité"
+                      placeholder="Ex : Facturation"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label htmlFor="departement" className="ml-1 block text-sm font-medium text-slate-700">Département</label>
+                    <input
+                      id="departement"
+                      type="text"
+                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
+                      value={formData.departement}
+                      onChange={e => setFormData({ ...formData, departement: e.target.value })}
+                      placeholder="Ex : Opérations maritimes"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label htmlFor="direction" className="ml-1 block text-sm font-medium text-slate-700">Direction</label>
+                    <input
+                      id="direction"
+                      type="text"
+                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
+                      value={formData.direction}
+                      onChange={e => setFormData({ ...formData, direction: e.target.value })}
+                      placeholder="Ex : DSM"
                     />
                   </div>
 
@@ -171,22 +227,6 @@ export default function NewUtilisateurPage() {
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Affectation Site</label>
-                    <div className="relative">
-                      <select
-                        className="w-full px-5 py-3.5 pl-12 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold appearance-none"
-                        value={formData.siteId}
-                        onChange={e => setFormData({ ...formData, siteId: e.target.value })}
-                      >
-                        <option value="">Sélectionner un site</option>
-                        {sites.map(site => (
-                          <option key={site.id} value={site.id}>{site.nom}</option>
-                        ))}
-                      </select>
-                      <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
-                    </div>
-                  </div>
 
 
 

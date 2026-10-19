@@ -43,7 +43,6 @@ interface ScoreItem {
   direction: string
   departement: string
   service: string
-  siteNom: string
   scoreTotal: number
   scoreCollegues: number
   scoreManager: number

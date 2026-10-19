@@ -5,11 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Save, Trash2, AlertCircle, QrCode, KeyRound, Eye, EyeOff, Check } from 'lucide-react'
 import { confirmer, toast } from '@/components/ui/feedback'
-
-interface Site {
-  id: string
-  nom: string
-}
+import { SEXES } from '@/lib/agents'
 
 export default function UtilisateurDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -17,7 +13,6 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [sites, setSites] = useState<Site[]>([])
   const [formData, setFormData] = useState({
     matricule: '',
     nom: '',
@@ -25,10 +20,12 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
     email: '',
     telephone: '',
     role: 'UTILISATEUR',
+    sexe: '',
+    nationalite: '',
+    emploi: '',
     service: '',
     departement: '',
     direction: '',
-    siteId: '',
     qrcodeActif: false,
   })
 
@@ -41,10 +38,7 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
   const [pwdSuccess, setPwdSuccess] = useState(false)
 
   useEffect(() => {
-    Promise.all([
-      fetch(`/api/admin/utilisateurs/${id}`).then(res => res.json()),
-      fetch('/api/admin/sites').then(res => res.json())
-    ]).then(([userData, sitesData]) => {
+    fetch(`/api/admin/utilisateurs/${id}`).then(res => res.json()).then((userData) => {
       if (userData.error) {
         setError(userData.error)
       } else {
@@ -55,14 +49,15 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
           email: userData.email,
           telephone: userData.telephone || '',
           role: userData.role,
+          sexe: userData.sexe || '',
+          nationalite: userData.nationalite || '',
+          emploi: userData.emploi || '',
           service: userData.service || '',
           departement: userData.departement || '',
           direction: userData.direction || '',
-          siteId: userData.siteId || '',
           qrcodeActif: userData.qrcodeActif || false,
         })
       }
-      setSites(Array.isArray(sitesData) ? sitesData : [])
     })
     .catch(() => setError('Erreur de chargement'))
     .finally(() => setLoading(false))
@@ -98,9 +93,11 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
         telephone: formData.telephone,
         role: formData.role,
         service: formData.service,
+        sexe: formData.sexe,
+        nationalite: formData.nationalite,
+        emploi: formData.emploi,
         departement: formData.departement,
         direction: formData.direction,
-        siteId: formData.siteId || null,
         qrcodeActif: formData.qrcodeActif,
       }
 
@@ -265,18 +262,44 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Site</label>
+                <label htmlFor="sexe" className="block text-sm font-medium text-gray-700 mb-1">Sexe</label>
                 <select
+                  id="sexe"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 outline-none"
-                  value={formData.siteId}
-                  onChange={e => setFormData({ ...formData, siteId: e.target.value })}
+                  value={formData.sexe}
+                  onChange={e => setFormData({ ...formData, sexe: e.target.value })}
                 >
-                  <option value="">Sélectionner un site</option>
-                  {sites.map(site => (
-                    <option key={site.id} value={site.id}>{site.nom}</option>
+                  <option value="">Non renseigné</option>
+                  {SEXES.map(s => (
+                    <option key={s.valeur} value={s.valeur}>{s.libelle}</option>
                   ))}
                 </select>
               </div>
+
+              <div>
+                <label htmlFor="nationalite" className="block text-sm font-medium text-gray-700 mb-1">Nationalité</label>
+                <input
+                  id="nationalite"
+                  type="text"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 outline-none"
+                  value={formData.nationalite}
+                  onChange={e => setFormData({ ...formData, nationalite: e.target.value })}
+                  placeholder="ex : Ivoirienne"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="emploi" className="block text-sm font-medium text-gray-700 mb-1">Emploi</label>
+                <input
+                  id="emploi"
+                  type="text"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 outline-none"
+                  value={formData.emploi}
+                  onChange={e => setFormData({ ...formData, emploi: e.target.value })}
+                  placeholder="ex : Agent de transit"
+                />
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Service</label>
                 <input

@@ -7,16 +7,14 @@ export async function GET() {
   if (!admin) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
 
   try {
-    const [totalUtilisateurs, totalSites, totalCampagnes, campagnesOuvertes] = await Promise.all([
+    const [totalUtilisateurs, totalCampagnes, campagnesOuvertes] = await Promise.all([
       prisma.utilisateur.count(),
-      prisma.site.count(),
       prisma.campagne.count(),
       prisma.campagne.count({ where: { statut: 'OUVERTE' } })
     ])
 
     return NextResponse.json({
       totalUtilisateurs,
-      totalSites,
       totalCampagnes,
       campagnesOuvertes
     })

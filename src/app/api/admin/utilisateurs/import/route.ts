@@ -1,16 +1,60 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import type { Prisma, Role } from '@prisma/client'
 import { codePrisma } from '@/lib/erreurs'
 import { normalizeMatricule, requireAdmin } from '@/lib/auth'
+import { normaliserSexe } from '@/lib/agents'
 import * as XLSX from 'xlsx'
 
-function getFieldValue(row: Record<string, unknown>, fieldKeys: string[]): string {
-  for (const key of fieldKeys) {
-    if (row[key] !== undefined && row[key] !== null && String(row[key]).trim() !== '') {
-      return String(row[key]).trim()
-    }
-  }
-  return ''
+/**
+ * POST /api/admin/utilisateurs/import
+ *
+ * Format de référence (liste RH) :
+ *   Matricule · Nom · Prénom · Sexe · Nationalité · Emploi · Service · Département · Direction
+ * Les colonnes « Statut », « Téléphone » et « Email » restent acceptées si elles sont présentes.
+ *
+ * Règles :
+ * - un agent est reconnu par son matricule ; il est créé s'il n'existe pas, mis à jour sinon ;
+ * - seules les colonnes présentes dans le fichier sont modifiées, et une cellule vide ne
+ *   remplace jamais une valeur existante ;
+ * - sans colonne Statut, le rôle d'un agent existant est conservé et un nouvel agent est créé « Agent » ;
+ * - un administrateur n'est jamais rétrogradé, et aucun administrateur n'est créé par import ;
+ * - les agents absents du fichier ne sont pas modifiés.
+ */
+
+type Champ =
+  | 'matricule' | 'nom' | 'prenom' | 'sexe' | 'nationalite' | 'emploi'
+  | 'service' | 'departement' | 'direction' | 'statut' | 'telephone' | 'email'
+
+/** En-tête normalisé : minuscules, sans accents, sans ponctuation ni sauts de ligne. */
+const cle = (s: string) =>
+  s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+
+/** Reconnaît une colonne par le début de son en-tête (ex. « Département (Dsm/Manut) » → departement). */
+function champDe(entete: string): Champ | null {
+  const k = cle(entete)
+  if (k.startsWith('matricule')) return 'matricule'
+  if (k === 'nom' || k === 'noms' || k.startsWith('nom ')) return 'nom'
+  if (k.startsWith('prenom')) return 'prenom'
+  if (k.startsWith('sexe') || k === 'genre') return 'sexe'
+  if (k.startsWith('nationalite')) return 'nationalite'
+  if (k.startsWith('emploi') || k.startsWith('fonction') || k.startsWith('poste')) return 'emploi'
+  if (k.startsWith('service')) return 'service'
+  if (k.startsWith('departement')) return 'departement'
+  if (k.startsWith('direction')) return 'direction'
+  if (k.startsWith('statut') || k.startsWith('status') || k.startsWith('role')) return 'statut'
+  if (k.startsWith('telephone') || k === 'tel') return 'telephone'
+  if (k.startsWith('email') || k.startsWith('e mail')) return 'email'
+  return null
+}
+
+function roleDepuisStatut(statut: string): Role | null {
+  const s = cle(statut)
+  if (!s) return null
+  if (s.includes('manager')) return 'MANAGER'
+  if (s.includes('externe') || s.includes('client')) return 'EXTERNE'
+  if (s.includes('admin')) return 'ADMIN'
+  return 'UTILISATEUR'
 }
 
 export async function POST(req: NextRequest) {
@@ -19,164 +63,116 @@ export async function POST(req: NextRequest) {
 
   try {
     const formData = await req.formData()
-    const file = formData.get('file') as File
-    
-    if (!file) {
+    const file = formData.get('file')
+    if (!(file instanceof File)) {
       return NextResponse.json({ error: 'Aucun fichier fourni' }, { status: 400 })
     }
 
-    const buffer = await file.arrayBuffer()
-    const workbook = XLSX.read(buffer, { type: 'array' })
-    const sheetName = workbook.SheetNames[0]
-    const sheet = workbook.Sheets[sheetName]
-    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet)
-
-    if (!rows || rows.length === 0) {
-      return NextResponse.json({ error: 'Fichier vide ou format non reconnu' }, { status: 400 })
+    const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array' })
+    const sheet = workbook.Sheets[workbook.SheetNames[0]]
+    const lignes = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, blankrows: false, raw: false })
+    if (lignes.length < 2) {
+      return NextResponse.json({ error: 'Fichier vide ou sans ligne de données.' }, { status: 400 })
     }
+
+    // Repérage des colonnes à partir de la première ligne
+    const colonnes = new Map<Champ, number>()
+    ;(lignes[0] as unknown[]).forEach((entete, i) => {
+      const champ = champDe(String(entete ?? ''))
+      if (champ && !colonnes.has(champ)) colonnes.set(champ, i)
+    })
+    if (!colonnes.has('matricule') || !colonnes.has('nom')) {
+      return NextResponse.json(
+        { error: 'Colonnes « Matricule » et « Nom » introuvables. Utilisez le modèle Excel fourni.' },
+        { status: 400 }
+      )
+    }
+    const present = (c: Champ) => colonnes.has(c)
 
     let crees = 0
     let misAJour = 0
     let ignores = 0
     const erreurs: string[] = []
-    const sitesCache = new Map<string, { id: string }>()
+    const vus = new Set<string>()
 
-    // PASS 1: Create or Update users and sites
-    for (const row of rows) {
-      const nom = getFieldValue(row, ['Nom', 'Nom *', 'NOM', 'nom']) || 'SansNom'
-      const prenom = getFieldValue(row, ['Prénom', 'Prenom', 'Prénom *', 'Prénoms', 'Prénoms *', 'PRENOM', 'prenom']) || ''
-      
-      const statusRaw = getFieldValue(row, [
-        'Statut',
-        'STATUT',
-        'statut',
-        'Statut [Agent ou Manager]',
-        'Statut\n[Agent ou Manager]',
-        'Statut\r\n[Agent ou Manager]',
-        'Rôle Système',
-        'Role Systeme',
-        'Rôle',
-        'Role',
-        'Status'
-      ]).toUpperCase()
+    for (let n = 1; n < lignes.length; n++) {
+      const ligne = lignes[n] as unknown[]
+      const v = (c: Champ) => {
+        const i = colonnes.get(c)
+        return i === undefined ? '' : String(ligne[i] ?? '').trim()
+      }
 
-      let role: 'ADMIN' | 'MANAGER' | 'UTILISATEUR' | 'EXTERNE' = 'UTILISATEUR'
-      if (statusRaw.includes('ADMIN')) role = 'ADMIN'
-      else if (statusRaw.includes('MANAGER')) role = 'MANAGER'
-      else if (statusRaw.includes('EXTERNE') || statusRaw.includes('CLIENT')) role = 'EXTERNE'
-
-      const matriculeOrTel = getFieldValue(row, [
-        'Matricule/Tel',
-        'Matricule / Tel',
-        'Matricule/tel',
-        'Matricule / tel',
-        'Matricule/Tel.',
-        'Matricule',
-        'MATRICULE',
-        'matricule',
-        'Matricule *',
-        'Téléphone (client externe)',
-        'Telephone (client externe)',
-        'Téléphone',
-        'Telephone',
-        'Tel',
-        'Matricule(collaborateurs)\nTéléphone(client externe)',
-        'Matricule(collaborateurs)\r\nTéléphone(client externe)',
-        'Matricule(collaborateurs) Téléphone(client externe)',
-        'Matricule(collaborateurs)',
-      ])
-
-      if (!matriculeOrTel) {
+      const brut = v('matricule')
+      if (!brut) {
         ignores++
         continue
       }
-
-      const finalMatricule = normalizeMatricule(matriculeOrTel)
-      const telephoneValue = role === 'EXTERNE'
-        ? matriculeOrTel
-        : (getFieldValue(row, ['Téléphone', 'Telephone', 'Tel', 'Téléphone (client externe)', 'Telephone (client externe)']) || undefined)
-
-      const emailFourni = getFieldValue(row, ['Email *', 'Email', 'EMAIL', 'email', 'E-mail']).toLowerCase()
-      const emailParDefaut = `${finalMatricule.toLowerCase().replace(/[^a-z0-9]/g, '') || 'user-' + Date.now()}@dsm.local`
-
-      const service = getFieldValue(row, ['Service', 'SERVICE', 'service', 'Service / Département'])
-
-      const departement = getFieldValue(row, [
-        'Département',
-        'Departement',
-        'DEPARTEMENT',
-        'departement',
-        'Département (Dsm/Manut/Entrepot)',
-        'Departement (Dsm/Manut/Entrepot)',
-        'Département\n(Dsm/Manut/Entrepot)',
-        'Département\r\n(Dsm/Manut/Entrepot)',
-      ])
-
-      const direction = getFieldValue(row, [
-        'Direction',
-        'DIRECTION',
-        'direction'
-      ])
-
-      // Une colonne « Site » explicite prime ; à défaut on garde l'ancien regroupement.
-      const siteNom = getFieldValue(row, ['Site', 'SITE', 'site', 'Localisation']) || departement || direction || 'Siège'
-
-      let site = sitesCache.get(siteNom)
-      if (!site) {
-        site = await prisma.site.upsert({ where: { nom: siteNom }, update: {}, create: { nom: siteNom } })
-        sitesCache.set(siteNom, site)
+      const matricule = normalizeMatricule(brut)
+      if (vus.has(matricule)) {
+        erreurs.push(`Ligne ${n + 1} (${matricule}) : matricule en double dans le fichier, ligne ignorée`)
+        continue
       }
+      vus.add(matricule)
+
+      const sexeBrut = v('sexe')
+      const sexe = normaliserSexe(sexeBrut)
+      if (sexeBrut && !sexe) {
+        erreurs.push(`Ligne ${n + 1} (${matricule}) : sexe « ${sexeBrut} » non reconnu (attendu M ou F), laissé inchangé`)
+      }
+
+      // Champs descriptifs : présents dans le fichier et non vides
+      const champs: Prisma.UtilisateurUpdateInput = {}
+      if (v('nom')) champs.nom = v('nom')
+      if (v('prenom')) champs.prenom = v('prenom')
+      if (sexe) champs.sexe = sexe
+      for (const c of ['nationalite', 'emploi', 'service', 'departement', 'direction'] as const) {
+        if (v(c)) champs[c] = v(c)
+      }
+      if (v('email')) champs.email = v('email').toLowerCase()
+
+      const roleFichier = present('statut') ? roleDepuisStatut(v('statut')) : null
 
       try {
         const existant = await prisma.utilisateur.findFirst({
-          where: { matricule: { equals: finalMatricule, mode: 'insensitive' } },
+          where: { matricule: { equals: matricule, mode: 'insensitive' } },
           select: { id: true, role: true },
         })
 
         if (existant) {
+          const role = roleFichier && existant.role !== 'ADMIN' && roleFichier !== 'ADMIN' ? roleFichier : undefined
+          const telephone = v('telephone') || (role === 'EXTERNE' ? brut : '')
           await prisma.utilisateur.update({
             where: { id: existant.id },
-            data: {
-              nom,
-              prenom,
-              // On n'écrase jamais un email réel par un email généré.
-              ...(emailFourni ? { email: emailFourni } : {}),
-              service: service || null,
-              departement: departement || null,
-              direction: direction || null,
-              // Un administrateur n'est jamais rétrogradé par un import.
-              ...(existant.role === 'ADMIN' ? {} : { role }),
-              site: { connect: { id: site.id } },
-              ...(telephoneValue ? { telephone: telephoneValue } : {}),
-            },
+            data: { ...champs, ...(role ? { role } : {}), ...(telephone ? { telephone } : {}) },
           })
           misAJour++
         } else {
+          const role: Role = roleFichier && roleFichier !== 'ADMIN' ? roleFichier : 'UTILISATEUR'
+          const telephone = v('telephone') || (role === 'EXTERNE' ? brut : '')
           await prisma.utilisateur.create({
             data: {
-              matricule: finalMatricule,
-              nom,
-              prenom,
-              email: emailFourni || emailParDefaut,
+              ...(champs as Prisma.UtilisateurCreateInput),
+              matricule,
+              nom: v('nom') || 'Sans nom',
+              prenom: v('prenom'),
+              email: (champs.email as string | undefined) ?? `${matricule.toLowerCase().replace(/[^a-z0-9]/g, '') || `agent-${n}`}@dsm.local`,
               motDePasse: '', // PIN à définir par l'agent à sa première connexion
-              service: service || null,
-              departement: departement || null,
-              direction: direction || null,
-              role: role === 'ADMIN' ? 'UTILISATEUR' : role,
-              site: { connect: { id: site.id } },
-              telephone: telephoneValue,
+              role,
+              telephone: telephone || null,
             },
           })
           crees++
         }
       } catch (err) {
-        erreurs.push(`${finalMatricule} : ${codePrisma(err) === 'P2002' ? 'email déjà utilisé par un autre agent' : 'ligne invalide'}`)
+        erreurs.push(
+          `Ligne ${n + 1} (${matricule}) : ${codePrisma(err) === 'P2002' ? 'email déjà utilisé par un autre agent' : 'ligne invalide'}`
+        )
       }
     }
 
     const parts = [`${crees} créé(s)`, `${misAJour} mis à jour`]
     if (ignores) parts.push(`${ignores} ligne(s) sans matricule ignorée(s)`)
-    if (erreurs.length) parts.push(`${erreurs.length} en erreur`)
+    if (erreurs.length) parts.push(`${erreurs.length} anomalie(s)`)
 
     return NextResponse.json({
       success: true,
@@ -184,9 +180,9 @@ export async function POST(req: NextRequest) {
       crees,
       misAJour,
       ignores,
-      erreurs: erreurs.slice(0, 50),
+      colonnesReconnues: [...colonnes.keys()],
+      erreurs: erreurs.slice(0, 100),
     })
-
   } catch (error) {
     console.error('Import error:', error)
     return NextResponse.json({ error: "Erreur lors de l'importation : vérifiez le format du fichier." }, { status: 500 })

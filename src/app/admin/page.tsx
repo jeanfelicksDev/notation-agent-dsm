@@ -12,9 +12,8 @@ export default async function AdminDashboard() {
   const campagne = await getCampagneOuverte()
   const maintenant = new Date()
 
-  const [agents, sites, campagnes, sansPin, verrouilles, avancement, sansEvaluateur, avisClients] = await Promise.all([
+  const [agents, campagnes, sansPin, verrouilles, avancement, sansEvaluateur, avisClients] = await Promise.all([
     prisma.utilisateur.count({ where: { role: { in: ['UTILISATEUR', 'MANAGER'] } } }),
-    prisma.site.count(),
     prisma.campagne.count(),
     prisma.utilisateur.count({
       where: { role: { in: ['UTILISATEUR', 'MANAGER'] }, NOT: [{ motDePasse: { startsWith: 'scrypt:' } }] },
@@ -183,7 +182,6 @@ export default async function AdminDashboard() {
             <ul className="divide-y divide-slate-100 text-sm">
               {[
                 { label: 'Agents et managers', valeur: agents, href: '/admin/utilisateurs' },
-                { label: 'Sites', valeur: sites, href: '/admin/sites' },
                 { label: 'Campagnes', valeur: campagnes, href: '/admin/campagnes' },
               ].map((r) => (
                 <li key={r.href}>

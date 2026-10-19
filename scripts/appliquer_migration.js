@@ -1,8 +1,10 @@
 /**
- * Applique prisma/migrations/0003_verrouillage_connexion/migration.sql sur la base de DATABASE_URL.
+ * Applique une migration SQL de prisma/migrations sur la base de DATABASE_URL.
  *
- *   node scripts/appliquer_migration_0003.js            → affiche l'état, demande confirmation, applique
- *   node scripts/appliquer_migration_0003.js --lecture  → affiche seulement l'état (aucune écriture)
+ *   node scripts/appliquer_migration.js 0004_identite_agents            → état, confirmation, application
+ *   node scripts/appliquer_migration.js 0004_identite_agents --lecture  → état seulement (aucune écriture)
+ *
+ * Les migrations de ce dossier sont écrites pour être rejouables sans risque (IF NOT EXISTS…).
  *
  * La base de production a évolué par `prisma db push` : on exécute le SQL directement
  * (il est idempotent) plutôt que `prisma migrate deploy`, qui rejouerait 0001 et 0002.
@@ -27,8 +29,8 @@ function lireEnv() {
 async function etat(c) {
   const q = async (s) => (await c.query(s)).rows
   const cols = await q(`select column_name from information_schema.columns
-    where table_name='Utilisateur' and column_name in ('tentativesEchouees','verrouilleJusqua')`)
-  console.log('Colonnes de verrouillage déjà présentes :', cols.map((r) => r.column_name).join(', ') || 'aucune')
+    where table_name='Utilisateur' and column_name in ('tentativesEchouees','verrouilleJusqua','sexe','nationalite','emploi')`)
+  console.log('Colonnes récentes déjà présentes :', cols.map((r) => r.column_name).join(', ') || 'aucune')
   console.table(await q(`select role, count(*)::int as total from "Utilisateur" group by role order by role`))
   console.log('Comptes dont le PIN sera remis à « à définir » (mot de passe non haché, hors ADMIN) :')
   console.table(await q(`select role, count(*)::int as comptes from "Utilisateur"
@@ -45,6 +47,12 @@ async function etat(c) {
 }
 
 async function main() {
+  const nom = process.argv.slice(2).find((a) => !a.startsWith('--'))
+  if (!nom) throw new Error('Indiquez la migration, ex. : node scripts/appliquer_migration.js 0004_identite_agents')
+  const fichier = path.join(__dirname, '..', 'prisma/migrations', nom, 'migration.sql')
+  if (!fs.existsSync(fichier)) throw new Error(`Migration introuvable : ${fichier}`)
+  console.log('Migration :', nom)
+
   const url = lireEnv()
   if (!url) throw new Error('DATABASE_URL introuvable (.env).')
   console.log('Base cible :', new URL(url).hostname, '\n')
@@ -60,7 +68,7 @@ async function main() {
     rl.close()
     if (reponse.trim() !== 'APPLIQUER') return console.log('Annulé, aucune modification.')
 
-    const sql = fs.readFileSync(path.join(__dirname, '..', 'prisma/migrations/0003_verrouillage_connexion/migration.sql'), 'utf8')
+    const sql = fs.readFileSync(fichier, 'utf8')
     await c.query('BEGIN')
     try {
       await c.query(sql)

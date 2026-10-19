@@ -22,7 +22,7 @@ export async function agentsEvaluablesPar(clientId: string, campagneId: string) 
       role: { in: ['UTILISATEUR', 'MANAGER'] },
       ...(affectations.length > 0 ? { id: { in: affectations.map((a) => a.evalueId) } } : {}),
     },
-    select: { id: true, nom: true, prenom: true, service: true, site: { select: { nom: true } } },
+    select: { id: true, nom: true, prenom: true, service: true, emploi: true },
     orderBy: [{ nom: 'asc' }, { prenom: 'asc' }],
   })
 }

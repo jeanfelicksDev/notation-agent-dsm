@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
         nom: a.nom,
         prenom: a.prenom,
         service: a.service,
-        site: a.site?.nom ?? null,
+        emploi: a.emploi ?? null,
         hasRated: notes.has(a.id),
       })),
     })

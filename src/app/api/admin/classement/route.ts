@@ -26,7 +26,6 @@ export interface RawAgentScore {
   direction: string
   departement: string
   service: string
-  siteNom: string
   scoreTotal: number
   scoreCollegues: number
   scoreManager: number
@@ -83,7 +82,6 @@ type UtilisateurClasse = {
   direction: string | null
   departement: string | null
   service: string | null
-  site: { nom: string } | null
 }
 
 function versAgent(
@@ -93,7 +91,7 @@ function versAgent(
   poids: Poids,
   arrondi = (n: number) => Math.round(n * 10) / 10
 ): RawAgentScore {
-  const dir = u.direction?.trim() || u.site?.nom?.trim() || 'Direction DSM'
+  const dir = u.direction?.trim() || 'Direction DSM'
   const dep = u.departement?.trim() || dir
   const srv = u.service?.trim() || dep
   return {
@@ -104,7 +102,6 @@ function versAgent(
     direction: dir,
     departement: dep,
     service: srv,
-    siteNom: u.site?.nom?.trim() || dep,
     scoreTotal: arrondi(s.scoreTotal),
     scoreCollegues: arrondi(s.scoreCollegues),
     scoreManager: arrondi(s.scoreManager),
@@ -196,7 +193,7 @@ function computeRankings(rawList: RawAgentScore[]) {
 
 const SELECT_UTILISATEUR = {
   matricule: true, nom: true, prenom: true, role: true,
-  direction: true, departement: true, service: true, site: { select: { nom: true } },
+  direction: true, departement: true, service: true,
 } as const
 
 async function listeCampagnes() {

@@ -35,10 +35,11 @@ interface Utilisateur {
   telephone?: string | null
   role: string
   service?: string | null
+  emploi?: string | null
+  departement?: string | null
   qrcodeActif?: boolean
   pinDefini: boolean
   verrouilleJusqua?: string | null
-  site: { nom: string } | null
 }
 
 type Filtre = 'tous' | 'sans_pin' | 'verrouilles' | 'managers' | 'externes'
@@ -94,7 +95,7 @@ export default function UtilisateursPage() {
   const liste = useMemo(() => {
     const q = recherche.trim().toLowerCase()
     return utilisateurs.filter((u) => {
-      if (q && !`${u.nom} ${u.prenom} ${u.matricule} ${u.service ?? ''} ${u.telephone ?? ''}`.toLowerCase().includes(q)) return false
+      if (q && !`${u.nom} ${u.prenom} ${u.matricule} ${u.service ?? ''} ${u.emploi ?? ''} ${u.departement ?? ''} ${u.telephone ?? ''}`.toLowerCase().includes(q)) return false
       if (filtre === 'sans_pin') return (u.role === 'UTILISATEUR' || u.role === 'MANAGER') && !u.pinDefini
       if (filtre === 'verrouilles') return estVerrouille(u)
       if (filtre === 'managers') return u.role === 'MANAGER'
@@ -272,7 +273,7 @@ export default function UtilisateursPage() {
               type="search"
               value={recherche}
               onChange={(e) => setRecherche(e.target.value)}
-              placeholder="Nom, matricule, service, téléphone…"
+              placeholder="Nom, matricule, emploi, service…"
               className="h-10 w-full rounded-lg border border-slate-200 bg-white pr-3 pl-9 text-sm outline-none focus:border-navy-600 focus:ring-2 focus:ring-navy-600/15"
             />
           </label>
@@ -284,7 +285,7 @@ export default function UtilisateursPage() {
               <thead className="border-b border-slate-100 bg-slate-50/60 text-xs text-slate-500">
                 <tr>
                   <th scope="col" className="px-5 py-3 font-medium">Agent</th>
-                  <th scope="col" className="px-5 py-3 font-medium">Service · site</th>
+                  <th scope="col" className="px-5 py-3 font-medium">Emploi · service</th>
                   <th scope="col" className="px-5 py-3 font-medium">Rôle</th>
                   <th scope="col" className="px-5 py-3 font-medium">Accès</th>
                   <th scope="col" className="px-5 py-3 text-center font-medium">QR</th>
@@ -314,8 +315,8 @@ export default function UtilisateursPage() {
                             <p className="text-xs text-slate-500 tabular-nums">{u.matricule}</p>
                           </td>
                           <td className="px-5 py-3.5 text-slate-600">
-                            {u.service || '—'}
-                            {u.site?.nom && <p className="text-xs text-slate-400">{u.site.nom}</p>}
+                            {u.emploi || u.service || '—'}
+                            {u.emploi && u.service && <p className="text-xs text-slate-400">{u.service}</p>}
                           </td>
                           <td className="px-5 py-3.5">
                             <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ${role.className}`}>{role.label}</span>
@@ -463,8 +464,9 @@ function DialogueImport({ onClose, onImported }: { onClose: () => void; onImport
       ) : (
         <div className="space-y-4">
           <p className="text-sm text-slate-600">
-            Fichier Excel (.xlsx) avec les colonnes : Nom, Prénom, Matricule ou téléphone, Service, Département, Statut, Direction. Les agents existants
-            sont mis à jour ; les nouveaux choisiront leur PIN à leur première connexion.
+            Fichier Excel (.xlsx) avec les colonnes : Matricule, Nom, Prénom, Sexe, Nationalité, Emploi, Service, Département, Direction.
+            Les agents existants sont mis à jour par matricule (une cellule vide ne change rien) ; les nouveaux choisiront leur PIN
+            à leur première connexion. Le rôle n’est pas modifié, et aucun agent n’est supprimé.
           </p>
           <button
             onClick={() => input.current?.click()}

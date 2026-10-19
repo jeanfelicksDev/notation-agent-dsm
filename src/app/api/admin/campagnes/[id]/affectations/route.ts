@@ -34,9 +34,7 @@ export async function POST(
 
     // 1. Auto-génération TAMIS globale
     if (autoGenerate) {
-      const allUsers = await prisma.utilisateur.findMany({
-        include: { site: true }
-      })
+      const allUsers = await prisma.utilisateur.findMany()
 
       const newAffectationsData: { campagneId: string; evaluateurId: string; evalueId: string }[] = []
       const existingKeys = new Set<string>()
@@ -58,11 +56,10 @@ export async function POST(
           }
         }
 
-        // B. Assigner les Managers (du même service, même département ou même site)
+        // B. Assigner les Managers (du même service ou du même département)
         const relevantManagers = managerUsers.filter(m => 
           (user.departement && m.departement === user.departement) ||
-          (user.service && m.service === user.service) ||
-          (user.siteId && m.siteId === user.siteId)
+          (user.service && m.service === user.service)
         )
         for (const mgr of relevantManagers) {
           if (mgr.id !== user.id) {

@@ -23,6 +23,9 @@ model Utilisateur {
   telephone           String?
   motDePasse          String
   role                Role          @default(UTILISATEUR)
+  sexe                String?
+  nationalite         String?
+  emploi              String?
   service             String?
   departement         String?
   direction           String?

@@ -38,12 +38,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Le mot de passe administrateur doit faire au moins 8 caractères.' }, { status: 400 })
     }
 
-    const site = await prisma.site.upsert({
-      where: { nom: 'Siège Social' },
-      update: {},
-      create: { nom: 'Siège Social', ville: 'Abidjan' },
-    })
-
     const existing = await prisma.utilisateur.findFirst({
       where: {
         OR: [
@@ -61,7 +55,6 @@ export async function POST(req: NextRequest) {
       prenom,
       motDePasse: hashPassword(password),
       role: 'ADMIN' as const,
-      siteId: site.id,
       tentativesEchouees: 0,
       verrouilleJusqua: null,
     }

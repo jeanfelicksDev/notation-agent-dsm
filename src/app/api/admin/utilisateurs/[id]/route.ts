@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto'
 import prisma from '@/lib/prisma'
 import { codePrisma } from '@/lib/erreurs'
 import type { Prisma } from '@prisma/client'
+import { normaliserSexe } from '@/lib/agents'
 import { requireAdmin, hashPassword, normalizeEmail, normalizeMatricule, pinEstDefini } from '@/lib/auth'
 
 export async function GET(
@@ -16,7 +17,6 @@ export async function GET(
     const { id } = await params
     const utilisateur = await prisma.utilisateur.findUnique({
       where: { id },
-      include: { site: true },
     })
 
     if (!utilisateur) {
@@ -73,9 +73,11 @@ export async function PATCH(
     if (has('email') && body.email) data.email = normalizeEmail(String(body.email))
     if (has('telephone')) data.telephone = optionnel(body.telephone)
     if (has('service')) data.service = optionnel(body.service)
+    if (has('sexe')) data.sexe = normaliserSexe(body.sexe)
+    if (has('nationalite')) data.nationalite = optionnel(body.nationalite)
+    if (has('emploi')) data.emploi = optionnel(body.emploi)
     if (has('departement')) data.departement = optionnel(body.departement)
     if (has('direction')) data.direction = optionnel(body.direction)
-    if (has('siteId')) data.site = body.siteId ? { connect: { id: body.siteId } } : { disconnect: true }
 
     if (has('role') && body.role && body.role !== actuel.role) {
       if (id === admin.id) {

@@ -50,18 +50,16 @@ async function main() {
   await prisma.$transaction([
     prisma.noteClient.deleteMany(), prisma.note.deleteMany(), prisma.scoreFinal.deleteMany(),
     prisma.affectation.deleteMany(), prisma.critere.deleteMany(), prisma.campagne.deleteMany(),
-    prisma.session.deleteMany(), prisma.otpToken.deleteMany(), prisma.utilisateur.deleteMany(), prisma.site.deleteMany(),
+    prisma.session.deleteMany(), prisma.otpToken.deleteMany(), prisma.utilisateur.deleteMany(),
   ])
 
-  const site = await prisma.site.create({ data: { nom: 'Port Autonome — Vridi', ville: 'Abidjan' } })
-  const site2 = await prisma.site.create({ data: { nom: 'Agence Plateau', ville: 'Abidjan' } })
   const pin = hash('2580')
 
   await prisma.utilisateur.create({
-    data: { matricule: 'DEMO-ADMIN', nom: 'Admin', prenom: 'Démo', email: 'admin@demo.local', motDePasse: hash('demo-admin-2026'), role: 'ADMIN', siteId: site.id },
+    data: { matricule: 'DEMO-ADMIN', nom: 'Admin', prenom: 'Démo', email: 'admin@demo.local', motDePasse: hash('demo-admin-2026'), role: 'ADMIN', sexe: 'M', nationalite: 'Ivoirienne', emploi: 'Chef de service' },
   })
   const manager = await prisma.utilisateur.create({
-    data: { matricule: 'M001', nom: 'Gbagbo', prenom: 'Laurent', email: 'm001@demo.local', motDePasse: pin, role: 'MANAGER', service: 'Transit', departement: 'Opérations maritimes', direction: 'DSM', siteId: site.id },
+    data: { matricule: 'M001', nom: 'Gbagbo', prenom: 'Laurent', email: 'm001@demo.local', motDePasse: pin, role: 'MANAGER', service: 'Transit', departement: 'Opérations maritimes', direction: 'DSM', sexe: 'M', nationalite: 'Ivoirienne', emploi: 'Chef de service' },
   })
 
   const agents = []
@@ -73,7 +71,7 @@ async function main() {
         nom: NOMS[i].toUpperCase(), prenom: PRENOMS[i], email: `a${i + 1}@demo.local`,
         telephone: `0102030${String(400 + i)}`,
         motDePasse: i === 23 ? '' : pin, role: 'UTILISATEUR', ...s,
-        siteId: i % 3 === 0 ? site2.id : site.id,
+        sexe: i % 2 ? 'F' : 'M', nationalite: 'Ivoirienne', emploi: `Agent ${s.service.toLowerCase()}`,
         qrcodeActif: i % 2 === 0, qrToken: i % 2 === 0 ? crypto.randomBytes(20).toString('hex') : null,
       },
     }))
