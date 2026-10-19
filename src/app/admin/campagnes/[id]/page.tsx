@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import AdminHeader from '@/components/AdminHeader'
 import { confirmer, toast } from '@/components/ui/feedback'
+import { typesDuCritere } from '@/lib/criteres'
 import { getAppreciationInfo } from '@/lib/default-criteres'
 
 interface Critere {
@@ -348,14 +349,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
   }
 
   const startEditCritere = (critere: Critere) => {
-    let initialTypeEvaluateurs = critere.typeEvaluateurs || [];
-    if (initialTypeEvaluateurs.length === 0 && critere.typeEvaluateur) {
-      if (critere.typeEvaluateur === 'TOUS') {
-        initialTypeEvaluateurs = ['MANAGER', 'COLLEGUE', 'CLIENT', 'CLIENT_INTERNE'];
-      } else {
-        initialTypeEvaluateurs = [critere.typeEvaluateur];
-      }
-    }
+    const initialTypeEvaluateurs = typesDuCritere(critere)
     setCritereForm({
       libelle: critere.libelle,
       description: critere.description || '',
@@ -701,7 +695,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                         className="text-xs font-bold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 px-4 py-2.5 rounded-xl transition-all border border-slate-200 shadow-sm flex items-center gap-2 disabled:opacity-50"
                       >
                         {seedingCriteres ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4 text-navy-800" />}
-                        <span>Rétablir grille DSM (15 critères)</span>
+                        <span>Rétablir la grille officielle</span>
                       </button>
                       {!showCritereForm && (
                         <button
@@ -843,7 +837,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                             : 'bg-navy-50 text-navy-900 hover:bg-navy-100'
                         }`}
                       >
-                        Tous évaluateurs ({criteres.filter(c => c.typeEvaluateur === 'TOUS').length})
+                        Tous évaluateurs ({criteres.filter(c => ['MANAGER', 'COLLEGUE', 'CLIENT_INTERNE'].every(t => typesDuCritere(c).includes(t))).length})
                       </button>
                       <button
                         onClick={() => setCritereFilter('COLLEGUE')}
@@ -853,7 +847,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                             : 'bg-navy-50 text-navy-800 hover:bg-navy-100'
                         }`}
                       >
-                        Collègues ({criteres.filter(c => c.typeEvaluateur === 'COLLEGUE').length})
+                        Collègues ({criteres.filter(c => typesDuCritere(c).includes('COLLEGUE')).length})
                       </button>
                       <button
                         onClick={() => setCritereFilter('MANAGER')}
@@ -863,7 +857,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                             : 'bg-teal-50 text-teal-700 hover:bg-teal-100'
                         }`}
                       >
-                        Managers ({criteres.filter(c => c.typeEvaluateur === 'MANAGER').length})
+                        Managers ({criteres.filter(c => typesDuCritere(c).includes('MANAGER')).length})
                       </button>
                       <button
                         onClick={() => setCritereFilter('CLIENT')}
@@ -873,7 +867,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                             : 'bg-amber-50 text-amber-800 hover:bg-amber-100'
                         }`}
                       >
-                        Clients QR ({criteres.filter(c => c.typeEvaluateur === 'CLIENT').length})
+                        Clients QR ({criteres.filter(c => typesDuCritere(c).includes('CLIENT')).length})
                       </button>
                       <button
                         onClick={() => setCritereFilter('CLIENT_INTERNE')}
@@ -883,7 +877,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                             : 'bg-pink-50 text-pink-700 hover:bg-pink-100'
                         }`}
                       >
-                        Clients internes ({criteres.filter(c => c.typeEvaluateur === 'CLIENT_INTERNE').length})
+                        Clients internes ({criteres.filter(c => typesDuCritere(c).includes('CLIENT_INTERNE')).length})
                       </button>
                     </div>
                   </div>
@@ -897,7 +891,9 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                           (c.description && c.description.toLowerCase().includes(critereSearch.toLowerCase()))
                         const matchesFilter =
                           critereFilter === 'ALL' ||
-                          c.typeEvaluateur === critereFilter
+                          (critereFilter === 'TOUS'
+                            ? ['MANAGER', 'COLLEGUE', 'CLIENT_INTERNE'].every(t => typesDuCritere(c).includes(t))
+                            : typesDuCritere(c).includes(critereFilter))
                         return matchesSearch && matchesFilter
                       })
                       .map((critere, index) => (
@@ -910,19 +906,18 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                             <div className="flex flex-wrap items-center gap-2.5">
                               <h4 className="text-base font-bold text-slate-900">{critere.libelle}</h4>
                               <span className="px-2.5 py-0.5 rounded-full bg-navy-50 text-navy-800 text-xs font-black border border-navy-100">
-                                Note: 0 à {critere.noteMaximale}
+                                Noté de 1 à {critere.noteMaximale}
                               </span>
-                              <span className={`px-2.5 py-0.5 rounded-full text-xs font-black ${
-                                critere.typeEvaluateur === 'MANAGER'
-                                  ? 'bg-teal-100 text-teal-800 border border-teal-200'
-                                  : critere.typeEvaluateur === 'CLIENT'
-                                  ? 'bg-amber-100 text-amber-800 border border-amber-200'
-                                  : critere.typeEvaluateur === 'TOUS'
-                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                                  : 'bg-navy-100 text-navy-900 border border-navy-200'
-                              }`}>
-                                {typeLabels[critere.typeEvaluateur] || critere.typeEvaluateur}
-                              </span>
+                              {typesDuCritere(critere).map(t => (
+                                <span key={t} className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ring-1 ${
+                                  t === 'MANAGER' ? 'bg-teal-50 text-teal-800 ring-teal-200'
+                                  : t === 'CLIENT' ? 'bg-gold-50 text-gold-800 ring-gold-200'
+                                  : t === 'CLIENT_INTERNE' ? 'bg-slate-100 text-slate-700 ring-slate-200'
+                                  : 'bg-navy-50 text-navy-800 ring-navy-200'
+                                }`}>
+                                  {typeLabels[t] || t}
+                                </span>
+                              ))}
                             </div>
                             {critere.description && (
                               <p className="text-xs text-slate-500 mt-1.5 font-medium leading-relaxed">{critere.description}</p>
