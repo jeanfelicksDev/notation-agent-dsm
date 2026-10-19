@@ -52,6 +52,7 @@ function roleDepuisStatut(statut: string): Role | null {
   const s = cle(statut)
   if (!s) return null
   if (s.includes('manager')) return 'MANAGER'
+  if (s.includes('interne')) return 'CLIENT_INTERNE'
   if (s.includes('externe') || s.includes('client')) return 'EXTERNE'
   if (s.includes('admin')) return 'ADMIN'
   return 'UTILISATEUR'

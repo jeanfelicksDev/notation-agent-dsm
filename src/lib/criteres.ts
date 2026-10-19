@@ -42,7 +42,7 @@ export function estEvaluateurManager(role: string | null | undefined) {
  * Critères qu'un évaluateur interne doit noter pour un collaborateur donné :
  * - manager → critères MANAGER ;
  * - collègue du même service → critères COLLEGUE ;
- * - agent d'un autre service → critères CLIENT_INTERNE.
+ * - agent d'un autre service, ou compte « Client interne » → critères CLIENT_INTERNE.
  */
 export function criteresPourPaire<C extends CritereTypable>(
   criteres: C[],
@@ -51,6 +51,9 @@ export function criteresPourPaire<C extends CritereTypable>(
 ): C[] {
   if (estEvaluateurManager(evaluateur.role)) {
     return criteres.filter((c) => typesDuCritere(c).includes('MANAGER'))
+  }
+  if (evaluateur.role === 'CLIENT_INTERNE') {
+    return criteres.filter((c) => typesDuCritere(c).includes('CLIENT_INTERNE'))
   }
   const type = evaluateur.service === evalue.service ? 'COLLEGUE' : 'CLIENT_INTERNE'
   return criteres.filter((c) => typesDuCritere(c).includes(type))

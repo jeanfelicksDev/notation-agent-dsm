@@ -39,14 +39,14 @@ export async function POST(
       const newAffectationsData: { campagneId: string; evaluateurId: string; evalueId: string }[] = []
       const existingKeys = new Set<string>()
 
-      // Seuls les agents opérationnels (non managers, non externes, non admins) sont notés
-      const evalueUsers = allUsers.filter(u => u.role !== 'MANAGER' && u.role !== 'EXTERNE' && u.role !== 'ADMIN')
+      // Seuls les agents opérationnels sont notés (ni managers, ni clients, ni administrateurs)
+      const evalueUsers = allUsers.filter(u => u.role === 'UTILISATEUR')
       const managerUsers = allUsers.filter(u => u.role === 'MANAGER')
 
       for (const user of evalueUsers) {
         // A. Assigner les collègues (pairs) du même service
         if (user.service) {
-          const sameServicePeers = allUsers.filter(u => u.service === user.service && u.id !== user.id && u.role !== 'MANAGER' && u.role !== 'EXTERNE' && u.role !== 'ADMIN')
+          const sameServicePeers = allUsers.filter(u => u.service === user.service && u.id !== user.id && u.role === 'UTILISATEUR')
           for (const peer of sameServicePeers) {
             const key = `${peer.id}_${user.id}`
             if (!existingKeys.has(key)) {

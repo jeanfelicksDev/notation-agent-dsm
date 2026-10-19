@@ -1177,7 +1177,7 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
 
   const getRoleCategory = (role: string): 'PAIR' | 'MANAGER' | 'EXTERNE' | 'ADMIN' => {
     if (role === 'MANAGER') return 'MANAGER'
-    if (role === 'EXTERNE') return 'EXTERNE'
+    if (role === 'EXTERNE' || role === 'CLIENT_INTERNE') return 'EXTERNE'
     if (role === 'ADMIN') return 'ADMIN'
     return 'PAIR'
   }
@@ -1188,6 +1188,8 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
         return { label: 'Manager', badge: 'bg-teal-100 text-teal-800 border-teal-200' }
       case 'EXTERNE':
         return { label: 'Client Ext.', badge: 'bg-amber-100 text-amber-800 border-amber-200' }
+      case 'CLIENT_INTERNE':
+        return { label: 'Client int.', badge: 'bg-slate-100 text-slate-700 border-slate-200' }
       case 'ADMIN':
         return { label: 'Admin', badge: 'bg-red-100 text-red-800 border-red-200' }
       default:
@@ -1196,7 +1198,7 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
   }
 
   // Règle métier DSM : seuls les collaborateurs pairs sont notés (ni managers, ni clients externes, ni admins)
-  const isNoteEligible = (u: User) => u.role !== 'MANAGER' && u.role !== 'EXTERNE' && u.role !== 'ADMIN'
+  const isNoteEligible = (u: User) => u.role === 'UTILISATEUR'
 
   // Liste de gauche (selon perspective)
   const baseLeftUsers = perspective === 'BY_EVALUE'
@@ -1978,7 +1980,7 @@ function SuiviDashboard({ affectations, users }: { affectations: any[], users: U
                         ? 'bg-amber-100 text-amber-800'
                         : 'bg-navy-100 text-navy-900'
                     }`}>
-                      {data.user.role === 'MANAGER' ? 'Manager' : data.user.role === 'EXTERNE' ? 'Client Ext.' : 'Pair'}
+                      {data.user.role === 'MANAGER' ? 'Manager' : data.user.role === 'EXTERNE' ? 'Client Ext.' : data.user.role === 'CLIENT_INTERNE' ? 'Client int.' : 'Pair'}
                     </span>
                   </div>
                   <p className="text-sm text-slate-500 font-medium">Matricule: {data.user.matricule} • Doit évaluer {data.totalToEvaluate} agents</p>

@@ -17,3 +17,9 @@ export function normaliserSexe(saisie: string | null | undefined): 'M' | 'F' | n
 export function libelleSexe(sexe: string | null | undefined) {
   return SEXES.find((s) => s.valeur === sexe)?.libelle ?? null
 }
+
+/** Services proposés dans les fiches agents. */
+export const SERVICES = ['Manutention', 'Consignation', 'Dépôt', 'Facturation'] as const
+
+/** Direction attribuée par défaut aux nouveaux agents. */
+export const DIRECTION_PAR_DEFAUT = 'Direction Maritime'
