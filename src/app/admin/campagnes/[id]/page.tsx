@@ -1811,15 +1811,17 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
                           </div>
                         </button>
                         {optionInterne && (
-                          <label className="flex cursor-pointer items-center gap-2 border-t border-emerald-200/70 px-4 py-2.5 text-xs font-medium text-emerald-950">
+                          <label
+                            title="Ce pair notera ce collaborateur sur les critères « Clients internes »"
+                            className="flex cursor-pointer items-center gap-2 border-t border-emerald-200/70 px-4 py-2 text-xs font-medium text-emerald-950"
+                          >
                             <input
                               type="checkbox"
                               checked={interne}
                               onChange={() => basculerInterne(user.id)}
                               className="h-4 w-4 rounded border-slate-300"
                             />
-                            Client interne
-                            <span className="font-normal text-emerald-800/70">· note les critères « Clients internes »</span>
+                            Noter en tant que client interne
                           </label>
                         )}
                         </div>
