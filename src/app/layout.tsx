@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next'
-import { Bodoni_Moda, Public_Sans } from 'next/font/google'
+import { Public_Sans, Source_Serif_4 } from 'next/font/google'
 import { Toaster } from '@/components/ui/feedback'
 import './globals.css'
 
@@ -9,11 +9,11 @@ const publicSans = Public_Sans({
   display: 'swap',
 })
 
-/** Didone à fort contraste, réservée aux titres d'affichage (ton « distinction »). */
-const bodoniModa = Bodoni_Moda({
+/** Serif chaleureuse à tailles optiques, réservée aux titres d'affichage. */
+const sourceSerif = Source_Serif_4({
   subsets: ['latin'],
   axes: ['opsz'],
-  variable: '--font-bodoni',
+  variable: '--font-serif-titres',
   display: 'swap',
 })
 
@@ -35,7 +35,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="fr" className={`${publicSans.variable} ${bodoniModa.variable} h-full`}>
+    <html lang="fr" className={`${publicSans.variable} ${sourceSerif.variable} h-full`}>
       <body className="min-h-full bg-canvas text-slate-900 antialiased">
         {children}
         <Toaster />

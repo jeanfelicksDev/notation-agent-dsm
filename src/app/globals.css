@@ -8,7 +8,7 @@
 
 @theme {
   --font-sans: var(--font-public-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-display: var(--font-bodoni), "Didot", "Bodoni 72", Georgia, serif;
+  --font-display: var(--font-serif-titres), Georgia, "Times New Roman", serif;
 
   /* Navy — ancré sur #002B49 (900) */
   --color-navy-50:  #f3f6f9;
