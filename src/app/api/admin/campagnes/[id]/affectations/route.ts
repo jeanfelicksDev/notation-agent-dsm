@@ -30,7 +30,9 @@ export async function POST(
   const { id } = await params
   try {
     const body = await req.json().catch(() => ({}))
-    const { mode, evaluateurId, evalueId, evalueIds, evaluateurIds, autoGenerate } = body
+    const { mode, evaluateurId, evalueId, evalueIds, evaluateurIds, autoGenerate, clientsInternes } = body
+    // Identifiants (du côté sélectionné) dont l'affectation est « client interne »
+    const internes = new Set<string>(Array.isArray(clientsInternes) ? clientsInternes.filter((x: unknown): x is string => typeof x === 'string') : [])
 
     // 1. Auto-génération TAMIS globale
     if (autoGenerate) {
@@ -87,7 +89,7 @@ export async function POST(
       if (!evalueId || !Array.isArray(evaluateurIds)) {
         return NextResponse.json({ error: 'Données invalides pour le mode collaborateur' }, { status: 400 })
       }
-      const resultat = await synchroniser(id, { evalueId }, 'evaluateurId', evaluateurIds, evalueId)
+      const resultat = await synchroniser(id, { evalueId }, 'evaluateurId', evaluateurIds, evalueId, internes)
       return NextResponse.json({ success: true, ...resultat })
     }
 
@@ -95,7 +97,7 @@ export async function POST(
     if (!evaluateurId || !Array.isArray(evalueIds)) {
       return NextResponse.json({ error: 'Données invalides' }, { status: 400 })
     }
-    const resultat = await synchroniser(id, { evaluateurId }, 'evalueId', evalueIds, evaluateurId)
+    const resultat = await synchroniser(id, { evaluateurId }, 'evalueId', evalueIds, evaluateurId, internes)
     return NextResponse.json({ success: true, ...resultat })
   } catch (error) {
     console.error('Affectation error:', error)
@@ -106,31 +108,43 @@ export async function POST(
 /**
  * Aligne les affectations sur la liste voulue SANS toucher à celles qui restent :
  * leur statut (brouillon, soumise) et leurs notes sont conservés. Seules les paires
- * retirées sont supprimées et les nouvelles créées. L'auto-évaluation est toujours exclue.
+ * retirées sont supprimées et les nouvelles créées ; la qualité « client interne » est
+ * mise à jour sur toutes. L'auto-évaluation est toujours exclue.
  */
 async function synchroniser(
   campagneId: string,
   fixe: { evalueId: string } | { evaluateurId: string },
   cote: 'evaluateurId' | 'evalueId',
   voulus: unknown[],
-  soiMeme: string
+  soiMeme: string,
+  internes: Set<string>
 ) {
   const cibles = new Set(voulus.filter((v): v is string => typeof v === 'string' && v !== '' && v !== soiMeme))
   const existantes = await prisma.affectation.findMany({
     where: { campagneId, ...fixe },
-    select: { id: true, evaluateurId: true, evalueId: true },
+    select: { id: true, evaluateurId: true, evalueId: true, clientInterne: true },
   })
   const actuels = new Set(existantes.map((a) => a[cote]))
 
   const aSupprimer = existantes.filter((a) => !cibles.has(a[cote])).map((a) => a.id)
   const aCreer = [...cibles].filter((c) => !actuels.has(c))
 
+  const aBasculer = existantes.filter((a) => cibles.has(a[cote]) && a.clientInterne !== internes.has(a[cote]))
+
   await prisma.$transaction([
     prisma.affectation.deleteMany({ where: { id: { in: aSupprimer } } }),
     prisma.affectation.createMany({
-      data: aCreer.map((c) => ({ campagneId, ...fixe, [cote]: c }) as { campagneId: string; evaluateurId: string; evalueId: string }),
+      data: aCreer.map((c) => ({ campagneId, ...fixe, [cote]: c, clientInterne: internes.has(c) }) as {
+        campagneId: string
+        evaluateurId: string
+        evalueId: string
+        clientInterne: boolean
+      }),
       skipDuplicates: true,
     }),
+    ...aBasculer.map((a) =>
+      prisma.affectation.update({ where: { id: a.id }, data: { clientInterne: internes.has(a[cote]) } })
+    ),
   ])
 
   return { ajoutees: aCreer.length, retirees: aSupprimer.length }

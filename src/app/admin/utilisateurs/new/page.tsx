@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Save, AlertCircle, User, Mail, Shield, Briefcase, Loader2, QrCode } from 'lucide-react'
 import AdminHeader from '@/components/AdminHeader'
-import { SEXES } from '@/lib/agents'
+import { DIRECTION_PAR_DEFAUT, SERVICES, SEXES } from '@/lib/agents'
+import { ROLES } from '@/lib/roles'
 
 export default function NewUtilisateurPage() {
   const router = useRouter()
@@ -23,7 +24,7 @@ export default function NewUtilisateurPage() {
     emploi: '',
     service: '',
     departement: '',
-    direction: '',
+    direction: DIRECTION_PAR_DEFAUT,
     qrcodeActif: false,
   })
 
@@ -176,14 +177,20 @@ export default function NewUtilisateurPage() {
 
                   <div className="space-y-2">
                     <label htmlFor="service" className="ml-1 block text-sm font-medium text-slate-700">Service</label>
-                    <input
-                      id="service"
-                      type="text"
-                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
-                      value={formData.service}
-                      onChange={e => setFormData({ ...formData, service: e.target.value })}
-                      placeholder="Ex : Facturation"
-                    />
+                    <select
+                  id="service"
+                  className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
+                  value={formData.service}
+                  onChange={e => setFormData({ ...formData, service: e.target.value })}
+                >
+                  <option value="">Non renseigné</option>
+                  {SERVICES.map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                  {formData.service && !(SERVICES as readonly string[]).includes(formData.service) && (
+                    <option value={formData.service}>{formData.service}</option>
+                  )}
+                </select>
                   </div>
 
                   <div className="space-y-2">
@@ -206,7 +213,7 @@ export default function NewUtilisateurPage() {
                       className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
                       value={formData.direction}
                       onChange={e => setFormData({ ...formData, direction: e.target.value })}
-                      placeholder="Ex : DSM"
+                      placeholder={DIRECTION_PAR_DEFAUT}
                     />
                   </div>
 
@@ -218,10 +225,9 @@ export default function NewUtilisateurPage() {
                         value={formData.role}
                         onChange={e => setFormData({ ...formData, role: e.target.value })}
                       >
-                        <option value="UTILISATEUR">Utilisateur (Agent)</option>
-                        <option value="MANAGER">Manager</option>
-                        <option value="ADMIN">Administrateur</option>
-                        <option value="EXTERNE">Externe (Client / Autre)</option>
+                        {ROLES.map(r => (
+                          <option key={r.valeur} value={r.valeur}>{r.libelle}</option>
+                        ))}
                       </select>
                       <Shield className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
                     </div>

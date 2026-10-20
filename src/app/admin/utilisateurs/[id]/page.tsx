@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Save, Trash2, AlertCircle, QrCode, KeyRound, Eye, EyeOff, Check } from 'lucide-react'
 import { confirmer, toast } from '@/components/ui/feedback'
-import { SEXES } from '@/lib/agents'
+import { DIRECTION_PAR_DEFAUT, SERVICES, SEXES } from '@/lib/agents'
+import { ROLES, ROLES_A_PIN } from '@/lib/roles'
 
 export default function UtilisateurDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -54,7 +55,7 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
           emploi: userData.emploi || '',
           service: userData.service || '',
           departement: userData.departement || '',
-          direction: userData.direction || '',
+          direction: userData.direction || DIRECTION_PAR_DEFAUT,
           qrcodeActif: userData.qrcodeActif || false,
         })
       }
@@ -255,9 +256,9 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
                   value={formData.role}
                   onChange={e => setFormData({ ...formData, role: e.target.value })}
                 >
-                  <option value="UTILISATEUR">Utilisateur</option>
-                  <option value="MANAGER">Manager</option>
-                  <option value="ADMIN">Administrateur</option>
+                  {ROLES.map(r => (
+                    <option key={r.valeur} value={r.valeur}>{r.libelle}</option>
+                  ))}
                 </select>
               </div>
 
@@ -301,14 +302,21 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Service</label>
-                <input
-                  type="text"
+                <label htmlFor="service" className="block text-sm font-medium text-gray-700 mb-1">Service</label>
+                <select
+                  id="service"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 outline-none"
                   value={formData.service}
                   onChange={e => setFormData({ ...formData, service: e.target.value })}
-                  placeholder="ex: Facturation, Opérations..."
-                />
+                >
+                  <option value="">Non renseigné</option>
+                  {SERVICES.map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                  {formData.service && !(SERVICES as readonly string[]).includes(formData.service) && (
+                    <option value={formData.service}>{formData.service} (valeur actuelle)</option>
+                  )}
+                </select>
               </div>
 
               <div>
@@ -329,7 +337,7 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 outline-none"
                   value={formData.direction}
                   onChange={e => setFormData({ ...formData, direction: e.target.value })}
-                  placeholder="ex: Direction des Opérations..."
+                  placeholder={DIRECTION_PAR_DEFAUT}
                 />
               </div>
 
@@ -384,7 +392,7 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
             </div>
 
             {/* PIN d'un agent : réinitialisation uniquement (l'agent le choisit lui-même) */}
-            {(formData.role === 'UTILISATEUR' || formData.role === 'MANAGER') && (
+            {ROLES_A_PIN.includes(formData.role) && (
               <div className="mt-4 flex flex-col gap-3 rounded-xl bg-slate-50 p-5 ring-1 ring-slate-200 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-sm font-semibold text-navy-900">Code PIN</p>

@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma'
 import { codePrisma } from '@/lib/erreurs'
 import type { Prisma } from '@prisma/client'
 import { normaliserSexe } from '@/lib/agents'
+import { estRole } from '@/lib/roles'
 import { requireAdmin, hashPassword, normalizeEmail, normalizeMatricule, pinEstDefini } from '@/lib/auth'
 
 export async function GET(
@@ -79,6 +80,9 @@ export async function PATCH(
     if (has('departement')) data.departement = optionnel(body.departement)
     if (has('direction')) data.direction = optionnel(body.direction)
 
+    if (has('role') && body.role && !estRole(body.role)) {
+      return NextResponse.json({ error: 'Rôle inconnu' }, { status: 400 })
+    }
     if (has('role') && body.role && body.role !== actuel.role) {
       if (id === admin.id) {
         return NextResponse.json({ error: 'Vous ne pouvez pas modifier votre propre rôle.' }, { status: 400 })

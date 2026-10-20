@@ -124,6 +124,8 @@ model Affectation {
   evalueId     String
   campagneId   String
   statut       StatutAffectation @default(EN_ATTENTE)
+  /// Pair désigné « client interne » de ce collaborateur : il note les critères CLIENT_INTERNE
+  clientInterne Boolean          @default(false)
   createdAt    DateTime          @default(now())
   campagne     Campagne          @relation(fields: [campagneId], references: [id], onDelete: Cascade)
   evalue       Utilisateur       @relation("EvalueAffectations", fields: [evalueId], references: [id], onDelete: Cascade)
@@ -217,6 +219,5 @@ enum Role {
   ADMIN
   MANAGER
   UTILISATEUR
-  CLIENT_INTERNE
   EXTERNE
 }

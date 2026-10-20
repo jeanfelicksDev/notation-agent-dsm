@@ -1148,6 +1148,8 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
   
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [targets, setTargets] = useState<string[]>([])
+  // Cibles dont l'affectation est « client interne » (le pair note les critères Clients internes)
+  const [internes, setInternes] = useState<string[]>([])
   const [targetSearch, setTargetSearch] = useState('')
   const [targetCategory, setTargetCategory] = useState<'ALL' | 'PAIR' | 'MANAGER' | 'EXTERNE'>('ALL')
   const [targetSort, setTargetSort] = useState<'name_asc' | 'role'>('name_asc')
@@ -1158,26 +1160,25 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
   useEffect(() => {
     if (!selectedUser) {
       setTargets([])
+      setInternes([])
       return
     }
     if (perspective === 'BY_EVALUE') {
       // Pour le noté sélectionné, qui sont ses évaluateurs ? (exclut strictement le noté lui-même)
-      const currentEvaluators = initialAffectations
-        .filter(a => a.evalueId === selectedUser.id && a.evaluateurId !== selectedUser.id)
-        .map(a => a.evaluateurId)
-      setTargets(currentEvaluators)
+      const lignes = initialAffectations.filter(a => a.evalueId === selectedUser.id && a.evaluateurId !== selectedUser.id)
+      setTargets(lignes.map(a => a.evaluateurId))
+      setInternes(lignes.filter(a => a.clientInterne).map(a => a.evaluateurId))
     } else {
       // Pour l'évaluateur sélectionné, qui sont ses notés ? (exclut strictement l'évaluateur lui-même)
-      const currentEvalues = initialAffectations
-        .filter(a => a.evaluateurId === selectedUser.id && a.evalueId !== selectedUser.id)
-        .map(a => a.evalueId)
-      setTargets(currentEvalues)
+      const lignes = initialAffectations.filter(a => a.evaluateurId === selectedUser.id && a.evalueId !== selectedUser.id)
+      setTargets(lignes.map(a => a.evalueId))
+      setInternes(lignes.filter(a => a.clientInterne).map(a => a.evalueId))
     }
   }, [selectedUser, perspective, initialAffectations])
 
   const getRoleCategory = (role: string): 'PAIR' | 'MANAGER' | 'EXTERNE' | 'ADMIN' => {
     if (role === 'MANAGER') return 'MANAGER'
-    if (role === 'EXTERNE' || role === 'CLIENT_INTERNE') return 'EXTERNE'
+    if (role === 'EXTERNE') return 'EXTERNE'
     if (role === 'ADMIN') return 'ADMIN'
     return 'PAIR'
   }
@@ -1188,12 +1189,10 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
         return { label: 'Manager', badge: 'bg-teal-100 text-teal-800 border-teal-200' }
       case 'EXTERNE':
         return { label: 'Client Ext.', badge: 'bg-amber-100 text-amber-800 border-amber-200' }
-      case 'CLIENT_INTERNE':
-        return { label: 'Client int.', badge: 'bg-slate-100 text-slate-700 border-slate-200' }
       case 'ADMIN':
         return { label: 'Admin', badge: 'bg-red-100 text-red-800 border-red-200' }
       default:
-        return { label: 'Pair (Collaborateur)', badge: 'bg-navy-100 text-navy-900 border-navy-200' }
+        return { label: 'Pair', badge: 'bg-navy-100 text-navy-900 border-navy-200' }
     }
   }
 
@@ -1280,10 +1279,18 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
 
     if (targets.includes(userId)) {
       setTargets(targets.filter(id => id !== userId))
+      setInternes(prev => prev.filter(id => id !== userId))
     } else {
       setTargets([...targets, userId])
     }
   }
+
+  /** Le notant de la paire est un pair : il peut être désigné « client interne ». */
+  const peutEtreClientInterne = (cible: User) =>
+    perspective === 'BY_EVALUE' ? cible.role === 'UTILISATEUR' : selectedUser?.role === 'UTILISATEUR'
+
+  const basculerInterne = (id: string) =>
+    setInternes(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]))
 
   const handleSelectAllFiltered = () => {
     if (!selectedUser) return
@@ -1303,6 +1310,7 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
     try {
       // Nettoyer strictement toute auto-évaluation éventuelle
       const cleanTargets = targets.filter(tId => tId !== selectedUser.id)
+      const clientsInternes = internes.filter(id => cleanTargets.includes(id))
 
       if (perspective === 'BY_EVALUE') {
         const r = await fetch(`/api/admin/campagnes/${campagneId}/affectations`, {
@@ -1311,7 +1319,8 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
           body: JSON.stringify({
             mode: 'by_evalue',
             evalueId: selectedUser.id,
-            evaluateurIds: cleanTargets
+            evaluateurIds: cleanTargets,
+            clientsInternes
           })
         })
         if (!r.ok) throw new Error()
@@ -1322,7 +1331,8 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
           body: JSON.stringify({
             mode: 'by_evaluateur',
             evaluateurId: selectedUser.id,
-            evalueIds: cleanTargets
+            evalueIds: cleanTargets,
+            clientsInternes
           })
         })
         if (!r.ok) throw new Error()
@@ -1746,15 +1756,23 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
                       const isSelected = targets.includes(user.id)
                       const catInfo = getCategoryLabel(user.role)
 
+                      const interne = internes.includes(user.id)
+                      const optionInterne = isSelected && peutEtreClientInterne(user)
+
                       return (
-                        <button
+                        <div
                           key={user.id}
-                          onClick={() => handleToggleTarget(user.id)}
-                          className={`w-full flex items-center justify-between p-3.5 sm:p-4 rounded-2xl border transition-all cursor-pointer ${
-                            isSelected 
-                              ? 'bg-emerald-50/95 border-emerald-300 ring-2 ring-emerald-100 shadow-sm' 
+                          className={`rounded-2xl border transition-all ${
+                            isSelected
+                              ? 'bg-emerald-50/95 border-emerald-300 ring-2 ring-emerald-100 shadow-sm'
                               : 'bg-white border-slate-100 hover:border-slate-300 hover:bg-slate-50'
                           }`}
+                        >
+                        <button
+                          type="button"
+                          onClick={() => handleToggleTarget(user.id)}
+                          aria-pressed={isSelected}
+                          className="w-full flex items-center justify-between p-3.5 sm:p-4 rounded-2xl cursor-pointer"
                         >
                           <div className="flex items-center gap-3 min-w-0">
                             <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-xs sm:text-sm flex-shrink-0 shadow-sm ${
@@ -1792,6 +1810,19 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
                             </div>
                           </div>
                         </button>
+                        {optionInterne && (
+                          <label className="flex cursor-pointer items-center gap-2 border-t border-emerald-200/70 px-4 py-2.5 text-xs font-medium text-emerald-950">
+                            <input
+                              type="checkbox"
+                              checked={interne}
+                              onChange={() => basculerInterne(user.id)}
+                              className="h-4 w-4 rounded border-slate-300"
+                            />
+                            Client interne
+                            <span className="font-normal text-emerald-800/70">· note les critères « Clients internes »</span>
+                          </label>
+                        )}
+                        </div>
                       )
                     })}
                   </div>
@@ -1980,7 +2011,7 @@ function SuiviDashboard({ affectations, users }: { affectations: any[], users: U
                         ? 'bg-amber-100 text-amber-800'
                         : 'bg-navy-100 text-navy-900'
                     }`}>
-                      {data.user.role === 'MANAGER' ? 'Manager' : data.user.role === 'EXTERNE' ? 'Client Ext.' : data.user.role === 'CLIENT_INTERNE' ? 'Client int.' : 'Pair'}
+                      {data.user.role === 'MANAGER' ? 'Manager' : data.user.role === 'EXTERNE' ? 'Client Ext.' : 'Pair'}
                     </span>
                   </div>
                   <p className="text-sm text-slate-500 font-medium">Matricule: {data.user.matricule} • Doit évaluer {data.totalToEvaluate} agents</p>

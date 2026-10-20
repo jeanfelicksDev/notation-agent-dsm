@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma'
 import type { Prisma, Role } from '@prisma/client'
 import { codePrisma } from '@/lib/erreurs'
 import { normalizeMatricule, requireAdmin } from '@/lib/auth'
-import { normaliserSexe } from '@/lib/agents'
+import { DIRECTION_PAR_DEFAUT, normaliserSexe } from '@/lib/agents'
 import * as XLSX from 'xlsx'
 
 /**
@@ -52,7 +52,6 @@ function roleDepuisStatut(statut: string): Role | null {
   const s = cle(statut)
   if (!s) return null
   if (s.includes('manager')) return 'MANAGER'
-  if (s.includes('interne')) return 'CLIENT_INTERNE'
   if (s.includes('externe') || s.includes('client')) return 'EXTERNE'
   if (s.includes('admin')) return 'ADMIN'
   return 'UTILISATEUR'
@@ -160,6 +159,7 @@ export async function POST(req: NextRequest) {
               motDePasse: '', // PIN à définir par l'agent à sa première connexion
               role,
               telephone: telephone || null,
+              direction: v('direction') || DIRECTION_PAR_DEFAUT,
             },
           })
           crees++

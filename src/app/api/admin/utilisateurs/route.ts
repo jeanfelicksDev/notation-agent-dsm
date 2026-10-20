@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { randomBytes } from 'node:crypto'
 import prisma from '@/lib/prisma'
 import { codePrisma } from '@/lib/erreurs'
-import { normaliserSexe } from '@/lib/agents'
+import { DIRECTION_PAR_DEFAUT, normaliserSexe } from '@/lib/agents'
+import { estRole } from '@/lib/roles'
 import { requireAdmin, hashPassword, pinEstDefini, normalizeEmail, normalizeMatricule } from '@/lib/auth'
 
 export async function GET() {
@@ -54,6 +55,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Tous les champs obligatoires doivent être remplis' }, { status: 400 })
     }
 
+    if (role && !estRole(role)) {
+      return NextResponse.json({ error: 'Rôle inconnu' }, { status: 400 })
+    }
     const finalRole = role || 'UTILISATEUR'
     const mdp = typeof motDePasse === 'string' ? motDePasse.trim() : ''
     // Un agent choisit lui-même son PIN à la première connexion ; un administrateur a un vrai mot de passe.
@@ -77,7 +81,7 @@ export async function POST(request: NextRequest) {
         emploi: emploi || null,
         service: service || null,
         departement: departement || null,
-        direction: direction || null,
+        direction: direction || DIRECTION_PAR_DEFAUT,
         qrcodeActif: isQrActive,
         qrToken: isQrActive ? randomBytes(20).toString('hex') : undefined,
       },

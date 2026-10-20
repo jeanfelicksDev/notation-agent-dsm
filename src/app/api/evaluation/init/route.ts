@@ -40,7 +40,7 @@ export async function GET() {
       prisma.affectation.findMany({
         where: { evaluateurId: evaluateur.id, campagneId: campagne.id, evalueId: { not: evaluateur.id } },
         select: {
-          id: true, evalueId: true, statut: true,
+          id: true, evalueId: true, statut: true, clientInterne: true,
           evalue: {
             select: { id: true, matricule: true, nom: true, prenom: true, service: true, emploi: true },
           },
@@ -72,7 +72,7 @@ export async function GET() {
     // Les critères à noter sont calculés ici, une seule fois, pour chaque collaborateur.
     const affectationsAvecCriteres = affectations.map((a) => ({
       ...a,
-      critereIds: criteresPourPaire(criteres, evaluateur, a.evalue).map((c) => c.id),
+      critereIds: criteresPourPaire(criteres, evaluateur, a.evalue, a.clientInterne).map((c) => c.id),
     }))
 
     return NextResponse.json({

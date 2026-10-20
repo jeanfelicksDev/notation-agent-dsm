@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import AdminHeader from '@/components/AdminHeader'
 import { confirmer, toast } from '@/components/ui/feedback'
+import { ROLES_A_PIN } from '@/lib/roles'
 
 const QRCode = dynamic(() => import('qrcode.react').then((m) => m.QRCodeSVG), { ssr: false })
 
@@ -48,7 +49,7 @@ const ROLES: Record<string, { label: string; className: string }> = {
   ADMIN: { label: 'Administrateur', className: 'bg-red-50 text-red-800 ring-red-200' },
   MANAGER: { label: 'Manager', className: 'bg-teal-50 text-teal-800 ring-teal-200' },
   EXTERNE: { label: 'Client externe', className: 'bg-gold-50 text-gold-800 ring-gold-200' },
-  UTILISATEUR: { label: 'Agent', className: 'bg-navy-50 text-navy-800 ring-navy-200' },
+  UTILISATEUR: { label: 'Pair', className: 'bg-navy-50 text-navy-800 ring-navy-200' },
 }
 
 const estVerrouille = (u: Utilisateur) => Boolean(u.verrouilleJusqua && new Date(u.verrouilleJusqua) > new Date())
@@ -86,7 +87,7 @@ export default function UtilisateursPage() {
   const internes = utilisateurs.filter((u) => u.role === 'UTILISATEUR' || u.role === 'MANAGER')
   const compteurs = {
     tous: utilisateurs.length,
-    sans_pin: internes.filter((u) => !u.pinDefini).length,
+    sans_pin: utilisateurs.filter((u) => ROLES_A_PIN.includes(u.role) && !u.pinDefini).length,
     verrouilles: utilisateurs.filter(estVerrouille).length,
     managers: utilisateurs.filter((u) => u.role === 'MANAGER').length,
     externes: utilisateurs.filter((u) => u.role === 'EXTERNE').length,
@@ -96,7 +97,7 @@ export default function UtilisateursPage() {
     const q = recherche.trim().toLowerCase()
     return utilisateurs.filter((u) => {
       if (q && !`${u.nom} ${u.prenom} ${u.matricule} ${u.service ?? ''} ${u.emploi ?? ''} ${u.departement ?? ''} ${u.telephone ?? ''}`.toLowerCase().includes(q)) return false
-      if (filtre === 'sans_pin') return (u.role === 'UTILISATEUR' || u.role === 'MANAGER') && !u.pinDefini
+      if (filtre === 'sans_pin') return ROLES_A_PIN.includes(u.role) && !u.pinDefini
       if (filtre === 'verrouilles') return estVerrouille(u)
       if (filtre === 'managers') return u.role === 'MANAGER'
       if (filtre === 'externes') return u.role === 'EXTERNE'
@@ -306,6 +307,7 @@ export default function UtilisateursPage() {
                   : liste.map((u) => {
                       const role = ROLES[u.role] ?? ROLES.UTILISATEUR
                       const interne = u.role === 'UTILISATEUR' || u.role === 'MANAGER'
+                      const aPin = ROLES_A_PIN.includes(u.role)
                       return (
                         <tr key={u.id} className="hover:bg-slate-50/70">
                           <td className="px-5 py-3.5">
@@ -354,7 +356,7 @@ export default function UtilisateursPage() {
                           </td>
                           <td className="px-5 py-3.5">
                             <div className="flex items-center justify-end gap-1">
-                              {interne && (u.pinDefini || estVerrouille(u)) && (
+                              {aPin && (u.pinDefini || estVerrouille(u)) && (
                                 <button
                                   onClick={() => reinitialiserPin(u)}
                                   className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"

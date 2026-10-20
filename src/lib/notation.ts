@@ -31,7 +31,7 @@ export async function preparerNotation(evaluateurId: string, evalueIds: string[]
     prisma.utilisateur.findUnique({ where: { id: evaluateurId }, select: { role: true, service: true } }),
     prisma.affectation.findMany({
       where: { evaluateurId, campagneId: campagne.id, evalueId: { in: evalueIds } },
-      select: { evalueId: true, statut: true, evalue: { select: { service: true, prenom: true, nom: true } } },
+      select: { evalueId: true, statut: true, clientInterne: true, evalue: { select: { service: true, prenom: true, nom: true } } },
     }),
     prisma.critere.findMany({
       where: { campagneId: campagne.id },
@@ -48,7 +48,7 @@ export async function preparerNotation(evaluateurId: string, evalueIds: string[]
   }
 
   const attendus = new Map(
-    affectations.map((a) => [a.evalueId, criteresPourPaire(criteres, evaluateur, a.evalue)])
+    affectations.map((a) => [a.evalueId, criteresPourPaire(criteres, evaluateur, a.evalue, a.clientInterne)])
   )
 
   /** Ne garde que des notes valides : critère attendu pour ce collaborateur, entier dans le barème. */
