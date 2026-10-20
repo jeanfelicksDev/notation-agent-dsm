@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { randomBytes } from 'node:crypto'
 import prisma from '@/lib/prisma'
 import { codePrisma } from '@/lib/erreurs'
-import { DIRECTION_PAR_DEFAUT, normaliserSexe } from '@/lib/agents'
+import { normaliserSexe } from '@/lib/agents'
+import { completerListes, directionParDefaut } from '@/lib/listes-serveur'
 import { estRole } from '@/lib/roles'
 import { requireAdmin, hashPassword, pinEstDefini, normalizeEmail, normalizeMatricule } from '@/lib/auth'
 
@@ -81,12 +82,13 @@ export async function POST(request: NextRequest) {
         emploi: emploi || null,
         service: service || null,
         departement: departement || null,
-        direction: direction || DIRECTION_PAR_DEFAUT,
+        direction: direction || (await directionParDefaut()),
         qrcodeActif: isQrActive,
         qrToken: isQrActive ? randomBytes(20).toString('hex') : undefined,
       },
       select: { id: true, matricule: true, nom: true, prenom: true, role: true },
     })
+    await completerListes([{ nationalite, service, departement, direction }])
 
     return NextResponse.json(utilisateur)
   } catch (error) {

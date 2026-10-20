@@ -5,6 +5,7 @@ import { codePrisma } from '@/lib/erreurs'
 import type { Prisma } from '@prisma/client'
 import { normaliserSexe } from '@/lib/agents'
 import { estRole } from '@/lib/roles'
+import { completerListes } from '@/lib/listes-serveur'
 import { requireAdmin, hashPassword, normalizeEmail, normalizeMatricule, pinEstDefini } from '@/lib/auth'
 
 export async function GET(
@@ -116,6 +117,7 @@ export async function PATCH(
       data,
       select: { id: true, matricule: true, nom: true, prenom: true, role: true },
     })
+    await completerListes([data])
 
     return NextResponse.json(utilisateur)
   } catch (error) {

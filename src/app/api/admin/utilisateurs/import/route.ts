@@ -3,7 +3,8 @@ import prisma from '@/lib/prisma'
 import type { Prisma, Role } from '@prisma/client'
 import { codePrisma } from '@/lib/erreurs'
 import { normalizeMatricule, requireAdmin } from '@/lib/auth'
-import { DIRECTION_PAR_DEFAUT, normaliserSexe } from '@/lib/agents'
+import { normaliserSexe } from '@/lib/agents'
+import { completerListes, directionParDefaut } from '@/lib/listes-serveur'
 import * as XLSX from 'xlsx'
 
 /**
@@ -94,6 +95,8 @@ export async function POST(req: NextRequest) {
     let ignores = 0
     const erreurs: string[] = []
     const vus = new Set<string>()
+    const direction = await directionParDefaut()
+    const valeursLues: Array<Record<string, unknown>> = []
 
     for (let n = 1; n < lignes.length; n++) {
       const ligne = lignes[n] as unknown[]
@@ -129,6 +132,7 @@ export async function POST(req: NextRequest) {
         if (v(c)) champs[c] = v(c)
       }
       if (v('email')) champs.email = v('email').toLowerCase()
+      valeursLues.push({ ...champs, direction: v('direction') || direction })
 
       const roleFichier = present('statut') ? roleDepuisStatut(v('statut')) : null
 
@@ -159,7 +163,7 @@ export async function POST(req: NextRequest) {
               motDePasse: '', // PIN à définir par l'agent à sa première connexion
               role,
               telephone: telephone || null,
-              direction: v('direction') || DIRECTION_PAR_DEFAUT,
+              direction: v('direction') || direction,
             },
           })
           crees++
@@ -170,6 +174,9 @@ export async function POST(req: NextRequest) {
         )
       }
     }
+
+    // Les valeurs nouvelles du fichier rejoignent les listes déroulantes.
+    await completerListes(valeursLues)
 
     const parts = [`${crees} créé(s)`, `${misAJour} mis à jour`]
     if (ignores) parts.push(`${ignores} ligne(s) sans matricule ignorée(s)`)

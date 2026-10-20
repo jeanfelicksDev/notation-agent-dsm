@@ -11,6 +11,7 @@ import {
   ExternalLink,
   FileSpreadsheet,
   KeyRound,
+  ListChecks,
   Loader2,
   Lock,
   Plus,
@@ -24,6 +25,8 @@ import {
 import AdminHeader from '@/components/AdminHeader'
 import { confirmer, toast } from '@/components/ui/feedback'
 import { ROLES_A_PIN } from '@/lib/roles'
+import { libelleRoleDepuis } from '@/lib/listes'
+import { useListes } from '@/components/listes'
 
 const QRCode = dynamic(() => import('qrcode.react').then((m) => m.QRCodeSVG), { ssr: false })
 
@@ -67,6 +70,7 @@ export default function UtilisateursPage() {
   const [activationQr, setActivationQr] = useState(false)
   const [importOuvert, setImportOuvert] = useState(false)
   const [qrOuvert, setQrOuvert] = useState(false)
+  const { listes } = useListes()
 
   const recuperer = () =>
     fetch('/api/admin/utilisateurs')
@@ -209,6 +213,13 @@ export default function UtilisateursPage() {
               Importer
             </button>
             <Link
+              href="/admin/listes"
+              className="inline-flex h-10 items-center gap-2 rounded-lg bg-white px-3.5 text-sm font-medium text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50"
+            >
+              <ListChecks className="h-4 w-4 text-navy-600" aria-hidden />
+              Listes
+            </Link>
+            <Link
               href="/admin/utilisateurs/new"
               className="inline-flex h-10 items-center gap-2 rounded-lg bg-navy-900 px-4 text-sm font-semibold text-white hover:bg-navy-800"
             >
@@ -321,7 +332,7 @@ export default function UtilisateursPage() {
                             {u.emploi && u.service && <p className="text-xs text-slate-400">{u.service}</p>}
                           </td>
                           <td className="px-5 py-3.5">
-                            <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ${role.className}`}>{role.label}</span>
+                            <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ${role.className}`}>{libelleRoleDepuis(listes, u.role)}</span>
                           </td>
                           <td className="px-5 py-3.5">
                             {estVerrouille(u) ? (

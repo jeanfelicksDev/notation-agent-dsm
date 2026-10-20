@@ -51,6 +51,21 @@ model Utilisateur {
   @@index([qrcodeActif])
 }
 
+/// Valeurs proposées dans les listes déroulantes des fiches agents (gérées par l'administrateur).
+/// liste : NATIONALITE | SERVICE | DEPARTEMENT | DIRECTION | ROLE.
+/// Pour ROLE, `code` porte la valeur de l'énum Role : seul le libellé se modifie.
+model ValeurListe {
+  id        String   @id @default(uuid())
+  liste     String
+  libelle   String
+  code      String?
+  parDefaut Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@unique([liste, libelle])
+  @@index([liste])
+}
+
 model OtpToken {
   id            String      @id @default(uuid())
   utilisateurId String

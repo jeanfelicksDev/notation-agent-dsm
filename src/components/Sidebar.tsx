@@ -7,6 +7,7 @@ import {
   ClipboardList,
   ExternalLink,
   LayoutDashboard,
+  ListChecks,
   LogOut,
   Menu,
   QrCode,
@@ -20,6 +21,7 @@ const navItems = [
   { label: 'Tableau de bord', href: '/admin', icon: LayoutDashboard, exact: true },
   { label: 'Campagnes', href: '/admin/campagnes', icon: ClipboardList },
   { label: 'Agents', href: '/admin/utilisateurs', icon: Users },
+  { label: 'Listes déroulantes', href: '/admin/listes', icon: ListChecks },
   { label: 'Classement', href: '/admin/classement', icon: Trophy },
 ]
 

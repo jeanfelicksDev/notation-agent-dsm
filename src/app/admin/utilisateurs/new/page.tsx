@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Save, AlertCircle, User, Mail, Shield, Briefcase, Loader2, QrCode } from 'lucide-react'
+import { ArrowLeft, Save, AlertCircle, User, Mail, Briefcase, Loader2, QrCode } from 'lucide-react'
 import AdminHeader from '@/components/AdminHeader'
-import { DIRECTION_PAR_DEFAUT, SERVICES, SEXES } from '@/lib/agents'
-import { ROLES } from '@/lib/roles'
+import { SEXES } from '@/lib/agents'
+import { valeurParDefaut } from '@/lib/listes'
+import { ChampListe, useListes } from '@/components/listes'
 
 export default function NewUtilisateurPage() {
   const router = useRouter()
@@ -24,9 +25,19 @@ export default function NewUtilisateurPage() {
     emploi: '',
     service: '',
     departement: '',
-    direction: DIRECTION_PAR_DEFAUT,
+    direction: '',
     qrcodeActif: false,
   })
+  // Valeurs marquées « par défaut » dans les listes (ex. la direction), une fois les listes chargées
+  const { listes, setListes } = useListes((l) =>
+    setFormData((f) => ({
+      ...f,
+      nationalite: f.nationalite || valeurParDefaut(l, 'NATIONALITE'),
+      service: f.service || valeurParDefaut(l, 'SERVICE'),
+      departement: f.departement || valeurParDefaut(l, 'DEPARTEMENT'),
+      direction: f.direction || valeurParDefaut(l, 'DIRECTION'),
+    }))
+  )
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -151,17 +162,17 @@ export default function NewUtilisateurPage() {
                     </select>
                   </div>
 
-                  <div className="space-y-2">
-                    <label htmlFor="nationalite" className="ml-1 block text-sm font-medium text-slate-700">Nationalité</label>
-                    <input
-                      id="nationalite"
-                      type="text"
-                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
-                      value={formData.nationalite}
-                      onChange={e => setFormData({ ...formData, nationalite: e.target.value })}
-                      placeholder="Ex : Ivoirienne"
-                    />
-                  </div>
+                  <ChampListe
+                    id="nationalite"
+                    label="Nationalité"
+                    liste="NATIONALITE"
+                    value={formData.nationalite}
+                    onChange={(v) => setFormData((f) => ({ ...f, nationalite: v }))}
+                    listes={listes}
+                    onListes={setListes}
+                    labelClassName="ml-1 block text-sm font-medium text-slate-700"
+                    selectClassName="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
+                  />
 
                   <div className="space-y-2">
                     <label htmlFor="emploi" className="ml-1 block text-sm font-medium text-slate-700">Emploi</label>
@@ -175,63 +186,53 @@ export default function NewUtilisateurPage() {
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <label htmlFor="service" className="ml-1 block text-sm font-medium text-slate-700">Service</label>
-                    <select
-                  id="service"
-                  className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
-                  value={formData.service}
-                  onChange={e => setFormData({ ...formData, service: e.target.value })}
-                >
-                  <option value="">Non renseigné</option>
-                  {SERVICES.map(s => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                  {formData.service && !(SERVICES as readonly string[]).includes(formData.service) && (
-                    <option value={formData.service}>{formData.service}</option>
-                  )}
-                </select>
-                  </div>
+                  <ChampListe
+                    id="service"
+                    label="Service"
+                    liste="SERVICE"
+                    value={formData.service}
+                    onChange={(v) => setFormData((f) => ({ ...f, service: v }))}
+                    listes={listes}
+                    onListes={setListes}
+                    labelClassName="ml-1 block text-sm font-medium text-slate-700"
+                    selectClassName="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
+                  />
 
-                  <div className="space-y-2">
-                    <label htmlFor="departement" className="ml-1 block text-sm font-medium text-slate-700">Département</label>
-                    <input
-                      id="departement"
-                      type="text"
-                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
-                      value={formData.departement}
-                      onChange={e => setFormData({ ...formData, departement: e.target.value })}
-                      placeholder="Ex : Opérations maritimes"
-                    />
-                  </div>
+                  <ChampListe
+                    id="departement"
+                    label="Département"
+                    liste="DEPARTEMENT"
+                    value={formData.departement}
+                    onChange={(v) => setFormData((f) => ({ ...f, departement: v }))}
+                    listes={listes}
+                    onListes={setListes}
+                    labelClassName="ml-1 block text-sm font-medium text-slate-700"
+                    selectClassName="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
+                  />
 
-                  <div className="space-y-2">
-                    <label htmlFor="direction" className="ml-1 block text-sm font-medium text-slate-700">Direction</label>
-                    <input
-                      id="direction"
-                      type="text"
-                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
-                      value={formData.direction}
-                      onChange={e => setFormData({ ...formData, direction: e.target.value })}
-                      placeholder={DIRECTION_PAR_DEFAUT}
-                    />
-                  </div>
+                  <ChampListe
+                    id="direction"
+                    label="Direction"
+                    liste="DIRECTION"
+                    value={formData.direction}
+                    onChange={(v) => setFormData((f) => ({ ...f, direction: v }))}
+                    listes={listes}
+                    onListes={setListes}
+                    labelClassName="ml-1 block text-sm font-medium text-slate-700"
+                    selectClassName="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
+                  />
 
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Rôle Système</label>
-                    <div className="relative">
-                      <select
-                        className="w-full px-5 py-3.5 pl-12 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold appearance-none"
-                        value={formData.role}
-                        onChange={e => setFormData({ ...formData, role: e.target.value })}
-                      >
-                        {ROLES.map(r => (
-                          <option key={r.valeur} value={r.valeur}>{r.libelle}</option>
-                        ))}
-                      </select>
-                      <Shield className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
-                    </div>
-                  </div>
+                  <ChampListe
+                    id="role"
+                    label="Rôle"
+                    liste="ROLE"
+                    value={formData.role}
+                    onChange={(v) => setFormData((f) => ({ ...f, role: v }))}
+                    listes={listes}
+                    onListes={setListes}
+                    labelClassName="ml-1 block text-sm font-medium text-slate-700"
+                    selectClassName="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
+                  />
 
 
 

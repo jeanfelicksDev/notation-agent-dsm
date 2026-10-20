@@ -5,8 +5,9 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Save, Trash2, AlertCircle, QrCode, KeyRound, Eye, EyeOff, Check } from 'lucide-react'
 import { confirmer, toast } from '@/components/ui/feedback'
-import { DIRECTION_PAR_DEFAUT, SERVICES, SEXES } from '@/lib/agents'
-import { ROLES, ROLES_A_PIN } from '@/lib/roles'
+import { SEXES } from '@/lib/agents'
+import { ROLES_A_PIN } from '@/lib/roles'
+import { ChampListe, useListes } from '@/components/listes'
 
 export default function UtilisateurDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -14,6 +15,7 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const { listes, setListes } = useListes()
   const [formData, setFormData] = useState({
     matricule: '',
     nom: '',
@@ -55,7 +57,7 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
           emploi: userData.emploi || '',
           service: userData.service || '',
           departement: userData.departement || '',
-          direction: userData.direction || DIRECTION_PAR_DEFAUT,
+          direction: userData.direction || '',
           qrcodeActif: userData.qrcodeActif || false,
         })
       }
@@ -249,18 +251,16 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Rôle</label>
-                <select
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 outline-none"
-                  value={formData.role}
-                  onChange={e => setFormData({ ...formData, role: e.target.value })}
-                >
-                  {ROLES.map(r => (
-                    <option key={r.valeur} value={r.valeur}>{r.libelle}</option>
-                  ))}
-                </select>
-              </div>
+              <ChampListe
+                id="role"
+                label="Rôle"
+                liste="ROLE"
+                value={formData.role}
+                onChange={(v) => setFormData((f) => ({ ...f, role: v }))}
+                listes={listes}
+                onListes={setListes}
+                selectClassName="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 outline-none bg-white"
+              />
 
               <div>
                 <label htmlFor="sexe" className="block text-sm font-medium text-gray-700 mb-1">Sexe</label>
@@ -277,17 +277,16 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
                 </select>
               </div>
 
-              <div>
-                <label htmlFor="nationalite" className="block text-sm font-medium text-gray-700 mb-1">Nationalité</label>
-                <input
-                  id="nationalite"
-                  type="text"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 outline-none"
-                  value={formData.nationalite}
-                  onChange={e => setFormData({ ...formData, nationalite: e.target.value })}
-                  placeholder="ex : Ivoirienne"
-                />
-              </div>
+              <ChampListe
+                id="nationalite"
+                label="Nationalité"
+                liste="NATIONALITE"
+                value={formData.nationalite}
+                onChange={(v) => setFormData((f) => ({ ...f, nationalite: v }))}
+                listes={listes}
+                onListes={setListes}
+                selectClassName="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 outline-none bg-white"
+              />
 
               <div>
                 <label htmlFor="emploi" className="block text-sm font-medium text-gray-700 mb-1">Emploi</label>
@@ -301,45 +300,38 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
                 />
               </div>
 
-              <div>
-                <label htmlFor="service" className="block text-sm font-medium text-gray-700 mb-1">Service</label>
-                <select
-                  id="service"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 outline-none"
-                  value={formData.service}
-                  onChange={e => setFormData({ ...formData, service: e.target.value })}
-                >
-                  <option value="">Non renseigné</option>
-                  {SERVICES.map(s => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                  {formData.service && !(SERVICES as readonly string[]).includes(formData.service) && (
-                    <option value={formData.service}>{formData.service} (valeur actuelle)</option>
-                  )}
-                </select>
-              </div>
+              <ChampListe
+                id="service"
+                label="Service"
+                liste="SERVICE"
+                value={formData.service}
+                onChange={(v) => setFormData((f) => ({ ...f, service: v }))}
+                listes={listes}
+                onListes={setListes}
+                selectClassName="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 outline-none bg-white"
+              />
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Département</label>
-                <input
-                  type="text"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 outline-none"
-                  value={formData.departement}
-                  onChange={e => setFormData({ ...formData, departement: e.target.value })}
-                  placeholder="ex: Dsm, Manut, Entrepot..."
-                />
-              </div>
+              <ChampListe
+                id="departement"
+                label="Département"
+                liste="DEPARTEMENT"
+                value={formData.departement}
+                onChange={(v) => setFormData((f) => ({ ...f, departement: v }))}
+                listes={listes}
+                onListes={setListes}
+                selectClassName="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 outline-none bg-white"
+              />
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Direction</label>
-                <input
-                  type="text"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 outline-none"
-                  value={formData.direction}
-                  onChange={e => setFormData({ ...formData, direction: e.target.value })}
-                  placeholder={DIRECTION_PAR_DEFAUT}
-                />
-              </div>
+              <ChampListe
+                id="direction"
+                label="Direction"
+                liste="DIRECTION"
+                value={formData.direction}
+                onChange={(v) => setFormData((f) => ({ ...f, direction: v }))}
+                listes={listes}
+                onListes={setListes}
+                selectClassName="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 outline-none bg-white"
+              />
 
 
 
