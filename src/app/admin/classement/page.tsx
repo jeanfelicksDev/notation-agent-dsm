@@ -20,15 +20,33 @@ interface SiteScores {
   scores: Score[]
 }
 
+interface CampagneResume {
+  id: string
+  libelle: string
+  statut: string
+}
+
 export default function ClassementPage() {
   const [siteScores, setSiteScores] = useState<SiteScores[]>([])
+  const [campagnes, setCampagnes] = useState<CampagneResume[]>([])
+  const [campagneId, setCampagneId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    fetch('/api/admin/classement')
+  const charger = (id?: string) => {
+    setLoading(true)
+    const url = id ? `/api/admin/classement?campagneId=${encodeURIComponent(id)}` : '/api/admin/classement'
+    fetch(url)
       .then(res => res.json())
-      .then(data => setSiteScores(data))
+      .then(data => {
+        setCampagnes(data.campagnes ?? [])
+        setCampagneId(data.campagneId ?? null)
+        setSiteScores(data.sites ?? [])
+      })
       .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    charger()
   }, [])
 
   const getMedalIcon = (rang: number) => {
@@ -63,6 +81,19 @@ export default function ClassementPage() {
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <h1 className="text-2xl font-bold text-gray-800">Classement par Site</h1>
+          {campagnes.length > 0 && (
+            <select
+              value={campagneId ?? ''}
+              onChange={e => charger(e.target.value)}
+              className="ml-auto border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 bg-white"
+            >
+              {campagnes.map(c => (
+                <option key={c.id} value={c.id}>
+                  {c.libelle}{c.statut !== 'CALCULEE' ? ` (${c.statut.toLowerCase()})` : ''}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       </header>
 

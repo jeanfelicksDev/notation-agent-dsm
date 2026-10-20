@@ -2,13 +2,30 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { requireAdmin } from '@/lib/auth'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const admin = await requireAdmin()
   if (!admin) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
 
   try {
-    const campagne = await prisma.campagne.findFirst({
-      where: { statut: 'CALCULEE' },
+    // Toutes les campagnes ayant des scores restent consultables, quel que soit leur statut
+    const campagnes = await prisma.campagne.findMany({
+      where: { scores: { some: {} } },
+      select: { id: true, libelle: true, statut: true, dateDebut: true },
+      orderBy: { dateDebut: 'desc' }
+    })
+
+    const campagneIdDemandee = request.nextUrl.searchParams.get('campagneId')
+    const selection =
+      campagnes.find(c => c.id === campagneIdDemandee) ??
+      campagnes.find(c => c.statut === 'CALCULEE') ??
+      campagnes[0]
+
+    if (!selection) {
+      return NextResponse.json({ campagnes: [], campagneId: null, sites: [] })
+    }
+
+    const campagne = await prisma.campagne.findUniqueOrThrow({
+      where: { id: selection.id },
       include: {
         scores: {
           include: {
@@ -20,10 +37,6 @@ export async function GET() {
         }
       }
     })
-
-    if (!campagne) {
-      return NextResponse.json([])
-    }
 
     const sites = await prisma.site.findMany()
 
@@ -58,7 +71,11 @@ export async function GET() {
       }
     }
 
-    return NextResponse.json(siteScores)
+    return NextResponse.json({
+      campagnes: campagnes.map(c => ({ id: c.id, libelle: c.libelle, statut: c.statut })),
+      campagneId: campagne.id,
+      sites: siteScores
+    })
   } catch (error) {
     console.error('Error:', error)
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
