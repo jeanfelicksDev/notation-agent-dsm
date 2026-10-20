@@ -8,6 +8,8 @@
 
 @theme {
   --font-sans: var(--font-public-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: var(--font-big-shoulders), "Arial Narrow", sans-serif;
+  --font-stencil: var(--font-bs-stencil), var(--font-big-shoulders), sans-serif;
 
   /* Navy — ancré sur #002B49 (900) */
   --color-navy-50:  #f3f6f9;
@@ -47,12 +49,18 @@
 
   --animate-fade-in: fade-in 200ms var(--ease-out-expo) both;
   --animate-rise-in: rise-in 260ms var(--ease-out-expo) both;
+  --animate-reveal: reveal 900ms var(--ease-out-expo) both;
 
   @keyframes fade-in {
     from { opacity: 0; }
     to { opacity: 1; }
   }
   /* Part d'un état déjà visible : le contenu ne dépend jamais de la fin de l'animation. */
+  /* Dévoilement du titre d'accueil : part d'un texte déjà lisible (aucun contenu masqué). */
+  @keyframes reveal {
+    from { transform: translateY(0.18em); letter-spacing: 0.03em; }
+    to { transform: none; letter-spacing: inherit; }
+  }
   @keyframes rise-in {
     from { transform: translateY(6px); }
     to { transform: none; }
