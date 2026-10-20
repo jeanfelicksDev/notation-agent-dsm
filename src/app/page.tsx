@@ -149,7 +149,7 @@ function AccueilContenu() {
     <div className="relative min-h-dvh overflow-hidden bg-navy-900 text-white">
       <Isobathes />
 
-      <div className="relative mx-auto grid min-h-dvh max-w-[90rem] grid-rows-[auto_1fr_auto] px-5 sm:px-10 lg:px-16">
+      <div className="relative mx-auto grid min-h-dvh max-w-6xl grid-rows-[auto_1fr_auto] px-5 sm:px-10">
         {/* ─── En-tête ─── */}
         <header className="flex items-center justify-between gap-4 py-6">
           <div className="flex items-center gap-3">
@@ -171,8 +171,8 @@ function AccueilContenu() {
         </header>
 
         {/* ─── Scène ─── */}
-        <main className="grid items-center gap-10 py-4 lg:grid-cols-12 lg:gap-16 lg:py-6">
-          <section className="lg:col-span-7" aria-labelledby="titre-page">
+        <main className="grid items-center gap-10 py-4 lg:grid-cols-[minmax(0,1fr)_24rem] lg:gap-14 lg:py-6 xl:gap-20">
+          <section aria-labelledby="titre-page">
             <h1 id="titre-page" className="max-w-2xl font-display text-[2.75rem] leading-[1.02] font-medium tracking-[-0.02em] text-white sm:text-6xl xl:text-[4.25rem]">
               Évaluation de la performance <span className="text-gold-400">des agents</span>
             </h1>
@@ -241,7 +241,7 @@ function AccueilContenu() {
           </section>
 
           {/* ─── Formulaire ─── */}
-          <section className="lg:col-span-5" aria-labelledby="titre-connexion">
+          <section aria-labelledby="titre-connexion">
             <div className="rounded-xl bg-white p-7 text-slate-900 shadow-overlay sm:p-9">
               {etape !== 'identifiant' && (
                 <button
