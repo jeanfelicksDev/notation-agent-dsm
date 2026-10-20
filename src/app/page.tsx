@@ -19,8 +19,16 @@ const MESSAGES_REDIRECTION: Record<string, string> = {
   session_expired: 'Votre session a expiré. Connectez-vous à nouveau.',
 }
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+function formatDateCourte(iso: string) {
+  return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+/** Libellé lisible : les mots en capitales passent en casse de titre, les sigles courts (DSM) restent en capitales. */
+function libelleCampagne(libelle: string) {
+  return libelle
+    .split(/\s+/)
+    .map((m) => (m.length > 3 && m === m.toUpperCase() ? m.charAt(0) + m.slice(1).toLowerCase() : m))
+    .join(' ')
 }
 
 /** Jours restants jusqu'à la fin du dernier jour de la campagne (0 = dernier jour). */
@@ -164,67 +172,76 @@ function AccueilContenu() {
 
         {/* ─── Scène ─── */}
         <main className="grid items-center gap-10 py-6 lg:grid-cols-12 lg:gap-16 lg:py-10">
-          <section className="lg:col-span-7" aria-labelledby="titre-campagne">
-            <div className="relative flex max-w-full flex-col items-start sm:inline-block">
-              <h1
-                id="titre-campagne"
-                className="animate-reveal font-display text-[clamp(2.6rem,8.5vw,8.25rem)] leading-[0.86] font-extrabold tracking-[-0.01em] text-balance uppercase"
-              >
-                {campagne ? campagne.libelle : 'Évaluation des agents'}
-              </h1>
-              {jours !== null && (
-                <p
-                  className="order-first mb-4 inline-block rotate-[-4deg] rounded-sm border-2 border-gold-500 px-3 py-1 font-stencil text-lg leading-none text-gold-400 sm:absolute sm:-top-7 sm:right-0 sm:mb-0 sm:rotate-[-6deg] sm:text-2xl lg:-right-6"
-                  aria-label={jours === 0 ? 'Dernier jour de la campagne' : `Clôture dans ${jours} jours`}
-                >
-                  {jours === 0 ? 'DERNIER JOUR' : `CLÔTURE J-${jours}`}
-                </p>
-              )}
-            </div>
-
-            <p className="mt-6 max-w-xl text-base leading-relaxed text-navy-100 sm:mt-8 sm:text-xl">
-              Notez les collaborateurs qui vous sont attribués, critère par critère.
-              {campagne && (
-                <>
-                  {' '}
-                  La campagne se termine le <strong className="font-semibold text-white">{formatDate(campagne.dateFin)}</strong>.
-                </>
-              )}
+          <section className="lg:col-span-7" aria-labelledby="titre-page">
+            <h1 id="titre-page" className="max-w-2xl text-4xl leading-[1.1] font-semibold tracking-tight text-white sm:text-5xl">
+              Évaluation de la performance des agents
+            </h1>
+            <p className="mt-5 hidden max-w-xl text-base leading-relaxed text-navy-100 sm:block sm:text-lg">
+              Notez, critère par critère, les collaborateurs qui vous sont attribués. Vos évaluations alimentent le classement de la campagne.
             </p>
 
-            {campagne && (
-              <div className="mt-10 hidden max-w-md sm:block">
-                <div className="flex items-baseline justify-between gap-4 text-sm">
-                  <span className="text-navy-200">Évaluations déjà soumises</span>
-                  <span className="font-display text-3xl leading-none font-bold text-white tabular-nums">
-                    {campagne.completionRate}
-                    <span className="ml-0.5 text-lg text-gold-400">%</span>
+            {campagne ? (
+              <div className="mt-10 max-w-2xl rounded-xl bg-white/[0.04] p-6 ring-1 ring-white/10 sm:p-7">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400/10 px-2.5 py-0.5 text-xs font-medium text-emerald-300 ring-1 ring-emerald-400/25">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden />
+                    Campagne ouverte
                   </span>
+                  <p className="text-base font-semibold text-gold-300">{libelleCampagne(campagne.libelle)}</p>
                 </div>
+
+                <dl className="mt-6 grid grid-cols-3 divide-x divide-white/10">
+                  <div className="pr-4">
+                    <dt className="text-xs text-navy-200">Clôture</dt>
+                    <dd className="mt-1 text-base font-semibold text-white sm:text-lg">{formatDateCourte(campagne.dateFin)}</dd>
+                  </div>
+                  <div className="px-4">
+                    <dt className="text-xs text-navy-200">Temps restant</dt>
+                    <dd className="mt-1 text-base font-semibold text-white tabular-nums sm:text-lg">
+                      {jours === 0 ? 'Dernier jour' : `${jours} jour${jours === 1 ? '' : 's'}`}
+                    </dd>
+                  </div>
+                  <div className="pl-4">
+                    <dt className="text-xs text-navy-200">Évaluations soumises</dt>
+                    <dd className="mt-1 text-base font-semibold text-white tabular-nums sm:text-lg">{campagne.completionRate} %</dd>
+                  </div>
+                </dl>
                 <div
-                  className="mt-3 grid h-2 grid-cols-20 gap-[3px]"
+                  className="mt-5 h-1 overflow-hidden rounded-full bg-white/10"
                   role="progressbar"
                   aria-valuenow={campagne.completionRate}
                   aria-valuemin={0}
                   aria-valuemax={100}
-                  aria-label="Évaluations déjà soumises"
+                  aria-label="Évaluations soumises"
                 >
-                  {Array.from({ length: 20 }, (_, i) => (
-                    <span
-                      key={i}
-                      className={`rounded-[1px] ${i < Math.round(campagne.completionRate / 5) ? 'bg-gold-500' : 'bg-white/12'}`}
-                    />
-                  ))}
+                  <div className="h-full rounded-full bg-gold-500" style={{ width: `${campagne.completionRate}%` }} />
                 </div>
               </div>
+            ) : (
+              <p className="mt-10 max-w-xl rounded-xl bg-white/[0.04] p-6 text-navy-100 ring-1 ring-white/10">
+                Aucune campagne d’évaluation n’est ouverte pour le moment.
+              </p>
             )}
+
+            <ol className="mt-10 hidden max-w-2xl gap-6 sm:grid sm:grid-cols-3">
+              {[
+                ['Identifiez-vous', 'avec votre matricule ou votre numéro de téléphone.'],
+                ['Choisissez un PIN', 'à 4 chiffres lors de votre première connexion.'],
+                ['Notez et soumettez', 'vos évaluations avant la date de clôture.'],
+              ].map(([titre, texte], i) => (
+                <li key={titre} className="border-t border-white/15 pt-4">
+                  <span className="text-xs font-medium text-gold-400 tabular-nums">Étape {i + 1}</span>
+                  <p className="mt-1 text-sm leading-relaxed text-navy-100">
+                    <strong className="font-semibold text-white">{titre}</strong> {texte}
+                  </p>
+                </li>
+              ))}
+            </ol>
           </section>
 
           {/* ─── Formulaire ─── */}
           <section className="lg:col-span-5" aria-labelledby="titre-connexion">
-            <div className="relative rounded-xl bg-white p-7 text-slate-900 shadow-overlay sm:p-10">
-              <Reperes />
-
+            <div className="rounded-xl bg-white p-7 text-slate-900 shadow-overlay sm:p-9">
               {etape !== 'identifiant' && (
                 <button
                   type="button"
@@ -236,7 +253,7 @@ function AccueilContenu() {
                 </button>
               )}
 
-              <h2 id="titre-connexion" className="font-display text-4xl leading-none font-bold tracking-tight text-navy-900 uppercase">
+              <h2 id="titre-connexion" className="text-2xl font-semibold tracking-tight text-navy-900">
                 {titre}
               </h2>
               <p className="mt-3 text-[15px] leading-relaxed text-slate-600">
@@ -290,12 +307,12 @@ function AccueilContenu() {
                           autoComplete={etape === 'definir' ? 'new-password' : 'current-password'}
                           required
                           disabled={loading}
-                          className={`${INPUT} pr-12 ${champPin ? 'font-display text-2xl tracking-[0.6em] tabular-nums' : ''}`}
+                          className={`${INPUT} pr-12 ${champPin ? 'text-xl tracking-[0.5em] tabular-nums' : ''}`}
                         />
                         <button
                           type="button"
                           onClick={() => setVoirSecret((v) => !v)}
-                          className="absolute inset-y-0 right-0 flex w-12 items-center justify-center rounded-r-lg text-slate-500 hover:text-slate-800"
+                          className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-lg text-slate-500 hover:text-slate-800"
                           aria-label={voirSecret ? 'Masquer' : 'Afficher'}
                         >
                           {voirSecret ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
@@ -316,7 +333,7 @@ function AccueilContenu() {
                         autoComplete="new-password"
                         required
                         disabled={loading}
-                        className={`${INPUT} font-display text-2xl tracking-[0.6em] tabular-nums`}
+                        className={`${INPUT} text-xl tracking-[0.5em] tabular-nums`}
                       />
                     </Champ>
                   )}
@@ -331,15 +348,15 @@ function AccueilContenu() {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="group flex h-14 w-full items-center justify-between rounded-lg bg-navy-900 px-5 text-base font-semibold text-white transition-colors hover:bg-navy-800 disabled:opacity-60"
+                    className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-navy-900 px-5 text-[15px] font-semibold text-white transition-colors hover:bg-navy-800 disabled:opacity-60"
                   >
-                    <span>{etape === 'identifiant' ? 'Continuer' : etape === 'definir' ? 'Enregistrer mon PIN' : 'Se connecter'}</span>
                     {loading ? (
                       <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
                     ) : (
-                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gold-500 text-navy-950 transition-transform group-hover:translate-x-1">
+                      <>
+                        {etape === 'identifiant' ? 'Continuer' : etape === 'definir' ? 'Enregistrer mon PIN' : 'Se connecter'}
                         <ArrowRight className="h-4 w-4" aria-hidden />
-                      </span>
+                      </>
                     )}
                   </button>
 
@@ -368,7 +385,7 @@ function AccueilContenu() {
 }
 
 const INPUT =
-  'block h-14 w-full rounded-lg border border-slate-300 bg-white px-4 text-lg text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-navy-700 focus:ring-4 focus:ring-navy-700/12 disabled:bg-slate-50'
+  'block h-12 w-full rounded-lg border border-slate-300 bg-white px-4 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-navy-700 focus:ring-4 focus:ring-navy-700/12 disabled:bg-slate-50'
 
 function Champ({ label, htmlFor, children }: { label: string; htmlFor: string; children: React.ReactNode }) {
   return (
@@ -381,25 +398,12 @@ function Champ({ label, htmlFor, children }: { label: string; htmlFor: string; c
   )
 }
 
-/** Repères de coupe dorés aux angles, comme sur une étiquette d'expédition. */
-function Reperes() {
-  const angle = 'pointer-events-none absolute h-5 w-5 border-gold-500'
-  return (
-    <>
-      <span aria-hidden className={`${angle} -top-2 -left-2 border-t-2 border-l-2`} />
-      <span aria-hidden className={`${angle} -top-2 -right-2 border-t-2 border-r-2`} />
-      <span aria-hidden className={`${angle} -bottom-2 -left-2 border-b-2 border-l-2`} />
-      <span aria-hidden className={`${angle} -right-2 -bottom-2 border-r-2 border-b-2`} />
-    </>
-  )
-}
-
 /** Isobathes : lignes de profondeur d'une carte marine, en filigrane du fond navy. */
 function Isobathes() {
   return (
     <svg
       aria-hidden
-      className="pointer-events-none absolute inset-0 h-full w-full text-white/[0.05]"
+      className="pointer-events-none absolute inset-0 h-full w-full text-white/[0.035]"
       viewBox="0 0 1440 900"
       preserveAspectRatio="xMidYMid slice"
       fill="none"
