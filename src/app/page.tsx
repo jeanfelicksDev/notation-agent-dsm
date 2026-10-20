@@ -151,7 +151,7 @@ function AccueilContenu() {
 
       <div className="relative mx-auto grid min-h-dvh max-w-[90rem] grid-rows-[auto_1fr_auto] px-5 sm:px-10 lg:px-16">
         {/* ─── En-tête ─── */}
-        <header className="flex items-center justify-between gap-4 py-6 lg:py-8">
+        <header className="flex items-center justify-between gap-4 py-6">
           <div className="flex items-center gap-3">
             <BrandMark size={36} />
             <div className="leading-tight">
@@ -171,23 +171,24 @@ function AccueilContenu() {
         </header>
 
         {/* ─── Scène ─── */}
-        <main className="grid items-center gap-10 py-6 lg:grid-cols-12 lg:gap-16 lg:py-10">
+        <main className="grid items-center gap-10 py-4 lg:grid-cols-12 lg:gap-16 lg:py-6">
           <section className="lg:col-span-7" aria-labelledby="titre-page">
-            <h1 id="titre-page" className="max-w-2xl text-4xl leading-[1.1] font-semibold tracking-tight text-white sm:text-5xl">
-              Évaluation de la performance des agents
+            <h1 id="titre-page" className="max-w-2xl font-display text-[2.75rem] leading-[1.02] font-medium tracking-[-0.02em] text-white sm:text-6xl xl:text-[4.25rem]">
+              Évaluation de la performance <span className="text-gold-400">des agents</span>
             </h1>
+            <span aria-hidden className="mt-6 block h-px w-24 bg-gold-500/70" />
             <p className="mt-5 hidden max-w-xl text-base leading-relaxed text-navy-100 sm:block sm:text-lg">
               Notez, critère par critère, les collaborateurs qui vous sont attribués. Vos évaluations alimentent le classement de la campagne.
             </p>
 
             {campagne ? (
-              <div className="mt-10 max-w-2xl rounded-xl bg-white/[0.04] p-6 ring-1 ring-white/10 sm:p-7">
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <div className="mt-8 max-w-2xl rounded-xl bg-white/[0.04] p-6 ring-1 ring-white/10">
+                <div className="flex flex-col items-start gap-3">
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400/10 px-2.5 py-0.5 text-xs font-medium text-emerald-300 ring-1 ring-emerald-400/25">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden />
                     Campagne ouverte
                   </span>
-                  <p className="text-base font-semibold text-gold-300">{libelleCampagne(campagne.libelle)}</p>
+                  <p className="w-full font-display text-2xl leading-tight font-medium text-white sm:text-[1.7rem]">{libelleCampagne(campagne.libelle)}</p>
                 </div>
 
                 <dl className="mt-6 grid grid-cols-3 divide-x divide-white/10">
@@ -223,15 +224,15 @@ function AccueilContenu() {
               </p>
             )}
 
-            <ol className="mt-10 hidden max-w-2xl gap-6 sm:grid sm:grid-cols-3">
+            <ol className="mt-8 hidden max-w-2xl gap-6 sm:grid sm:grid-cols-3">
               {[
                 ['Identifiez-vous', 'avec votre matricule ou votre numéro de téléphone.'],
                 ['Choisissez un PIN', 'à 4 chiffres lors de votre première connexion.'],
                 ['Notez et soumettez', 'vos évaluations avant la date de clôture.'],
               ].map(([titre, texte], i) => (
                 <li key={titre} className="border-t border-white/15 pt-4">
-                  <span className="text-xs font-medium text-gold-400 tabular-nums">Étape {i + 1}</span>
-                  <p className="mt-1 text-sm leading-relaxed text-navy-100">
+                  <span className="font-display text-[1.75rem] leading-none text-gold-400" aria-label={`Étape ${i + 1}`}>{i + 1}</span>
+                  <p className="mt-3 text-sm leading-relaxed text-navy-100">
                     <strong className="font-semibold text-white">{titre}</strong> {texte}
                   </p>
                 </li>
@@ -253,7 +254,7 @@ function AccueilContenu() {
                 </button>
               )}
 
-              <h2 id="titre-connexion" className="text-2xl font-semibold tracking-tight text-navy-900">
+              <h2 id="titre-connexion" className="font-display text-[2.1rem] leading-none font-medium tracking-[-0.01em] text-navy-900">
                 {titre}
               </h2>
               <p className="mt-3 text-[15px] leading-relaxed text-slate-600">
