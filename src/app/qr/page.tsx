@@ -49,9 +49,18 @@ export default function PortailClient() {
         setCampagne(data.campagne.libelle)
       })
       .catch(() => setIndisponible('Connexion impossible. Vérifiez votre réseau puis rechargez la page.'))
+
+    // Numéro saisi sur la page d'accueil (onglet « Client externe ») : lu une seule fois puis effacé.
+    const transmis = sessionStorage.getItem('dsm-client-telephone')
+    if (transmis) {
+      sessionStorage.removeItem('dsm-client-telephone')
+      setTelephone(transmis)
+      verifier(false, transmis)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const verifier = async (silencieux = false) => {
+  const verifier = async (silencieux = false, numero = telephone) => {
     if (!silencieux) {
       setErreur('')
       setChargement(true)
@@ -60,7 +69,7 @@ export default function PortailClient() {
       const res = await fetch('/api/qr/verify-client', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ telephone }),
+        body: JSON.stringify({ telephone: numero }),
       })
       const data = await res.json()
       if (!res.ok) {
