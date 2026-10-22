@@ -51,26 +51,37 @@ export interface RawAgentScore {
   maxManager: number
   maxCollegues: number
   maxClient: number
+  /** Part neutralisée car tous ses notants ont été invalidés (force majeure) */
+  managerNeutralise: boolean
+  colleguesNeutralise: boolean
 }
 
 type Poids = { poidsManager: number; poidsCollegues: number; poidsClient: number }
 const POIDS_PAR_DEFAUT: Poids = { poidsManager: 55, poidsCollegues: 45, poidsClient: 25 }
 
+type Neutralisation = { managerNeutralise?: boolean; colleguesNeutralise?: boolean }
+
 /** Même répartition que le calcul du score (src/lib/scores.ts), exprimée en points. */
-function parts(s: { scoreCollegues: number; scoreManager: number; scoreClient: number }, p: Poids) {
+function parts(s: { scoreCollegues: number; scoreManager: number; scoreClient: number } & Neutralisation, p: Poids) {
+  // Une part neutralisée (tous ses notants invalidés) reporte son poids sur l'autre
+  const total = p.poidsManager + p.poidsCollegues
+  const poidsManager = s.colleguesNeutralise ? total : s.managerNeutralise ? 0 : p.poidsManager
+  const poidsCollegues = s.managerNeutralise ? total : s.colleguesNeutralise ? 0 : p.poidsCollegues
+  const echelle = p.poidsCollegues > 0 ? poidsCollegues / p.poidsCollegues : 0
+
   const c = s.scoreCollegues > 0
   const q = s.scoreClient > 0
-  const client = Math.min(p.poidsClient, p.poidsCollegues)
-  const maxCollegues = c && q ? p.poidsCollegues - client : c ? p.poidsCollegues : 0
-  const maxClient = c && q ? client : q ? p.poidsCollegues : 0
+  const client = Math.min(p.poidsClient, p.poidsCollegues) * echelle
+  const maxCollegues = c && q ? poidsCollegues - client : c ? poidsCollegues : 0
+  const maxClient = c && q ? client : q ? poidsCollegues : 0
   const r = (n: number) => Math.round(n * 10) / 10
   return {
-    partManager: r((s.scoreManager * p.poidsManager) / 100),
+    partManager: r((s.scoreManager * poidsManager) / 100),
     partCollegues: r((s.scoreCollegues * maxCollegues) / 100),
     partClient: r((s.scoreClient * maxClient) / 100),
-    maxManager: p.poidsManager,
-    maxCollegues: maxCollegues || p.poidsCollegues,
-    maxClient: maxClient || p.poidsCollegues,
+    maxManager: poidsManager,
+    maxCollegues: r(maxCollegues || poidsCollegues),
+    maxClient: r(maxClient || poidsCollegues),
   }
 }
 
@@ -87,7 +98,7 @@ type UtilisateurClasse = {
 function versAgent(
   utilisateurId: string,
   u: UtilisateurClasse,
-  s: { scoreTotal: number; scoreCollegues: number; scoreManager: number; scoreClient: number },
+  s: { scoreTotal: number; scoreCollegues: number; scoreManager: number; scoreClient: number } & Neutralisation,
   poids: Poids,
   arrondi = (n: number) => Math.round(n * 10) / 10
 ): RawAgentScore {
@@ -121,6 +132,8 @@ function versAgent(
     totalInDirection: 0,
     totalInDepartement: 0,
     totalInService: 0,
+    managerNeutralise: !!s.managerNeutralise,
+    colleguesNeutralise: !!s.colleguesNeutralise,
     ...parts(s, poids),
   }
 }

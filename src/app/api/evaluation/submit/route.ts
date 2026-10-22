@@ -29,6 +29,7 @@ export async function POST(request: NextRequest) {
       where: {
         evaluateurId: sessionUser.id,
         statut: { not: 'TERMINEE' },
+        invalidee: false,
         campagneId: campagneOuverte.id,
         evalueId: { not: sessionUser.id },
       },

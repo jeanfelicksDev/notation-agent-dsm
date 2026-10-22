@@ -31,7 +31,7 @@ export async function preparerNotation(evaluateurId: string, evalueIds: string[]
     prisma.utilisateur.findUnique({ where: { id: evaluateurId }, select: { role: true, service: true } }),
     prisma.affectation.findMany({
       where: { evaluateurId, campagneId: campagne.id, evalueId: { in: evalueIds } },
-      select: { evalueId: true, statut: true, clientInterne: true, evalue: { select: { service: true, prenom: true, nom: true } } },
+      select: { evalueId: true, statut: true, clientInterne: true, invalidee: true, evalue: { select: { service: true, prenom: true, nom: true } } },
     }),
     prisma.critere.findMany({
       where: { campagneId: campagne.id },
@@ -42,6 +42,9 @@ export async function preparerNotation(evaluateurId: string, evalueIds: string[]
   if (!evaluateur) throw new ErreurNotation('Compte introuvable.', 404)
   if (affectations.length !== evalueIds.length) {
     throw new ErreurNotation("Certains collaborateurs ne vous sont pas attribués.", 403)
+  }
+  if (affectations.some((a) => a.invalidee)) {
+    throw new ErreurNotation("Cette évaluation a été invalidée par l'administration.", 403)
   }
   if (affectations.some((a) => a.statut === 'TERMINEE')) {
     throw new ErreurNotation('Ces évaluations ont déjà été soumises et sont verrouillées.', 409)

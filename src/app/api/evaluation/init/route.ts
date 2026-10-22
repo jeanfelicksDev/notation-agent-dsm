@@ -38,7 +38,7 @@ export async function GET() {
     // Les affectations sont définies par l'administration : aucune n'est créée automatiquement ici.
     const [affectations, notes, criteres] = await Promise.all([
       prisma.affectation.findMany({
-        where: { evaluateurId: evaluateur.id, campagneId: campagne.id, evalueId: { not: evaluateur.id } },
+        where: { evaluateurId: evaluateur.id, campagneId: campagne.id, evalueId: { not: evaluateur.id }, invalidee: false },
         select: {
           id: true, evalueId: true, statut: true, clientInterne: true,
           evalue: {

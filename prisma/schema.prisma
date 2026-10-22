@@ -141,6 +141,12 @@ model Affectation {
   statut       StatutAffectation @default(EN_ATTENTE)
   /// Pair désigné « client interne » de ce collaborateur : il note les critères CLIENT_INTERNE
   clientInterne Boolean          @default(false)
+  /// Notant empêché (force majeure, accident, décès) : ses notes pour ce collaborateur
+  /// sont ignorées et la part correspondante est neutralisée dans le score
+  invalidee               Boolean            @default(false)
+  motifInvalidation       MotifInvalidation?
+  commentaireInvalidation String?
+  invalideeAt             DateTime?
   createdAt    DateTime          @default(now())
   campagne     Campagne          @relation(fields: [campagneId], references: [id], onDelete: Cascade)
   evalue       Utilisateur       @relation("EvalueAffectations", fields: [evalueId], references: [id], onDelete: Cascade)
@@ -201,6 +207,9 @@ model ScoreFinal {
   scoreManager   Float       @default(0)
   scoreClient    Float       @default(0)
   scoreTotal     Float       @default(0)
+  /// Part manager / collègues neutralisée suite à l'invalidation de tous ses notants
+  managerNeutralise   Boolean @default(false)
+  colleguesNeutralise Boolean @default(false)
   rang           Int?
   createdAt      DateTime    @default(now())
   campagne       Campagne    @relation(fields: [campagneId], references: [id], onDelete: Cascade)
@@ -228,6 +237,13 @@ enum StatutAffectation {
   EN_ATTENTE
   BROUILLON
   TERMINEE
+}
+
+enum MotifInvalidation {
+  FORCE_MAJEURE
+  ACCIDENT
+  DECES
+  AUTRE
 }
 
 enum Role {
