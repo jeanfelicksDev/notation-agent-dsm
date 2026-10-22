@@ -10,7 +10,10 @@ import { estEvaluateurManager } from '@/lib/criteres'
  * - score = part manager (poidsManager) + part collègues/clients (poidsCollegues), sur 100 ;
  * - dans la part collègues/clients, les clients QR comptent pour poidsClient points quand
  *   collègues ET clients existent ; sinon la source présente prend toute la part ;
- * - une source absente compte pour 0 : un agent sans note manager plafonne à poidsCollegues.
+ * - une source absente compte pour 0 : un agent sans note manager plafonne à poidsCollegues ;
+ * - exception : les notes d'une affectation invalidée (force majeure, accident, décès) sont
+ *   ignorées, et si la part manager ou collègues/clients n'a plus aucune note pour cette raison,
+ *   elle est neutralisée : le score est ramené sur 100 à partir de la part restante.
  */
 
 export type ScoreCalcule = {
@@ -19,6 +22,8 @@ export type ScoreCalcule = {
   scoreManager: number
   scoreClient: number
   scoreTotal: number
+  managerNeutralise: boolean
+  colleguesNeutralise: boolean
   rang: number
 }
 
@@ -69,10 +74,14 @@ export async function calculerScores(campagneId: string): Promise<ScoreCalcule[]
   })
   if (!campagne) return []
 
-  const [terminees, notes, notesClients] = await Promise.all([
+  const [terminees, invalidees, notes, notesClients] = await Promise.all([
     prisma.affectation.findMany({
-      where: { campagneId, statut: 'TERMINEE' },
+      where: { campagneId, statut: 'TERMINEE', invalidee: false },
       select: { evaluateurId: true, evalueId: true },
+    }),
+    prisma.affectation.findMany({
+      where: { campagneId, invalidee: true },
+      select: { evalueId: true, evaluateur: { select: { role: true } } },
     }),
     prisma.note.findMany({
       where: { campagneId },
@@ -102,8 +111,16 @@ export async function calculerScores(campagneId: string): Promise<ScoreCalcule[]
     cumuler(clients, nc.agentId, nc.clientId || nc.ipHash || nc.id, nc.valeur, nc.critere.noteMaximale || 5)
   }
 
+  // Sources dont au moins un notant a été invalidé, par collaborateur noté
+  const managerInvalide = new Set<string>()
+  const collegueInvalide = new Set<string>()
+  for (const a of invalidees) {
+    ;(estEvaluateurManager(a.evaluateur.role) ? managerInvalide : collegueInvalide).add(a.evalueId)
+  }
+
   const agents = new Set([...manager.keys(), ...collegues.keys(), ...clients.keys()])
   const poidsClient = Math.min(campagne.poidsClient, campagne.poidsCollegues)
+  const poidsTotal = campagne.poidsManager + campagne.poidsCollegues
 
   const resultats: ScoreCalcule[] = [...agents].map((id) => {
     const m = manager.has(id) ? moyenneDesRatios(manager.get(id)!) : null
@@ -117,7 +134,13 @@ export async function calculerScores(campagneId: string): Promise<ScoreCalcule[]
       partNonManager = c ?? q ?? 0
     }
 
-    const total = ((m ?? 0) * campagne.poidsManager + partNonManager * campagne.poidsCollegues) / 100
+    // Part sans aucune note valide à cause d'un notant invalidé : neutralisée plutôt que comptée 0
+    const managerNeutralise = m === null && managerInvalide.has(id) && campagne.poidsCollegues > 0
+    const colleguesNeutralise = c === null && q === null && collegueInvalide.has(id) && campagne.poidsManager > 0
+
+    let total = ((m ?? 0) * campagne.poidsManager + partNonManager * campagne.poidsCollegues) / 100
+    if (managerNeutralise) total = (partNonManager * poidsTotal) / 100
+    else if (colleguesNeutralise) total = ((m ?? 0) * poidsTotal) / 100
 
     return {
       utilisateurId: id,
@@ -125,6 +148,8 @@ export async function calculerScores(campagneId: string): Promise<ScoreCalcule[]
       scoreCollegues: arrondi(c ?? 0),
       scoreClient: arrondi(q ?? 0),
       scoreTotal: arrondi(total),
+      managerNeutralise,
+      colleguesNeutralise,
       rang: 0,
     }
   })
@@ -143,7 +168,10 @@ export async function enregistrerScores(campagneId: string) {
     ...scores.map((s) =>
       prisma.scoreFinal.upsert({
         where: { utilisateurId_campagneId: { utilisateurId: s.utilisateurId, campagneId } },
-        update: { scoreCollegues: s.scoreCollegues, scoreManager: s.scoreManager, scoreClient: s.scoreClient, scoreTotal: s.scoreTotal, rang: s.rang },
+        update: {
+          scoreCollegues: s.scoreCollegues, scoreManager: s.scoreManager, scoreClient: s.scoreClient, scoreTotal: s.scoreTotal,
+          managerNeutralise: s.managerNeutralise, colleguesNeutralise: s.colleguesNeutralise, rang: s.rang,
+        },
         create: { ...s, campagneId },
       })
     ),

@@ -149,3 +149,51 @@ async function synchroniser(
 
   return { ajoutees: aCreer.length, retirees: aSupprimer.length }
 }
+
+const MOTIFS_INVALIDATION = ['FORCE_MAJEURE', 'ACCIDENT', 'DECES', 'AUTRE'] as const
+type MotifInvalidation = (typeof MOTIFS_INVALIDATION)[number]
+
+/**
+ * Invalide (ou rétablit) les notes d'un notant empêché par un cas de force majeure,
+ * un accident ou un décès. Sans `evalueId`, toutes ses affectations de la campagne sont visées.
+ * Les notes sont conservées mais ignorées au calcul : les collaborateurs notés restent classés
+ * sur leurs autres évaluations (voir src/lib/scores.ts).
+ */
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const admin = await requireAdmin()
+  if (!admin) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
+
+  const { id } = await params
+  try {
+    const body = await req.json().catch(() => null)
+    const evaluateurId = typeof body?.evaluateurId === 'string' ? body.evaluateurId : ''
+    const evalueId = typeof body?.evalueId === 'string' ? body.evalueId : undefined
+    const motif = MOTIFS_INVALIDATION.find((m) => m === body?.motif) as MotifInvalidation | undefined
+    const commentaire = typeof body?.commentaire === 'string' ? body.commentaire.trim().slice(0, 500) : ''
+
+    if (!evaluateurId || typeof body?.invalidee !== 'boolean') {
+      return NextResponse.json({ error: 'Données invalides' }, { status: 400 })
+    }
+    if (body.invalidee && !motif) {
+      return NextResponse.json({ error: "Le motif de l'invalidation est requis" }, { status: 400 })
+    }
+
+    const resultat = await prisma.affectation.updateMany({
+      where: { campagneId: id, evaluateurId, ...(evalueId ? { evalueId } : {}) },
+      data: body.invalidee
+        ? { invalidee: true, motifInvalidation: motif, commentaireInvalidation: commentaire || null, invalideeAt: new Date() }
+        : { invalidee: false, motifInvalidation: null, commentaireInvalidation: null, invalideeAt: null },
+    })
+    if (resultat.count === 0) {
+      return NextResponse.json({ error: 'Aucune affectation trouvée pour ce notant' }, { status: 404 })
+    }
+
+    return NextResponse.json({ success: true, count: resultat.count })
+  } catch (error) {
+    console.error('Invalidation error:', error)
+    return NextResponse.json({ error: "Erreur lors de l'invalidation" }, { status: 500 })
+  }
+}

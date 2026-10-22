@@ -67,6 +67,8 @@ interface ScoreItem {
   maxManager: number
   maxCollegues: number
   maxClient: number
+  managerNeutralise?: boolean
+  colleguesNeutralise?: boolean
 }
 
 interface CampagneSummary {
@@ -1314,7 +1316,13 @@ export default function ClassementPage() {
               const partClients = selectedScore.partClient
               const maxClients = selectedScore.maxClient
               const partNonManager = Math.round((partCollegues + partClients) * 10) / 10
-              const maxNonManager = data?.campagne?.poidsCollegues ?? 45
+              // Une part neutralisée reporte son poids sur l'autre : le total reste sur 100
+              const maxNonManager = (data?.campagne?.poidsManager ?? 55) + (data?.campagne?.poidsCollegues ?? 45) - selectedScore.maxManager
+              const neutralisation = selectedScore.managerNeutralise
+                ? "Part manager neutralisée (notant invalidé pour cas de force majeure) : score ramené sur les autres évaluations."
+                : selectedScore.colleguesNeutralise
+                ? "Part collègues neutralisée (notants invalidés pour cas de force majeure) : score ramené sur l'évaluation manager."
+                : null
               const partManager = selectedScore.partManager
               const maxManager = selectedScore.maxManager
 
@@ -1362,6 +1370,11 @@ export default function ClassementPage() {
                         Collègues & clients ({partNonManager} / {maxNonManager} pts) · Manager ({partManager} / {maxManager} pts)
                       </div>
                     </div>
+                    {neutralisation && (
+                      <div className="text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                        {neutralisation}
+                      </div>
+                    )}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       {/* Collègues */}
                       <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/80 flex flex-col justify-between">
@@ -1421,7 +1434,7 @@ export default function ClassementPage() {
                         <div className="w-full bg-navy-200 h-1.5 rounded-full mt-3 overflow-hidden">
                           <div
                             className="bg-navy-700 h-full rounded-full"
-                            style={{ width: `${Math.min(100, (partManager / maxManager) * 100)}%` }}
+                            style={{ width: `${maxManager > 0 ? Math.min(100, (partManager / maxManager) * 100) : 0}%` }}
                           ></div>
                         </div>
                       </div>

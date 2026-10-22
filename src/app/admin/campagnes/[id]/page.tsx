@@ -966,7 +966,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
               )}
 
               {activeTab === 'suivi' && (
-                <SuiviDashboard affectations={affectations} users={allUsers} />
+                <SuiviDashboard campagneId={id} affectations={affectations} users={allUsers} onUpdate={loadAffectations} />
               )}
 
               {activeTab === 'prix' && (
@@ -1851,9 +1851,44 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
 }
 
 
-function SuiviDashboard({ affectations, users }: { affectations: any[], users: User[] }) {
+const MOTIFS_INVALIDATION: Record<string, string> = {
+  FORCE_MAJEURE: 'Cas de force majeure',
+  ACCIDENT: 'Accident',
+  DECES: 'Décès',
+  AUTRE: 'Autre',
+}
+
+function SuiviDashboard({ campagneId, affectations, users, onUpdate }: { campagneId: string, affectations: any[], users: User[], onUpdate: () => void }) {
   const [suiviCategory, setSuiviCategory] = useState<'ALL' | 'PAIR' | 'MANAGER' | 'EXTERNE'>('ALL')
   const [suiviSearch, setSuiviSearch] = useState('')
+  // Notant en cours d'invalidation (formulaire ouvert)
+  const [invalidation, setInvalidation] = useState<string | null>(null)
+  const [motif, setMotif] = useState('FORCE_MAJEURE')
+  const [commentaire, setCommentaire] = useState('')
+  const [envoi, setEnvoi] = useState(false)
+
+  const changerInvalidation = async (evaluateurId: string, invalidee: boolean) => {
+    setEnvoi(true)
+    try {
+      const res = await fetch(`/api/admin/campagnes/${campagneId}/affectations`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ evaluateurId, invalidee, motif, commentaire }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        alert(data.error || 'Erreur lors de la mise à jour')
+        return
+      }
+      setInvalidation(null)
+      setCommentaire('')
+      onUpdate()
+    } catch {
+      alert('Erreur de connexion')
+    } finally {
+      setEnvoi(false)
+    }
+  }
 
   // Get all unique evaluateurs from affectations
   const evaluateurIds = [...new Set(affectations.map(a => a.evaluateurId))]
@@ -1864,14 +1899,18 @@ function SuiviDashboard({ affectations, users }: { affectations: any[], users: U
     const userAffectations = affectations.filter(a => a.evaluateurId === evalId)
     const isTerminee = userAffectations.some(a => a.statut === 'TERMINEE')
     const isBrouillon = userAffectations.some(a => a.statut === 'BROUILLON')
-    
+    // L'invalidation porte sur l'ensemble des affectations du notant
+    const invalidee = userAffectations.find(a => a.invalidee)
+
     let statut = 'EN_ATTENTE'
-    if (isTerminee) statut = 'TERMINEE'
+    if (invalidee) statut = 'INVALIDEE'
+    else if (isTerminee) statut = 'TERMINEE'
     else if (isBrouillon) statut = 'BROUILLON'
 
     return {
       user: user || { id: evalId, nom: 'Inconnu', prenom: '', matricule: '', role: 'UTILISATEUR' },
       statut,
+      invalidee,
       totalToEvaluate: userAffectations.length
     }
   })
@@ -1898,9 +1937,19 @@ function SuiviDashboard({ affectations, users }: { affectations: any[], users: U
   const countBrouillon = filteredTracking.filter(d => d.statut === 'BROUILLON').length
   const countAttente = filteredTracking.filter(d => d.statut === 'EN_ATTENTE').length
   const total = filteredTracking.length
+  const countInvalidee = trackingData.filter(d => d.statut === 'INVALIDEE').length
 
   return (
     <div className="space-y-6">
+      {countInvalidee > 0 && (
+        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-100 text-rose-800 text-sm font-medium flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 shrink-0" />
+          <span>
+            {countInvalidee} notant(s) invalidé(s) : leurs notes sont ignorées et les collaborateurs concernés sont
+            classés sur leurs autres évaluations. Recalculez les scores après toute modification.
+          </span>
+        </div>
+      )}
       {/* Stat Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center">
@@ -1992,7 +2041,8 @@ function SuiviDashboard({ affectations, users }: { affectations: any[], users: U
             </div>
           )}
           {filteredTracking.map((data, idx) => (
-            <div key={idx} className="p-4 md:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-slate-50 transition-colors">
+            <div key={idx} className="p-4 md:p-6 hover:bg-slate-50 transition-colors">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="flex items-center gap-4">
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs ${
                   data.user.role === 'MANAGER'
@@ -2017,9 +2067,20 @@ function SuiviDashboard({ affectations, users }: { affectations: any[], users: U
                     </span>
                   </div>
                   <p className="text-sm text-slate-500 font-medium">Matricule: {data.user.matricule} • Doit évaluer {data.totalToEvaluate} agents</p>
+                  {data.invalidee && (
+                    <p className="text-xs text-rose-700 font-semibold mt-1">
+                      Motif : {MOTIFS_INVALIDATION[data.invalidee.motifInvalidation] || '—'}
+                      {data.invalidee.commentaireInvalidation ? ` — ${data.invalidee.commentaireInvalidation}` : ''}
+                    </p>
+                  )}
                 </div>
               </div>
-              <div>
+              <div className="flex items-center gap-3">
+                {data.statut === 'INVALIDEE' && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-100 text-rose-700 text-xs font-black">
+                    <X className="w-4 h-4" /> Notes invalidées
+                  </span>
+                )}
                 {data.statut === 'TERMINEE' && (
                   <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-black">
                     <CheckCircle2 className="w-4 h-4" /> Finalisé
@@ -2035,7 +2096,71 @@ function SuiviDashboard({ affectations, users }: { affectations: any[], users: U
                     <Clock className="w-4 h-4" /> Non commencé
                   </span>
                 )}
+                {data.user.role !== 'EXTERNE' && (data.statut === 'INVALIDEE' ? (
+                  <button
+                    onClick={() => {
+                      if (confirm(`Rétablir les notes de ${data.user.prenom} ${data.user.nom} ?`)) {
+                        changerInvalidation(data.user.id, false)
+                      }
+                    }}
+                    disabled={envoi}
+                    className="text-xs font-bold text-slate-500 hover:text-slate-900 underline disabled:opacity-50"
+                  >
+                    Rétablir
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setInvalidation(invalidation === data.user.id ? null : data.user.id)
+                      setMotif('FORCE_MAJEURE')
+                      setCommentaire('')
+                    }}
+                    className="text-xs font-bold text-rose-600 hover:text-rose-800 underline"
+                  >
+                    Invalider
+                  </button>
+                ))}
               </div>
+            </div>
+            {invalidation === data.user.id && (
+              <div className="mt-4 p-4 rounded-2xl bg-rose-50/60 border border-rose-100 space-y-3">
+                <p className="text-sm text-slate-700 font-medium">
+                  Les notes de <span className="font-bold">{data.user.prenom} {data.user.nom}</span> seront ignorées au calcul.
+                  Les {data.totalToEvaluate} collaborateur(s) concerné(s) resteront classés sur leurs autres évaluations.
+                </p>
+                <div className="flex flex-col md:flex-row gap-3">
+                  <select
+                    value={motif}
+                    onChange={e => setMotif(e.target.value)}
+                    className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold outline-none"
+                  >
+                    {Object.entries(MOTIFS_INVALIDATION).map(([valeur, libelle]) => (
+                      <option key={valeur} value={valeur}>{libelle}</option>
+                    ))}
+                  </select>
+                  <input
+                    type="text"
+                    placeholder="Commentaire (facultatif)"
+                    value={commentaire}
+                    onChange={e => setCommentaire(e.target.value)}
+                    className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm outline-none"
+                  />
+                  <button
+                    onClick={() => changerInvalidation(data.user.id, true)}
+                    disabled={envoi}
+                    className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-xl text-sm font-bold disabled:opacity-50"
+                  >
+                    Confirmer l&apos;invalidation
+                  </button>
+                  <button
+                    onClick={() => setInvalidation(null)}
+                    className="px-4 py-2 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-100"
+                  >
+                    Annuler
+                  </button>
+                </div>
+              </div>
+            )}
             </div>
           ))}
         </div>
