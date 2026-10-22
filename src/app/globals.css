@@ -49,6 +49,8 @@
   --animate-fade-in: fade-in 200ms var(--ease-out-expo) both;
   --animate-rise-in: rise-in 260ms var(--ease-out-expo) both;
   --animate-balayage: balayage 7s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  --animate-entree: entree 1100ms var(--ease-out-expo) both;
+  --animate-pouls: pouls 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
 
   @keyframes fade-in {
     from { opacity: 0; }
@@ -59,6 +61,16 @@
   @keyframes balayage {
     from { transform: translateY(-10rem); }
     to { transform: translateY(100dvh); }
+  }
+  /* Entrée de la page d'accueil : le contenu part déjà lisible et se met au point. */
+  @keyframes entree {
+    from { transform: translateY(14px); filter: blur(5px); opacity: 0.4; }
+    to { transform: none; filter: none; opacity: 1; }
+  }
+  /* Onde autour du témoin « campagne ouverte » */
+  @keyframes pouls {
+    from { transform: scale(1); opacity: 0.7; }
+    to { transform: scale(2.6); opacity: 0; }
   }
   @keyframes rise-in {
     from { transform: translateY(6px); }
