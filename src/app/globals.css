@@ -100,12 +100,12 @@ body {
 }
 
 h1, h2, h3, h4 {
-  text-wrap: balance;
+  text-wrap-style: balance;
   letter-spacing: -0.015em;
 }
 
 p {
-  text-wrap: pretty;
+  text-wrap-style: pretty;
 }
 
 /* Chiffres tabulaires dans tout ce qui se compare : scores, rangs, tableaux */

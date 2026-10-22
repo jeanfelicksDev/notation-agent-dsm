@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic'
 import { AlertCircle, ArrowLeft, ArrowRight, ArrowUpRight, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { destinationPourRole } from '@/lib/roles'
 import { BrandMark } from '@/components/BrandMark'
+import { libelleCampagne } from '@/lib/libelle'
 
 const QRCode = dynamic(() => import('qrcode.react').then((m) => m.QRCodeSVG), { ssr: false })
 
@@ -21,14 +22,6 @@ const MESSAGES_REDIRECTION: Record<string, string> = {
 
 function formatDateCourte(iso: string) {
   return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
-}
-
-/** Libellé lisible : les mots en capitales passent en casse de titre, les sigles courts (DSM) restent en capitales. */
-function libelleCampagne(libelle: string) {
-  return libelle
-    .split(/\s+/)
-    .map((m) => (m.length > 3 && m === m.toUpperCase() ? m.charAt(0) + m.slice(1).toLowerCase() : m))
-    .join(' ')
 }
 
 /** Jours restants jusqu'à la fin du dernier jour de la campagne (0 = dernier jour). */
