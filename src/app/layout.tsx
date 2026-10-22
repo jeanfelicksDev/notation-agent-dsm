@@ -13,6 +13,7 @@ const publicSans = Public_Sans({
 const sourceSerif = Source_Serif_4({
   subsets: ['latin'],
   axes: ['opsz'],
+  style: ['normal', 'italic'],
   variable: '--font-serif-titres',
   display: 'swap',
 })

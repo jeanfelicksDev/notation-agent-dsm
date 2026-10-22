@@ -22,6 +22,7 @@ import {
 import { getAppreciationInfo, getAppreciationOptions } from '@/lib/default-criteres'
 import { BrandMark } from '@/components/BrandMark'
 import { confirmer, toast } from '@/components/ui/feedback'
+import { libelleCampagne } from '@/lib/libelle'
 
 /* ─── Types ─────────────────────────────────────────────────────── */
 
@@ -429,49 +430,61 @@ export default function EvaluerPage() {
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-canvas">
       {/* ─── En-tête ─── */}
-      <header className="z-30 flex h-16 shrink-0 items-center gap-3 bg-navy-900 px-3 text-white sm:px-6">
+      <header className="relative z-30 flex h-[68px] shrink-0 items-center gap-3 overflow-hidden bg-navy-900 px-3 text-white sm:px-6">
+        <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(55%_160%_at_0%_0%,#0b3d63_0%,transparent_65%)]" />
+        <span aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-gold-500/50 to-transparent" />
+
         <button
           onClick={() => setTiroir(true)}
-          className="rounded-md p-2 text-navy-100 hover:bg-white/10 lg:hidden"
+          className="relative rounded-md p-2 text-navy-100 hover:bg-white/10 lg:hidden"
           aria-label="Afficher la liste des collaborateurs"
         >
           <Users className="h-5 w-5" />
         </button>
-        <BrandMark size={32} />
-        <div className="min-w-0 flex-1 leading-tight">
-          <p className="truncate text-[15px] font-semibold">{campagne?.libelle}</p>
-          <p className="hidden truncate text-xs text-navy-200 sm:block">
+        <span className="relative rounded-[9px] shadow-[0_6px_16px_-6px_rgb(212_175_55/0.55)]">
+          <BrandMark size={34} />
+        </span>
+        <div className="relative min-w-0 flex-1 leading-tight">
+          <p className="truncate font-display text-[17px] font-medium tracking-[-0.01em]">{campagne && libelleCampagne(campagne.libelle)}</p>
+          <p className="mt-0.5 hidden truncate text-xs text-navy-200 sm:block">
             {isManager ? 'Évaluation manager' : 'Évaluation entre collègues'} · jusqu’au{' '}
             {campagne && new Date(campagne.dateFin).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}
           </p>
         </div>
 
-        <div className="hidden w-48 md:block" aria-label={`Progression : ${nbComplets} sur ${affectations.length} collaborateurs`}>
-          <div className="flex justify-between text-xs">
+        <div className="relative hidden w-52 md:block" aria-label={`Progression : ${nbComplets} sur ${affectations.length} collaborateurs`}>
+          <div className="flex items-baseline justify-between text-xs">
             <span className="text-navy-200">Progression</span>
-            <span className="font-semibold tabular-nums">
-              {nbComplets} / {affectations.length}
+            <span className="font-display text-sm font-medium tabular-nums">
+              {nbComplets} <span className="text-navy-300">/ {affectations.length}</span>
             </span>
           </div>
-          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10">
-            <div className="h-full rounded-full bg-gold-500 transition-[width] duration-500" style={{ width: `${pct}%` }} />
+          <div className="mt-1.5 h-[5px] overflow-hidden rounded-full bg-white/10">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-gold-600 via-gold-400 to-gold-200 shadow-[0_0_10px_rgb(212_175_55/0.55)] transition-[width] duration-700 ease-[var(--ease-out-expo)]"
+              style={{ width: `${pct}%` }}
+            />
           </div>
         </div>
 
-        <IndicateurSauvegarde etat={sauvegarde} />
+        <div className="relative">
+          <IndicateurSauvegarde etat={sauvegarde} />
+        </div>
 
         <button
           onClick={soumettre}
           disabled={submitting || lectureSeule || ouvertes.length === 0}
-          className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors sm:px-4 ${
-            pret ? 'bg-gold-500 text-navy-950 hover:bg-gold-400' : 'bg-white/10 text-navy-100 hover:bg-white/15'
-          } disabled:cursor-not-allowed disabled:opacity-50`}
+          className={`relative inline-flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-200 sm:px-4 ${
+            pret
+              ? 'bg-gradient-to-b from-gold-300 to-gold-500 text-navy-950 shadow-[inset_0_1px_0_rgb(255_255_255/0.45),0_8px_20px_-8px_rgb(212_175_55/0.7)] hover:-translate-y-px'
+              : 'bg-white/[0.07] text-navy-100 ring-1 ring-white/15 hover:bg-white/[0.12]'
+          } disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0`}
         >
           {submitting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Send className="h-4 w-4" aria-hidden />}
           <span className="hidden sm:inline">Soumettre</span>
         </button>
 
-        <button onClick={deconnexion} className="rounded-md p-2 text-navy-200 hover:bg-white/10 hover:text-white" aria-label="Se déconnecter" title="Se déconnecter">
+        <button onClick={deconnexion} className="relative rounded-md p-2 text-navy-200 hover:bg-white/10 hover:text-white" aria-label="Se déconnecter" title="Se déconnecter">
           <LogOut className="h-4.5 w-4.5" />
         </button>
       </header>
@@ -492,9 +505,12 @@ export default function EvaluerPage() {
           }`}
           aria-label="Collaborateurs à évaluer"
         >
-          <div className="space-y-3 border-b border-slate-100 p-4">
+          <div className="space-y-3.5 border-b border-slate-100 p-4 pt-5">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-navy-900">Vos collaborateurs</h2>
+              <h2 className="flex items-baseline gap-2 font-display text-lg font-medium text-navy-900">
+                Vos collaborateurs
+                <span className="font-sans text-xs font-medium text-slate-400 tabular-nums">{affectations.length}</span>
+              </h2>
               <button onClick={() => setTiroir(false)} className="rounded p-1 text-slate-400 hover:text-slate-700 lg:hidden" aria-label="Fermer">
                 <X className="h-4.5 w-4.5" />
               </button>
@@ -507,10 +523,10 @@ export default function EvaluerPage() {
                 value={recherche}
                 onChange={(e) => setRecherche(e.target.value)}
                 placeholder="Nom, matricule, service…"
-                className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pr-3 pl-9 text-sm outline-none focus:border-navy-600 focus:bg-white focus:ring-2 focus:ring-navy-600/15"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2.5 pr-3 pl-9 text-sm shadow-[inset_0_1px_2px_rgb(0_43_73/0.04)] outline-none transition placeholder:text-slate-400 focus:border-navy-600 focus:bg-white focus:ring-4 focus:ring-navy-600/10"
               />
             </label>
-            <div className="grid grid-cols-3 gap-1 rounded-lg bg-slate-100 p-1 text-xs" role="tablist" aria-label="Filtrer">
+            <div className="grid grid-cols-3 gap-1 rounded-xl bg-navy-50 p-1 text-xs ring-1 ring-navy-100" role="tablist" aria-label="Filtrer">
               {([
                 ['tous', `Tous`],
                 ['a_faire', `À faire`],
@@ -521,7 +537,11 @@ export default function EvaluerPage() {
                   role="tab"
                   aria-selected={filtre === k}
                   onClick={() => setFiltre(k)}
-                  className={`rounded-md py-1.5 transition-colors ${filtre === k ? 'bg-white font-semibold text-navy-900 shadow-card' : 'text-slate-600 hover:text-slate-900'}`}
+                  className={`rounded-lg py-1.5 transition-all duration-200 ${
+                    filtre === k
+                      ? 'bg-white font-semibold text-navy-900 shadow-[0_1px_2px_rgb(0_43_73/0.08),0_4px_10px_-4px_rgb(0_43_73/0.18)]'
+                      : 'text-navy-500 hover:text-navy-900'
+                  }`}
                 >
                   {l}
                 </button>
@@ -529,7 +549,7 @@ export default function EvaluerPage() {
             </div>
           </div>
 
-          <ol className="flex-1 space-y-0.5 overflow-y-auto p-2">
+          <ol className="flex-1 space-y-1 overflow-y-auto p-2.5">
             {listeFiltree.length === 0 && <li className="px-3 py-8 text-center text-sm text-slate-500">Aucun collaborateur ne correspond.</li>}
             {listeFiltree.map((aff) => {
               const idx = affectations.indexOf(aff)
@@ -545,13 +565,21 @@ export default function EvaluerPage() {
                     disabled={!ouvert}
                     aria-current={actif ? 'step' : undefined}
                     title={!ouvert ? 'Terminez d’abord les collaborateurs précédents' : undefined}
-                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors ${
-                      actif ? 'bg-navy-50 ring-1 ring-navy-200' : ouvert ? 'hover:bg-slate-50' : 'cursor-not-allowed opacity-45'
+                    className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-all duration-200 ${
+                      actif
+                        ? 'bg-white shadow-[0_1px_2px_rgb(0_43_73/0.06),0_6px_16px_-8px_rgb(0_43_73/0.25)] ring-1 ring-navy-200'
+                        : ouvert
+                          ? 'hover:bg-slate-50'
+                          : 'cursor-not-allowed opacity-45'
                     }`}
                   >
                     <span
-                      className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
-                        actif ? 'bg-navy-900 text-white' : fini ? 'bg-emerald-50 text-emerald-800' : 'bg-slate-100 text-slate-600'
+                      className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                        actif
+                          ? 'bg-gradient-to-b from-navy-700 to-navy-950 text-white ring-2 ring-gold-400/80 ring-offset-2'
+                          : fini
+                            ? 'bg-emerald-50 text-emerald-800'
+                            : 'bg-slate-100 text-slate-600'
                       }`}
                     >
                       {initiales(aff)}
@@ -568,6 +596,13 @@ export default function EvaluerPage() {
                     <span className="min-w-0 flex-1">
                       <span className={`block truncate text-sm ${actif ? 'font-semibold text-navy-900' : 'font-medium text-slate-800'}`}>{nomComplet(aff)}</span>
                       <span className="block truncate text-xs text-slate-500">{aff.evalue.service || 'Service non renseigné'}</span>
+                      {/* Avancement des critères de ce collaborateur */}
+                      <span aria-hidden className="mt-1.5 block h-[3px] overflow-hidden rounded-full bg-slate-100">
+                        <span
+                          className={`block h-full rounded-full transition-[width] duration-500 ${fini ? 'bg-emerald-500' : 'bg-gold-500'}`}
+                          style={{ width: `${cs.length ? (aff.statut === 'TERMINEE' ? 100 : (remplis / cs.length) * 100) : 0}%` }}
+                        />
+                      </span>
                     </span>
                     <span className={`shrink-0 text-xs tabular-nums ${fini ? 'text-emerald-700' : 'text-slate-400'}`}>
                       {aff.statut === 'TERMINEE' ? 'Soumis' : `${remplis}/${cs.length}`}
@@ -583,9 +618,9 @@ export default function EvaluerPage() {
         </aside>
 
         {/* ─── Zone de notation ─── */}
-        <main className="min-w-0 flex-1 overflow-y-auto">
+        <main className="min-w-0 flex-1 overflow-y-auto bg-[linear-gradient(180deg,#e9eef4_0%,var(--color-canvas)_340px)]">
           {courant && (
-            <div className="mx-auto max-w-5xl space-y-5 px-4 py-6 sm:px-8 sm:py-8">
+            <div className="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-8 sm:py-9">
               <EnteteCollaborateur
                 aff={courant}
                 position={currentIndex + 1}
@@ -595,39 +630,66 @@ export default function EvaluerPage() {
               />
 
               <div className="flex items-center justify-between gap-3">
-                <nav className="-mx-1 flex min-w-0 gap-1.5 overflow-x-auto px-1 pb-1" aria-label="Critères">
-                  {criteresCourants.map((c, i) => {
-                    const v = valeur(courant.evalueId, c.id)
-                    const ouvert = i === 0 || criteresCourants.slice(0, i).every((p) => valeur(courant.evalueId, p.id) > 0)
-                    const actif = vue === 'focus' && i === critereIndex
-                    return (
-                      <button
-                        key={c.id}
-                        onClick={() => {
-                          setVue('focus')
-                          setCritereIndex(i)
-                        }}
-                        disabled={!ouvert}
-                        aria-current={actif ? 'step' : undefined}
-                        className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs transition-colors ${
-                          actif
-                            ? 'bg-navy-900 font-semibold text-white'
-                            : v > 0
-                              ? 'bg-white text-navy-900 ring-1 ring-navy-200 hover:bg-navy-50'
-                              : ouvert
-                                ? 'bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50'
-                                : 'cursor-not-allowed bg-slate-50 text-slate-400 ring-1 ring-slate-100'
-                        }`}
-                      >
-                        {v > 0 && !actif ? <Check className="h-3 w-3 text-emerald-600" strokeWidth={3} aria-hidden /> : <span className="tabular-nums">{i + 1}.</span>}
-                        {c.libelle}
-                      </button>
-                    )
-                  })}
+                {/* Parcours des critères : étapes reliées, notées en or */}
+                <nav className="-mx-1 min-w-0 overflow-x-auto px-1 pb-1" aria-label="Critères">
+                  <ol className="flex items-center">
+                    {criteresCourants.map((c, i) => {
+                      const v = valeur(courant.evalueId, c.id)
+                      const ouvert = i === 0 || criteresCourants.slice(0, i).every((p) => valeur(courant.evalueId, p.id) > 0)
+                      const actif = vue === 'focus' && i === critereIndex
+                      return (
+                        <li key={c.id} className="flex shrink-0 items-center">
+                          {i > 0 && (
+                            <span
+                              aria-hidden
+                              className={`mx-1 h-px w-3 xl:w-5 ${valeur(courant.evalueId, criteresCourants[i - 1].id) > 0 ? 'bg-gold-400' : 'bg-slate-300'}`}
+                            />
+                          )}
+                          <button
+                            onClick={() => {
+                              setVue('focus')
+                              setCritereIndex(i)
+                            }}
+                            disabled={!ouvert}
+                            aria-current={actif ? 'step' : undefined}
+                            aria-label={`Critère ${i + 1} : ${c.libelle}${v > 0 ? ' (noté)' : ''}`}
+                            title={c.libelle}
+                            className={`group flex items-center gap-2 rounded-full py-1 pr-3 pl-1 text-xs transition-all duration-200 ${
+                              actif
+                                ? 'bg-navy-900 font-semibold text-white shadow-[0_6px_14px_-6px_rgb(0_26_46/0.6)]'
+                                : v > 0
+                                  ? 'text-navy-900 hover:bg-white'
+                                  : ouvert
+                                    ? 'text-slate-600 hover:bg-white'
+                                    : 'cursor-not-allowed text-slate-400'
+                            }`}
+                          >
+                            <span
+                              className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold tabular-nums transition-colors ${
+                                actif
+                                  ? v > 0
+                                    ? 'bg-gold-400 text-navy-950'
+                                    : 'bg-white/15 text-white'
+                                  : v > 0
+                                    ? 'bg-gold-100 text-gold-800 ring-1 ring-gold-300'
+                                    : ouvert
+                                      ? 'bg-white text-slate-600 ring-1 ring-slate-300'
+                                      : 'bg-slate-100 text-slate-400'
+                              }`}
+                            >
+                              {v > 0 ? <Check className="h-3 w-3" strokeWidth={3} aria-hidden /> : i + 1}
+                            </span>
+                            {/* Sur écran moyen, seuls le critère en cours et les critères notés gardent leur nom */}
+                            <span className={actif || v > 0 ? '' : 'hidden xl:inline'}>{c.libelle}</span>
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ol>
                 </nav>
                 <button
                   onClick={() => setVue(vue === 'focus' ? 'liste' : 'focus')}
-                  className="hidden shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200 hover:bg-white sm:inline-flex"
+                  className="hidden shrink-0 items-center gap-1.5 rounded-xl bg-white/60 px-3 py-2 text-xs font-medium text-slate-600 ring-1 ring-slate-200 transition-colors hover:bg-white hover:text-navy-900 sm:inline-flex"
                 >
                   {vue === 'focus' ? <LayoutList className="h-3.5 w-3.5" aria-hidden /> : <Rows3 className="h-3.5 w-3.5" aria-hidden />}
                   {vue === 'focus' ? 'Tout afficher' : 'Un critère à la fois'}
@@ -700,10 +762,10 @@ export default function EvaluerPage() {
 /* ─── Sous-composants ───────────────────────────────────────────── */
 
 const BTN_PRIMAIRE =
-  'inline-flex items-center justify-center gap-2 rounded-lg bg-navy-900 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-navy-800 disabled:cursor-not-allowed disabled:opacity-40'
+  'group inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-navy-800 to-navy-950 px-5 py-3 text-sm font-semibold tracking-[0.01em] text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.12),0_10px_20px_-10px_rgb(0_26_46/0.7)] transition-[box-shadow,transform,opacity] duration-200 hover:-translate-y-px hover:shadow-[inset_0_1px_0_rgb(255_255_255/0.14),0_16px_28px_-12px_rgb(0_26_46/0.75)] active:translate-y-0 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-35 disabled:shadow-none'
 const BTN_SECONDAIRE =
-  'inline-flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-medium text-slate-700 ring-1 ring-slate-300 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40'
-const BTN_DISCRET = 'inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-100'
+  'inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-[0_1px_2px_rgb(0_43_73/0.05)] ring-1 ring-slate-200 transition-colors hover:bg-slate-50 hover:text-navy-900 disabled:cursor-not-allowed disabled:opacity-40'
+const BTN_DISCRET = 'inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm text-slate-600 hover:bg-slate-100'
 
 function EnteteCollaborateur({
   aff,
@@ -726,31 +788,49 @@ function EnteteCollaborateur({
   const appreciation = maxNotes > 0 ? getAppreciationInfo((somme / maxNotes) * 100) : null
 
   return (
-    <section className="flex flex-col gap-4 rounded-[var(--radius-card)] bg-white p-5 shadow-card sm:flex-row sm:items-center sm:justify-between sm:p-6">
-      <div className="flex min-w-0 items-center gap-4">
-        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-navy-900 text-base font-semibold text-white">
+    <section className="relative flex animate-entree flex-col gap-5 overflow-hidden rounded-2xl bg-white p-5 shadow-[0_1px_2px_rgb(0_43_73/0.05),0_12px_32px_-16px_rgb(0_43_73/0.22)] sm:flex-row sm:items-center sm:justify-between sm:p-7">
+      <span aria-hidden className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-gold-600 via-gold-400 to-gold-600" />
+      <div className="flex min-w-0 items-center gap-4 sm:gap-5">
+        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-navy-700 to-navy-950 font-display text-lg font-medium text-white ring-2 ring-gold-400/80 ring-offset-[3px]">
           {initiales(aff)}
         </span>
         <div className="min-w-0">
           <p className="text-xs text-slate-500">
-            Collaborateur {position} sur {total}
+            Collaborateur <span className="font-semibold text-navy-900 tabular-nums">{position}</span> sur {total}
           </p>
-          <h1 className="truncate text-xl font-semibold tracking-tight text-navy-900 sm:text-2xl">{nomComplet(aff)}</h1>
-          <p className="truncate text-sm text-slate-600">
+          <h1 className="mt-0.5 truncate font-display text-[1.45rem] leading-tight font-medium tracking-[-0.01em] text-navy-900 sm:text-[1.75rem]">
+            {nomComplet(aff)}
+          </h1>
+          <p className="mt-1 truncate text-sm text-slate-600">
             {aff.evalue.service || 'Service non renseigné'}
             {aff.evalue.emploi && <> · {aff.evalue.emploi}</>}
             <span className="text-slate-400"> · {aff.evalue.matricule}</span>
           </p>
         </div>
       </div>
-      <div className="shrink-0 sm:text-right" aria-live="polite">
-        <p className="text-xs text-slate-500">
+      <div className="shrink-0 sm:min-w-[11rem] sm:text-right" aria-live="polite">
+        <p className="font-display text-[2rem] leading-none font-medium text-navy-900 tabular-nums">
+          {somme}
+          <span className="font-sans text-sm font-normal text-slate-500"> / {max} pts</span>
+        </p>
+        {/* Un segment par critère : or quand il est noté */}
+        <div className="mt-3 flex gap-1 sm:justify-end" aria-hidden>
+          {criteres.map((c) => (
+            <span
+              key={c.id}
+              className={`h-1.5 w-6 rounded-full transition-colors duration-300 ${(notes[c.id]?.valeur ?? 0) > 0 ? 'bg-gold-500' : 'bg-slate-200'}`}
+            />
+          ))}
+        </div>
+        <p className="mt-2 text-xs text-slate-500">
           {notes_} critère{notes_ > 1 ? 's' : ''} noté{notes_ > 1 ? 's' : ''} sur {criteres.length}
+          {appreciation && (
+            <>
+              {' · '}
+              <span className="font-semibold text-navy-900">{appreciation.appreciation}</span>
+            </>
+          )}
         </p>
-        <p className="mt-0.5 text-lg font-semibold text-navy-900 tabular-nums">
-          {somme} <span className="text-sm font-normal text-slate-500">/ {max} pts</span>
-        </p>
-        {appreciation && <p className="text-sm text-slate-600">{appreciation.appreciation}</p>}
       </div>
     </section>
   )
@@ -790,29 +870,42 @@ function CarteCritere({
   }, [autoFocus, verrouille])
 
   return (
-    <section className={`rounded-[var(--radius-card)] bg-white shadow-card ${compact ? 'p-5' : 'animate-rise-in p-5 sm:p-8'}`}>
+    <section
+      className={`rounded-2xl bg-white shadow-[0_1px_2px_rgb(0_43_73/0.05),0_12px_32px_-18px_rgb(0_43_73/0.22)] ${
+        compact ? 'p-5 sm:p-6' : 'animate-fondu p-5 sm:p-9'
+      }`}
+    >
       <fieldset disabled={verrouille}>
         <legend className="contents">
-          <span className="block text-xs text-slate-500">
-            Critère {position} sur {total} · noté sur {critere.noteMaximale}
+          <span className="flex flex-col gap-1.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
+            <span className={`block font-display font-medium tracking-[-0.015em] text-navy-900 ${compact ? 'text-xl' : 'text-[1.75rem] sm:text-[2.1rem]'} leading-tight`}>
+              {critere.libelle}
+            </span>
+            <span className="shrink-0 text-xs text-slate-500">
+              Critère <span className="font-semibold text-navy-900 tabular-nums">{position}</span> sur {total} · noté sur {critere.noteMaximale}
+            </span>
           </span>
-          <span className={`mt-1 block font-semibold tracking-tight text-navy-900 ${compact ? 'text-lg' : 'text-2xl'}`}>{critere.libelle}</span>
         </legend>
-        {critere.description && !compact && <p className="mt-3 max-w-[70ch] text-[15px] leading-relaxed text-slate-700">{critere.description}</p>}
+        {!compact && <span aria-hidden className="mt-4 block h-px w-14 bg-gradient-to-r from-gold-500 to-gold-500/20" />}
+        {critere.description && !compact && <p className="mt-4 max-w-[68ch] text-[15px] leading-relaxed text-slate-600">{critere.description}</p>}
 
         <div
-          className={`mt-6 grid gap-2 ${critere.noteMaximale === 10 ? 'grid-cols-2 sm:grid-cols-5' : compact ? 'grid-cols-5' : 'grid-cols-1 md:grid-cols-5'}`}
+          className={`grid gap-2.5 ${compact ? 'mt-4' : 'mt-7'} ${critere.noteMaximale === 10 ? 'grid-cols-2 sm:grid-cols-5' : compact ? 'grid-cols-5' : 'grid-cols-1 md:grid-cols-5'}`}
           role="radiogroup"
           aria-label={`Appréciation pour ${critere.libelle}`}
         >
           {options.map((opt, i) => {
             const choisi = v === opt.note
+            // Niveau visuel de l'appréciation, sur 5 crans quel que soit le barème
+            const crans = Math.max(1, Math.round((opt.note / critere.noteMaximale) * 5))
             return (
               <label
                 key={opt.note}
-                className={`group relative flex cursor-pointer rounded-lg p-3 ring-1 transition-[background-color,box-shadow,color] has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-navy-600 has-[:disabled]:cursor-not-allowed ${
-                  choisi ? 'bg-navy-900 text-white ring-navy-900' : 'bg-white text-slate-800 ring-slate-200 hover:bg-navy-50 hover:ring-navy-200'
-                } ${compact ? 'flex-col items-center text-center' : 'items-start gap-3 md:flex-col md:gap-0'}`}
+                className={`group relative flex cursor-pointer rounded-xl ring-1 transition-[background-color,box-shadow,color,transform] duration-200 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-navy-600 has-[:disabled]:cursor-not-allowed ${
+                  choisi
+                    ? 'bg-gradient-to-b from-navy-800 to-navy-950 text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.1),0_14px_28px_-14px_rgb(0_26_46/0.8)] ring-navy-900'
+                    : 'bg-white text-slate-800 ring-slate-200 hover:-translate-y-0.5 hover:shadow-[0_10px_22px_-14px_rgb(0_43_73/0.45)] hover:ring-navy-300 has-[:disabled]:hover:translate-y-0 has-[:disabled]:hover:shadow-none'
+                } ${compact ? 'flex-col items-center p-3 text-center' : 'items-center gap-4 p-4 md:flex-col md:items-start md:gap-0'}`}
               >
                 <input
                   ref={i === 0 ? premierRadio : undefined}
@@ -823,23 +916,43 @@ function CarteCritere({
                   onChange={() => onNote(opt.note)}
                   className="sr-only"
                 />
+                {choisi && (
+                  <span
+                    aria-hidden
+                    className={`absolute flex items-center justify-center rounded-full bg-gold-400 text-navy-950 ${compact ? 'top-1.5 right-1.5 h-4 w-4' : 'top-3 right-3 h-5 w-5'}`}
+                  >
+                    <Check className={compact ? 'h-2.5 w-2.5' : 'h-3 w-3'} strokeWidth={3} />
+                  </span>
+                )}
                 <span
-                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-sm font-semibold tabular-nums ${
-                    choisi ? 'bg-gold-500 text-navy-950' : 'bg-slate-100 text-slate-700 group-hover:bg-white'
+                  className={`shrink-0 font-display leading-none font-medium tabular-nums transition-colors ${compact ? 'text-xl' : 'text-[2rem]'} ${
+                    choisi ? 'text-gold-300' : 'text-navy-900 group-hover:text-navy-700'
                   }`}
                 >
                   {opt.note}
                 </span>
-                <span className={compact ? 'mt-1.5' : 'md:mt-2.5'}>
-                  <span className={`block text-sm font-semibold ${compact ? 'text-xs' : ''}`}>{opt.appreciation}</span>
-                  {!compact && <span className={`mt-0.5 block text-xs leading-snug ${choisi ? 'text-navy-100' : 'text-slate-500'}`}>{opt.description}</span>}
+                <span className={`min-w-0 ${compact ? 'mt-1' : 'md:mt-3'}`}>
+                  <span className={`block font-semibold ${compact ? 'text-xs' : 'text-sm'}`}>{opt.appreciation}</span>
+                  {!compact && <span className={`mt-1 block text-xs leading-snug ${choisi ? 'text-navy-200' : 'text-slate-500'}`}>{opt.description}</span>}
                 </span>
+                {!compact && (
+                  <span aria-hidden className="ml-auto flex shrink-0 gap-[3px] md:mt-auto md:ml-0 md:w-full md:pt-4">
+                    {Array.from({ length: 5 }, (_, k) => (
+                      <span
+                        key={k}
+                        className={`h-1 w-3 rounded-full md:w-auto md:flex-1 ${
+                          k < crans ? (choisi ? 'bg-gold-400' : 'bg-navy-300 group-hover:bg-navy-500') : choisi ? 'bg-white/15' : 'bg-slate-100'
+                        }`}
+                      />
+                    ))}
+                  </span>
+                )}
               </label>
             )
           })}
         </div>
 
-        <div className="mt-6">
+        <div className={compact ? 'mt-4' : 'mt-7'}>
           <label htmlFor={`com-${nom}`} className="flex items-baseline justify-between text-sm font-medium text-slate-800">
             Commentaire <span className="text-xs font-normal text-slate-400">facultatif</span>
           </label>
@@ -851,7 +964,7 @@ function CarteCritere({
             disabled={verrouille || v === 0}
             onChange={(e) => onCommentaire(e.target.value)}
             placeholder={v === 0 ? 'Choisissez d’abord une appréciation.' : 'Un fait marquant, un exemple concret, une piste de progrès…'}
-            className="mt-1.5 block w-full resize-y rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-[15px] text-slate-900 outline-none placeholder:text-slate-400 focus:border-navy-600 focus:ring-2 focus:ring-navy-600/15 disabled:bg-slate-50"
+            className="mt-2 block w-full resize-y rounded-xl border border-slate-200 bg-slate-50/60 px-4 py-3 text-[15px] text-slate-900 shadow-[inset_0_1px_2px_rgb(0_43_73/0.04)] outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-navy-600 focus:bg-white focus:ring-4 focus:ring-navy-600/10 disabled:cursor-not-allowed disabled:hover:border-slate-200"
           />
           {commentaire.length > MAX_COMMENTAIRE - 80 && (
             <p className="mt-1 text-right text-xs text-slate-500 tabular-nums">
@@ -881,7 +994,7 @@ function ActionSuivante(p: {
     return (
       <button onClick={p.onCritereSuivant} disabled={!p.critereNote} className={BTN_PRIMAIRE}>
         Critère suivant
-        <ChevronRight className="h-4 w-4" aria-hidden />
+        <ChevronRight className="h-4 w-4 text-gold-400 transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden />
       </button>
     )
   }
@@ -889,7 +1002,7 @@ function ActionSuivante(p: {
     return (
       <button onClick={p.onCollaborateurSuivant} disabled={!p.collaborateurComplet} className={BTN_PRIMAIRE}>
         Collaborateur suivant
-        <ChevronRight className="h-4 w-4" aria-hidden />
+        <ChevronRight className="h-4 w-4 text-gold-400 transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden />
       </button>
     )
   }
@@ -897,7 +1010,7 @@ function ActionSuivante(p: {
     <button
       onClick={p.onSoumettre}
       disabled={!p.pret || p.submitting}
-      className="inline-flex items-center justify-center gap-2 rounded-lg bg-gold-500 px-4 py-2.5 text-sm font-semibold text-navy-950 transition-colors hover:bg-gold-400 disabled:cursor-not-allowed disabled:opacity-40"
+      className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-gold-300 to-gold-500 px-5 py-3 text-sm font-semibold text-navy-950 shadow-[inset_0_1px_0_rgb(255_255_255/0.45),0_10px_22px_-10px_rgb(212_175_55/0.75)] transition-[transform,opacity] duration-200 hover:-translate-y-px disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-40"
     >
       <Send className="h-4 w-4" aria-hidden />
       Soumettre mes évaluations
@@ -977,9 +1090,10 @@ function EcranMessage({
         </span>
       </header>
       <main className="flex flex-1 items-center justify-center p-6">
-        <div className="w-full max-w-md animate-rise-in rounded-[var(--radius-card)] bg-white p-8 shadow-card">
+        <div className="relative w-full max-w-md animate-entree overflow-hidden rounded-2xl bg-white p-9 shadow-[0_1px_2px_rgb(0_43_73/0.05),0_16px_40px_-18px_rgb(0_43_73/0.3)]">
+          <span aria-hidden className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-gold-600 via-gold-400 to-gold-600" />
           <span className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-50">{icone}</span>
-          <h1 className="mt-5 text-xl font-semibold tracking-tight text-navy-900">{titre}</h1>
+          <h1 className="mt-5 font-display text-2xl font-medium tracking-[-0.01em] text-navy-900">{titre}</h1>
           <p className="mt-2 text-[15px] leading-relaxed text-slate-600">{children}</p>
           <div className="mt-7 flex flex-wrap gap-2">{actions}</div>
         </div>
