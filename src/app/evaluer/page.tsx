@@ -872,7 +872,7 @@ function CarteCritere({
   return (
     <section
       className={`rounded-2xl bg-white shadow-[0_1px_2px_rgb(0_43_73/0.05),0_12px_32px_-18px_rgb(0_43_73/0.22)] ${
-        compact ? 'p-5 sm:p-6' : 'animate-entree p-5 sm:p-9'
+        compact ? 'p-5 sm:p-6' : 'animate-fondu p-5 sm:p-9'
       }`}
     >
       <fieldset disabled={verrouille}>

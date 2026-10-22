@@ -50,6 +50,7 @@
   --animate-rise-in: rise-in 260ms var(--ease-out-expo) both;
   --animate-balayage: balayage 7s cubic-bezier(0.45, 0, 0.55, 1) infinite;
   --animate-entree: entree 1100ms var(--ease-out-expo) both;
+  --animate-fondu: fondu 2s cubic-bezier(0.25, 0.1, 0.25, 1) both;
   --animate-pouls: pouls 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
 
   @keyframes fade-in {
@@ -63,6 +64,11 @@
     to { transform: translateY(100dvh); }
   }
   /* Entrée de la page d'accueil : le contenu part déjà lisible et se met au point. */
+  /* Fondu entre deux critères du questionnaire */
+  @keyframes fondu {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
   @keyframes entree {
     from { transform: translateY(14px); filter: blur(5px); opacity: 0.4; }
     to { transform: none; filter: none; opacity: 1; }
