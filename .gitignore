@@ -48,3 +48,7 @@ next-env.d.ts
 
 # Le modèle d’import Excel est un fichier public servi par l’application
 !public/templates/*.xlsx
+
+# documents locaux
+/Manuel - Calcul des notes et meilleur agent de la direction.pdf
+/sauvegardes/
