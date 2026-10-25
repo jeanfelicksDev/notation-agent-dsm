@@ -179,7 +179,7 @@ function AccueilContenu() {
       <Quadrillage />
       <Compas />
 
-      <div className="relative mx-auto flex min-h-dvh w-full max-w-[1480px] flex-col px-5 sm:px-10 lg:px-16">
+      <div className="relative flex min-h-dvh w-full flex-col px-5 sm:px-10 lg:px-[clamp(3rem,6vw,9rem)]">
         {/* ─── En-tête ─── */}
         <header className="flex items-center gap-4 border-b border-white/[0.06] py-6 sm:py-7">
           <span className="rounded-2xl bg-gradient-to-b from-gold-300 to-gold-600 p-[3px] shadow-[0_10px_28px_-8px_rgb(212_175_55/0.6)]">
@@ -204,9 +204,9 @@ function AccueilContenu() {
           </Link>
         </header>
 
-        <main className="grid flex-1 items-center gap-12 py-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,35rem)] lg:gap-16 xl:gap-24 lg:py-14">
+        <main className="grid flex-1 items-center gap-12 py-10 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:gap-[clamp(3rem,6vw,10rem)] lg:py-14 2xl:py-8">
           {/* ─── Présentation et campagne ─── */}
-          <section aria-labelledby="titre-page" className="min-w-0">
+          <section aria-labelledby="titre-page" className="min-w-0 lg:max-w-[clamp(40rem,46vw,60rem)]">
             <span className="inline-flex animate-entree items-center gap-2.5 rounded-full bg-navy-900/70 px-4 py-2 text-xs font-semibold tracking-[0.08em] text-navy-100 ring-1 ring-white/15 sm:text-xs">
               <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgb(52_211_153/0.7)]" aria-hidden />
               PORTAIL RH INTERNE SÉCURISÉ
@@ -214,19 +214,19 @@ function AccueilContenu() {
 
             <h1
               id="titre-page"
-              className="mt-8 animate-entree text-[2.9rem] leading-[1.02] font-semibold tracking-[-0.035em] text-white [animation-delay:60ms] sm:text-[3.9rem] xl:text-[4.5rem]"
+              className="mt-8 animate-entree text-[2.9rem] leading-[1.02] font-semibold tracking-[-0.035em] text-white [animation-delay:60ms] sm:text-[3.9rem] xl:text-[clamp(4.5rem,3.6vw,5.25rem)]"
             >
               Évaluation de la performance
               <em className="mt-1 block font-display text-[0.95em] font-normal tracking-[-0.01em] text-gold-300 italic">des agents</em>
             </h1>
 
-            <p className="mt-6 max-w-[44rem] animate-entree text-base leading-relaxed text-navy-200 [animation-delay:120ms] sm:text-[1.2rem] sm:leading-[1.6]">
+            <p className="mt-6 max-w-[44rem] animate-entree text-base leading-relaxed text-navy-200 [animation-delay:120ms] sm:text-[1.2rem] sm:leading-[1.6] 2xl:max-w-[50rem] 2xl:text-[1.25rem]">
               Notez, critère par critère, les collaborateurs qui vous sont attribués. Vos évaluations alimentent avec équité le classement
               d’excellence de la campagne.
             </p>
 
             {campagne ? (
-              <div className="relative mt-10 max-w-[45rem] animate-entree overflow-hidden rounded-2xl bg-gradient-to-b from-[#12294a] to-[#0d2140] p-6 shadow-[0_30px_60px_-30px_rgb(0_0_0/0.6),inset_0_1px_0_rgb(255_255_255/0.06)] ring-1 ring-white/10 [animation-delay:180ms] sm:p-9">
+              <div className="relative mt-10 max-w-[45rem] 2xl:mt-8 2xl:max-w-none animate-entree overflow-hidden rounded-2xl bg-gradient-to-b from-[#12294a] to-[#0d2140] p-6 shadow-[0_30px_60px_-30px_rgb(0_0_0/0.6),inset_0_1px_0_rgb(255_255_255/0.06)] ring-1 ring-white/10 [animation-delay:180ms] sm:p-9">
                 <span aria-hidden className="absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-gold-400/60 to-transparent" />
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <span className="inline-flex items-center gap-2 rounded-full bg-emerald-400/10 py-1.5 pr-3.5 pl-3 text-sm font-medium text-emerald-300 ring-1 ring-emerald-400/30">
@@ -256,26 +256,14 @@ function AccueilContenu() {
                 </dl>
               </div>
             ) : (
-              <p className="mt-10 max-w-[45rem] animate-entree rounded-2xl bg-white/[0.05] p-8 text-navy-100 ring-1 ring-white/10 [animation-delay:180ms]">
+              <p className="mt-10 max-w-[45rem] 2xl:max-w-none animate-entree rounded-2xl bg-white/[0.05] p-8 text-navy-100 ring-1 ring-white/10 [animation-delay:180ms]">
                 Aucune campagne d’évaluation n’est ouverte pour le moment.
               </p>
             )}
-
-            <ol className="mt-12 hidden max-w-[45rem] animate-entree gap-8 [animation-delay:260ms] sm:grid sm:grid-cols-3">
-              {ETAPES_GUIDE.map(([titreEtape, texte], i) => (
-                <li key={titreEtape}>
-                  <span className="font-display text-[2.1rem] leading-none text-gold-300 italic" aria-label={`Étape ${i + 1}`}>
-                    {String(i + 1).padStart(2, '0')}
-                  </span>
-                  <p className="mt-4 text-[1.05rem] font-semibold text-white">{titreEtape}</p>
-                  <p className="mt-2 text-sm leading-relaxed text-navy-200">{texte}</p>
-                </li>
-              ))}
-            </ol>
           </section>
 
           {/* ─── Connexion ─── */}
-          <section aria-labelledby="titre-connexion" className="relative w-full animate-entree [animation-delay:140ms] lg:justify-self-end">
+          <section aria-labelledby="titre-connexion" className="relative w-full animate-entree [animation-delay:140ms] lg:max-w-[clamp(28rem,22vw,33rem)] lg:justify-self-center">
             <div aria-hidden className="pointer-events-none absolute -inset-16 -z-10 rounded-full bg-[radial-gradient(closest-side,rgb(212_175_55/0.12),transparent)] blur-2xl" />
             <div className="relative rounded-[28px] bg-[#f4f6f9] p-7 text-slate-900 shadow-[0_50px_90px_-30px_rgb(0_0_0/0.75),0_14px_30px_-14px_rgb(0_0_0/0.45)] sm:p-12">
               <Lock className="absolute top-7 right-7 h-5 w-5 text-slate-300" aria-hidden />
@@ -478,6 +466,21 @@ function AccueilContenu() {
           </section>
         </main>
 
+        {/* ─── Étapes : bandeau sur toute la largeur ─── */}
+        <ol className="hidden animate-entree gap-8 border-t border-white/[0.06] py-8 [animation-delay:260ms] sm:grid sm:grid-cols-3 lg:gap-[clamp(3rem,6vw,10rem)]">
+          {ETAPES_GUIDE.map(([titreEtape, texte], i) => (
+            <li key={titreEtape} className="flex items-start gap-5">
+              <span className="shrink-0 font-display text-[2.1rem] leading-none text-gold-300 italic" aria-label={`Étape ${i + 1}`}>
+                {String(i + 1).padStart(2, '0')}
+              </span>
+              <div className="max-w-[26rem]">
+                <p className="text-[1.05rem] font-semibold text-white">{titreEtape}</p>
+                <p className="mt-1.5 text-sm leading-relaxed text-navy-200">{texte}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+
         {/* ─── Pied de page ─── */}
         <footer className="flex flex-col gap-6 pb-8 sm:flex-row sm:items-end sm:justify-between">
           <div className="hidden items-center gap-4 rounded-2xl bg-white/[0.04] p-3 pr-6 ring-1 ring-white/10 sm:flex">
@@ -551,7 +554,7 @@ function Quadrillage() {
 /** Compas de carte marine en filigrane, centré en bas de page, avec sa ligne d'horizon. */
 function Compas() {
   return (
-    <div aria-hidden className="pointer-events-none absolute bottom-0 left-[45%] hidden h-[34rem] w-[34rem] -translate-x-1/2 translate-y-[38%] lg:block">
+    <div aria-hidden className="pointer-events-none absolute bottom-0 left-[60%] hidden h-[34rem] w-[34rem] -translate-x-1/2 translate-y-[38%] lg:block">
       <div className="absolute top-1/2 left-1/2 h-px w-[66rem] -translate-x-1/2 bg-gradient-to-r from-transparent via-white/15 to-transparent" />
       <svg viewBox="-300 -300 600 600" className="h-full w-full text-white" fill="none" stroke="currentColor">
         <g strokeOpacity="0.09">
