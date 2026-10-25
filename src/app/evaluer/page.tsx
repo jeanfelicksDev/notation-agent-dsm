@@ -71,6 +71,8 @@ type Sauvegarde = { etat: 'idle' | 'pending' | 'saving' | 'saved' | 'error'; at?
 type Passage = Pick<TransitionCollaborateurProps, 'de' | 'vers' | 'sens'> & { cle: number }
 
 const AUTOSAVE_MS = 1200
+/** Temps laissé pour voir la dernière note avant d'enchaîner sur le collaborateur suivant. */
+const ENCHAINEMENT_MS = 700
 const MAX_COMMENTAIRE = 500
 
 const nomComplet = (a: Affectation) => `${a.evalue.prenom} ${a.evalue.nom}`
@@ -106,6 +108,8 @@ export default function EvaluerPage() {
   const [passage, setPassage] = useState<Passage | null>(null)
   const finPassage = useCallback(() => setPassage(null), [])
   const zoneNotation = useRef<HTMLElement>(null)
+  // Collaborateur dont le questionnaire vient d'être complété : on enchaîne sur le suivant
+  const [enchainerApres, setEnchainerApres] = useState<string | null>(null)
 
   // Collaborateurs modifiés depuis la dernière sauvegarde réussie
   const sales = useRef(new Set<string>())
@@ -273,6 +277,10 @@ export default function EvaluerPage() {
     if (vue === 'focus' && premiereFois && idx < cs.length - 1) {
       setTimeout(() => setCritereIndex(idx + 1), 220)
     }
+
+    // Cette note complète le questionnaire : enchaînement vers le prochain collaborateur à noter
+    const complete = cs.every((c) => c.id === critere.id || valeur(aff.evalueId, c.id) > 0)
+    if (premiereFois && complete) setEnchainerApres(aff.evalueId)
   }
 
   const changerCommentaire = (aff: Affectation, critereId: string, texte: string) => {
@@ -292,6 +300,7 @@ export default function EvaluerPage() {
     idx === 0 || affectations.slice(0, idx).every((a) => a.statut === 'TERMINEE' || estComplet(a))
 
   const allerA = async (idx: number) => {
+    setEnchainerApres(null)
     if (idx < 0 || idx >= affectations.length || idx === currentIndex || !estDeverrouille(idx)) return
     const quitte = affectations[currentIndex]
     if (quitte && sales.current.has(quitte.evalueId)) await sauvegarder(quitte.evalueId)
@@ -308,6 +317,26 @@ export default function EvaluerPage() {
       vers: { nom: nomComplet(cible), initiales: initiales(cible), service: cible.evalue.service },
     })
   }
+
+  // Lu depuis le minuteur : la ref garde la version qui voit les notes à jour
+  const allerAuProchainANoter = (depuisEvalueId: string) => {
+    if (affectations[currentIndex]?.evalueId !== depuisEvalueId) return
+    const idx = affectations.findIndex((a, i) => i > currentIndex && a.statut !== 'TERMINEE' && !estComplet(a))
+    if (idx !== -1) allerA(idx)
+  }
+  const allerAuProchainANoterRef = useRef(allerAuProchainANoter)
+  useEffect(() => {
+    allerAuProchainANoterRef.current = allerAuProchainANoter
+  })
+
+  useEffect(() => {
+    if (!enchainerApres) return
+    const t = setTimeout(() => {
+      setEnchainerApres(null)
+      allerAuProchainANoterRef.current(enchainerApres)
+    }, ENCHAINEMENT_MS)
+    return () => clearTimeout(t)
+  }, [enchainerApres])
 
   /* ─── Soumission ─── */
 
