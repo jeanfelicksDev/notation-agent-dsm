@@ -71,8 +71,6 @@ type Sauvegarde = { etat: 'idle' | 'pending' | 'saving' | 'saved' | 'error'; at?
 type Passage = Pick<TransitionCollaborateurProps, 'de' | 'vers' | 'sens'> & { cle: number }
 
 const AUTOSAVE_MS = 1200
-/** Temps laissé pour voir la dernière note avant d'enchaîner sur le collaborateur suivant. */
-const ENCHAINEMENT_MS = 700
 const MAX_COMMENTAIRE = 500
 
 const nomComplet = (a: Affectation) => `${a.evalue.prenom} ${a.evalue.nom}`
@@ -108,8 +106,6 @@ export default function EvaluerPage() {
   const [passage, setPassage] = useState<Passage | null>(null)
   const finPassage = useCallback(() => setPassage(null), [])
   const zoneNotation = useRef<HTMLElement>(null)
-  // Collaborateur dont le questionnaire vient d'être complété : on enchaîne sur le suivant
-  const [enchainerApres, setEnchainerApres] = useState<string | null>(null)
 
   // Collaborateurs modifiés depuis la dernière sauvegarde réussie
   const sales = useRef(new Set<string>())
@@ -261,7 +257,6 @@ export default function EvaluerPage() {
 
   const choisirNote = (aff: Affectation, critere: Critere, note: number) => {
     if (aff.statut === 'TERMINEE' || lectureSeule) return
-    const premiereFois = valeur(aff.evalueId, critere.id) === 0
     setNotes((prev) => ({
       ...prev,
       [aff.evalueId]: {
@@ -270,17 +265,6 @@ export default function EvaluerPage() {
       },
     }))
     marquerModifie(aff.evalueId)
-
-    // Auto-avance au critère suivant, seulement lors d'une première notation en mode focus
-    const cs = criteresDe(aff)
-    const idx = cs.findIndex((c) => c.id === critere.id)
-    if (vue === 'focus' && premiereFois && idx < cs.length - 1) {
-      setTimeout(() => setCritereIndex(idx + 1), 220)
-    }
-
-    // Cette note complète le questionnaire : enchaînement vers le prochain collaborateur à noter
-    const complete = cs.every((c) => c.id === critere.id || valeur(aff.evalueId, c.id) > 0)
-    if (premiereFois && complete) setEnchainerApres(aff.evalueId)
   }
 
   const changerCommentaire = (aff: Affectation, critereId: string, texte: string) => {
@@ -300,7 +284,6 @@ export default function EvaluerPage() {
     idx === 0 || affectations.slice(0, idx).every((a) => a.statut === 'TERMINEE' || estComplet(a))
 
   const allerA = async (idx: number) => {
-    setEnchainerApres(null)
     if (idx < 0 || idx >= affectations.length || idx === currentIndex || !estDeverrouille(idx)) return
     const quitte = affectations[currentIndex]
     if (quitte && sales.current.has(quitte.evalueId)) await sauvegarder(quitte.evalueId)
@@ -318,25 +301,22 @@ export default function EvaluerPage() {
     })
   }
 
-  // Lu depuis le minuteur : la ref garde la version qui voit les notes à jour
-  const allerAuProchainANoter = (depuisEvalueId: string) => {
-    if (affectations[currentIndex]?.evalueId !== depuisEvalueId) return
-    const idx = affectations.findIndex((a, i) => i > currentIndex && a.statut !== 'TERMINEE' && !estComplet(a))
-    if (idx !== -1) allerA(idx)
+  // Bouton « Aucun commentaire à faire » : critère suivant, ou rideau vers le prochain collaborateur à noter
+  const continuer = (aff: Affectation, critereIdx: number) => {
+    const cs = criteresDe(aff)
+    if (critereIdx < cs.length - 1) {
+      setCritereIndex(critereIdx + 1)
+      return
+    }
+    const manquant = cs.findIndex((c) => valeur(aff.evalueId, c.id) === 0)
+    if (manquant !== -1) {
+      setCritereIndex(manquant)
+      return
+    }
+    const prochain = affectations.findIndex((a, i) => i > currentIndex && a.statut !== 'TERMINEE' && !estComplet(a))
+    if (prochain !== -1) allerA(prochain)
+    else toast.success('Tous vos collaborateurs sont notés : vous pouvez soumettre vos évaluations.')
   }
-  const allerAuProchainANoterRef = useRef(allerAuProchainANoter)
-  useEffect(() => {
-    allerAuProchainANoterRef.current = allerAuProchainANoter
-  })
-
-  useEffect(() => {
-    if (!enchainerApres) return
-    const t = setTimeout(() => {
-      setEnchainerApres(null)
-      allerAuProchainANoterRef.current(enchainerApres)
-    }, ENCHAINEMENT_MS)
-    return () => clearTimeout(t)
-  }, [enchainerApres])
 
   /* ─── Soumission ─── */
 
@@ -766,6 +746,7 @@ export default function EvaluerPage() {
                   verrouille={verrouille}
                   onNote={(n) => choisirNote(courant, criteresCourants[critereIndex], n)}
                   onCommentaire={(t) => changerCommentaire(courant, criteresCourants[critereIndex].id, t)}
+                  onContinuer={() => continuer(courant, critereIndex)}
                   autoFocus
                 />
               ) : (
@@ -904,6 +885,7 @@ function CarteCritere({
   verrouille,
   onNote,
   onCommentaire,
+  onContinuer,
   compact = false,
   autoFocus = false,
 }: {
@@ -915,6 +897,8 @@ function CarteCritere({
   verrouille: boolean
   onNote: (n: number) => void
   onCommentaire: (t: string) => void
+  /** Passage au critère (ou au collaborateur) suivant ; absent en vue « Tout afficher ». */
+  onContinuer?: () => void
   compact?: boolean
   autoFocus?: boolean
 }) {
@@ -1012,6 +996,14 @@ function CarteCritere({
         </div>
 
         <div className={compact ? 'mt-4' : 'mt-7'}>
+          {onContinuer && (
+            <div className="mb-5 flex justify-end">
+              <button type="button" onClick={onContinuer} disabled={v === 0} className={BTN_PRIMAIRE}>
+                {commentaire.trim() ? 'Valider et continuer' : 'Aucun commentaire à faire'}
+                <ChevronRight className="h-4 w-4 text-gold-400 transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden />
+              </button>
+            </div>
+          )}
           <label htmlFor={`com-${nom}`} className="flex items-baseline justify-between text-sm font-medium text-slate-800">
             Commentaire <span className="text-xs font-normal text-slate-400">facultatif</span>
           </label>
