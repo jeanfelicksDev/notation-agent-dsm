@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers'
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto'
 import prisma from '@/lib/prisma'
+import { estHorsCampagne } from '@/lib/roles'
 
 export const SESSION_COOKIE_NAME = 'eval_session'
 const SESSION_DURATION_MS = 1000 * 60 * 60 * 8 // 8 heures
@@ -162,6 +163,8 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     await prisma.session.delete({ where: { id: session.id } }).catch(() => {})
     return null
   }
+  // Un compte passé « hors campagne » après s'être connecté perd l'accès à sa session.
+  if (estHorsCampagne(session.utilisateur.role)) return null
 
   return session.utilisateur
 }

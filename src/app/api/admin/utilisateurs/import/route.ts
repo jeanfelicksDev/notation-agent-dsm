@@ -55,6 +55,7 @@ function roleDepuisStatut(statut: string): Role | null {
   if (s.includes('manager')) return 'MANAGER'
   if (s.includes('externe') || s.includes('client')) return 'EXTERNE'
   if (s.includes('admin')) return 'ADMIN'
+  if (s.includes('cadre')) return 'CADRE'
   return 'UTILISATEUR'
 }
 

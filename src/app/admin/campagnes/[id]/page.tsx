@@ -13,6 +13,7 @@ import {
 import AdminHeader from '@/components/AdminHeader'
 import { confirmer, toast } from '@/components/ui/feedback'
 import { typesDuCritere } from '@/lib/criteres'
+import { estHorsCampagne } from '@/lib/roles'
 import { getAppreciationInfo } from '@/lib/default-criteres'
 
 interface Critere {
@@ -113,7 +114,8 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
   const loadUsers = () => {
     fetch('/api/admin/utilisateurs')
       .then(res => res.json())
-      .then(data => setAllUsers(data))
+      // Les cadres sont dans l'annuaire mais ne participent pas aux campagnes.
+      .then(data => setAllUsers(Array.isArray(data) ? data.filter((u: User) => !estHorsCampagne(u.role)) : []))
   }
 
   const loadAffectations = () => {
