@@ -9,6 +9,7 @@ import {
   ChevronRight,
   CircleCheck,
   CloudOff,
+  EyeOff,
   LayoutList,
   Loader2,
   Lock,
@@ -20,6 +21,7 @@ import {
   X,
 } from 'lucide-react'
 import { getAppreciationInfo, getAppreciationOptions } from '@/lib/default-criteres'
+import { commentaireObligatoire } from '@/lib/commentaires'
 import { BrandMark } from '@/components/BrandMark'
 import { confirmer, toast } from '@/components/ui/feedback'
 import { TransitionCollaborateur, type TransitionCollaborateurProps } from '@/components/evaluer/TransitionCollaborateur'
@@ -121,12 +123,22 @@ export default function EvaluerPage() {
   )
   const valeur = (evalueId: string, critereId: string) => notes[evalueId]?.[critereId]?.valeur ?? 0
 
+  /** Noté, et commenté si la note est basse (le commentaire est alors obligatoire). */
+  const critereRempli = useCallback(
+    (evalueId: string, c: Critere) => {
+      const n = notes[evalueId]?.[c.id]
+      const v = n?.valeur ?? 0
+      return v > 0 && (!commentaireObligatoire(v, c.noteMaximale) || !!n?.commentaire.trim())
+    },
+    [notes]
+  )
+
   const estComplet = useCallback(
     (aff: Affectation) => {
       const cs = criteresDe(aff)
-      return cs.length > 0 && cs.every((c) => (notes[aff.evalueId]?.[c.id]?.valeur ?? 0) > 0)
+      return cs.length > 0 && cs.every((c) => critereRempli(aff.evalueId, c))
     },
-    [criteresDe, notes]
+    [criteresDe, critereRempli]
   )
 
   const lectureSeule = !campagne?.ouverte
@@ -308,7 +320,7 @@ export default function EvaluerPage() {
       setCritereIndex(critereIdx + 1)
       return
     }
-    const manquant = cs.findIndex((c) => valeur(aff.evalueId, c.id) === 0)
+    const manquant = cs.findIndex((c) => !critereRempli(aff.evalueId, c))
     if (manquant !== -1) {
       setCritereIndex(manquant)
       return
@@ -327,8 +339,12 @@ export default function EvaluerPage() {
   const soumettre = async () => {
     const incomplet = ouvertes.find((a) => !estComplet(a))
     if (incomplet) {
-      const manquant = criteresDe(incomplet).find((c) => valeur(incomplet.evalueId, c.id) === 0)
-      toast.error(`« ${manquant?.libelle} » n’est pas encore noté pour ${nomComplet(incomplet)}.`)
+      const manquant = criteresDe(incomplet).find((c) => !critereRempli(incomplet.evalueId, c))
+      toast.error(
+        manquant && valeur(incomplet.evalueId, manquant.id) > 0
+          ? `« ${manquant.libelle} » : un commentaire est requis pour expliquer cette note de ${nomComplet(incomplet)}.`
+          : `« ${manquant?.libelle} » n’est pas encore noté pour ${nomComplet(incomplet)}.`
+      )
       allerA(affectations.indexOf(incomplet))
       return
     }
@@ -673,15 +689,15 @@ export default function EvaluerPage() {
                 <nav className="-mx-1 min-w-0 overflow-x-auto px-1 pb-1" aria-label="Critères">
                   <ol className="flex items-center">
                     {criteresCourants.map((c, i) => {
-                      const v = valeur(courant.evalueId, c.id)
-                      const ouvert = i === 0 || criteresCourants.slice(0, i).every((p) => valeur(courant.evalueId, p.id) > 0)
+                      const fait = critereRempli(courant.evalueId, c)
+                      const ouvert = i === 0 || criteresCourants.slice(0, i).every((p) => critereRempli(courant.evalueId, p))
                       const actif = vue === 'focus' && i === critereIndex
                       return (
                         <li key={c.id} className="flex shrink-0 items-center">
                           {i > 0 && (
                             <span
                               aria-hidden
-                              className={`mx-1 h-px w-3 xl:w-5 ${valeur(courant.evalueId, criteresCourants[i - 1].id) > 0 ? 'bg-gold-400' : 'bg-slate-300'}`}
+                              className={`mx-1 h-px w-3 xl:w-5 ${critereRempli(courant.evalueId, criteresCourants[i - 1]) ? 'bg-gold-400' : 'bg-slate-300'}`}
                             />
                           )}
                           <button
@@ -691,12 +707,12 @@ export default function EvaluerPage() {
                             }}
                             disabled={!ouvert}
                             aria-current={actif ? 'step' : undefined}
-                            aria-label={`Critère ${i + 1} : ${c.libelle}${v > 0 ? ' (noté)' : ''}`}
+                            aria-label={`Critère ${i + 1} : ${c.libelle}${fait ? ' (noté)' : ''}`}
                             title={c.libelle}
                             className={`group flex items-center gap-2 rounded-full py-1 pr-3 pl-1 text-xs transition-all duration-200 ${
                               actif
                                 ? 'bg-navy-900 font-semibold text-white shadow-[0_6px_14px_-6px_rgb(0_26_46/0.6)]'
-                                : v > 0
+                                : fait
                                   ? 'text-navy-900 hover:bg-white'
                                   : ouvert
                                     ? 'text-slate-600 hover:bg-white'
@@ -706,20 +722,20 @@ export default function EvaluerPage() {
                             <span
                               className={`flex h-6 w-6 items-center justify-center rounded-full text-2xs font-semibold tabular-nums transition-colors ${
                                 actif
-                                  ? v > 0
+                                  ? fait
                                     ? 'bg-gold-400 text-navy-950'
                                     : 'bg-white/15 text-white'
-                                  : v > 0
+                                  : fait
                                     ? 'bg-gold-100 text-gold-800 ring-1 ring-gold-300'
                                     : ouvert
                                       ? 'bg-white text-slate-600 ring-1 ring-slate-300'
                                       : 'bg-slate-100 text-slate-400'
                               }`}
                             >
-                              {v > 0 ? <Check className="h-3 w-3" strokeWidth={3} aria-hidden /> : i + 1}
+                              {fait ? <Check className="h-3 w-3" strokeWidth={3} aria-hidden /> : i + 1}
                             </span>
                             {/* Sur écran moyen, seuls le critère en cours et les critères notés gardent leur nom */}
-                            <span className={actif || v > 0 ? '' : 'hidden xl:inline'}>{c.libelle}</span>
+                            <span className={actif || fait ? '' : 'hidden xl:inline'}>{c.libelle}</span>
                           </button>
                         </li>
                       )
@@ -781,7 +797,7 @@ export default function EvaluerPage() {
                   vue={vue}
                   critereIndex={critereIndex}
                   nbCriteres={criteresCourants.length}
-                  critereNote={valeur(courant.evalueId, criteresCourants[critereIndex]?.id ?? '') > 0}
+                  critereNote={!!criteresCourants[critereIndex] && critereRempli(courant.evalueId, criteresCourants[critereIndex])}
                   collaborateurComplet={courant.statut === 'TERMINEE' || estComplet(courant)}
                   dernier={currentIndex === affectations.length - 1}
                   pret={pret}
@@ -905,6 +921,8 @@ function CarteCritere({
   const options = getAppreciationOptions(critere.noteMaximale)
   const v = note?.valeur ?? 0
   const commentaire = note?.commentaire ?? ''
+  const obligatoire = commentaireObligatoire(v, critere.noteMaximale)
+  const commentaireManquant = obligatoire && !commentaire.trim()
   const nom = `note-${aff.evalueId}-${critere.id}`
   const premierRadio = useRef<HTMLInputElement>(null)
 
@@ -998,23 +1016,41 @@ function CarteCritere({
         <div className={compact ? 'mt-4' : 'mt-7'}>
           {onContinuer && (
             <div className="mb-5 flex justify-end">
-              <button type="button" onClick={onContinuer} disabled={v === 0} className={BTN_PRIMAIRE}>
-                {commentaire.trim() ? 'Valider et continuer' : 'Aucun commentaire à faire'}
+              <button type="button" onClick={onContinuer} disabled={v === 0 || commentaireManquant} className={BTN_PRIMAIRE}>
+                {commentaireManquant ? 'Commentaire requis pour cette note' : commentaire.trim() ? 'Valider et continuer' : 'Aucun commentaire à faire'}
                 <ChevronRight className="h-4 w-4 text-gold-400 transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden />
               </button>
             </div>
           )}
           <label htmlFor={`com-${nom}`} className="flex items-baseline justify-between text-sm font-medium text-slate-800">
-            Commentaire <span className="text-xs font-normal text-slate-400">facultatif</span>
+            Commentaire
+            {obligatoire ? (
+              <span className="text-xs font-semibold text-amber-700">obligatoire pour cette note</span>
+            ) : (
+              <span className="text-xs font-normal text-slate-400">facultatif</span>
+            )}
           </label>
+          <p id={`anonymat-${nom}`} className="mt-1 flex items-start gap-1.5 text-xs text-slate-500">
+            <EyeOff className="mt-0.5 h-3.5 w-3.5 shrink-0 text-navy-400" aria-hidden />
+            Transmis sans votre nom. Évitez les détails qui permettraient de vous reconnaître.
+          </p>
           <textarea
             id={`com-${nom}`}
             rows={compact ? 2 : 3}
             value={commentaire}
             maxLength={MAX_COMMENTAIRE}
             disabled={verrouille || v === 0}
+            required={obligatoire}
+            aria-invalid={commentaireManquant || undefined}
+            aria-describedby={`anonymat-${nom}`}
             onChange={(e) => onCommentaire(e.target.value)}
-            placeholder={v === 0 ? 'Choisissez d’abord une appréciation.' : 'Un fait marquant, un exemple concret, une piste de progrès…'}
+            placeholder={
+              v === 0
+                ? 'Choisissez d’abord une appréciation.'
+                : obligatoire
+                  ? 'Expliquez cette appréciation : un fait concret, son effet, ce qui aiderait à progresser.'
+                  : 'Un fait marquant, un exemple concret, une piste de progrès…'
+            }
             className="mt-2 block w-full resize-y rounded-xl border border-slate-200 bg-slate-50/60 px-4 py-3 text-[15px] text-slate-900 shadow-[inset_0_1px_2px_rgb(0_43_73/0.04)] outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-navy-600 focus:bg-white focus:ring-4 focus:ring-navy-600/10 disabled:cursor-not-allowed disabled:hover:border-slate-200"
           />
           {commentaire.length > MAX_COMMENTAIRE - 80 && (

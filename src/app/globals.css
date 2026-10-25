@@ -201,6 +201,9 @@ button:not(:disabled), [role="button"]:not([aria-disabled="true"]) {
 @media (max-width: 1023px) {
   .dsm-page-with-sidebar { margin-left: 0; }
 }
+@media print {
+  .dsm-page-with-sidebar { margin-left: 0; }
+}
 
 /* ─── Accessibilité du mouvement ─────────────────────────────── */
 

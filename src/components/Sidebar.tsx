@@ -10,6 +10,7 @@ import {
   ListChecks,
   LogOut,
   Menu,
+  MessageSquareText,
   QrCode,
   Trophy,
   Users,
@@ -23,6 +24,7 @@ const navItems = [
   { label: 'Agents', href: '/admin/utilisateurs', icon: Users },
   { label: 'Listes déroulantes', href: '/admin/listes', icon: ListChecks },
   { label: 'Classement', href: '/admin/classement', icon: Trophy },
+  { label: 'Retours', href: '/admin/retours', icon: MessageSquareText },
 ]
 
 export default function Sidebar({ admin }: { admin: { prenom: string; nom: string } }) {
@@ -37,7 +39,7 @@ export default function Sidebar({ admin }: { admin: { prenom: string; nom: strin
   return (
     <>
       {/* Barre mobile */}
-      <div className="sticky top-0 z-40 flex h-14 items-center justify-between bg-navy-900 px-4 text-white lg:hidden">
+      <div className="sticky top-0 z-40 flex h-14 items-center justify-between bg-navy-900 px-4 text-white lg:hidden print:hidden">
         <span className="flex items-center gap-2.5 text-[15px] font-semibold">
           <BrandMark size={28} />
           DSM <span className="text-gold-500">TAMIS</span>
@@ -58,7 +60,7 @@ export default function Sidebar({ admin }: { admin: { prenom: string; nom: strin
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-[var(--sidebar-width)] flex-col bg-navy-900 text-white transition-transform duration-200 ease-out lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-[var(--sidebar-width)] flex-col bg-navy-900 text-white transition-transform duration-200 ease-out lg:translate-x-0 print:hidden ${
           ouvert ? 'translate-x-0' : '-translate-x-full'
         }`}
         aria-label="Navigation de l'administration"

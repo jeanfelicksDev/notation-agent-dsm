@@ -56,7 +56,7 @@ export async function GET(
         critere: nc.critere.libelle,
         valeur: nc.valeur,
         noteMaximale: nc.critere.noteMaximale,
-        commentaire: nc.commentaire
+        // Pas de commentaire ici : il serait rattaché au nom du client. Voir /admin/retours.
       })
     }
 

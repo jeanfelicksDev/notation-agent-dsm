@@ -113,13 +113,15 @@ interface DetailedNote {
   critereLibelle: string
   noteMaximale: number
   valeur: number
-  commentaire: string | null
   typeEvaluateur?: string
   typeEvaluateurs?: string[]
 }
 
+/** Notes d'un évaluateur, sans son identité : « Évaluateur 2 » ou « Manager ». */
 interface EvaluateurNotes {
-  evaluateur: { id: string; nom: string; prenom: string; matricule: string; role: string; service: string | null }
+  libelle: string
+  estManager: boolean
+  soumis: boolean
   notes: DetailedNote[]
 }
 
@@ -1461,7 +1463,7 @@ export default function ClassementPage() {
                   {/* Notes Collègues & Clients Internes */}
                   {(() => {
                     const colleguesEvals = detailedNotes.evaluateursNotes.filter(
-                      (e) => e.evaluateur.role !== 'MANAGER' && e.evaluateur.role !== 'ADMIN'
+                      (e) => !e.estManager
                     )
                     const colleguesCriteres = detailedNotes.criteres.filter((c) => {
                       const types = (c as any).typeEvaluateurs && (c as any).typeEvaluateurs.length > 0 ? (c as any).typeEvaluateurs : [c.typeEvaluateur]
@@ -1502,12 +1504,12 @@ export default function ClassementPage() {
                                 const maxTotal = filteredNotes.reduce((s, n) => s + n.noteMaximale, 0)
                                 const scoreSur45 = maxTotal > 0 ? Math.round((total / maxTotal) * (data?.campagne?.poidsCollegues ?? 45) * 10) / 10 : 0
                                 return (
-                                  <tr key={ev.evaluateur.id} className="hover:bg-navy-50/50 transition-colors">
+                                  <tr key={ev.libelle} className="hover:bg-navy-50/50 transition-colors">
                                     <td className="px-3 py-2.5 whitespace-nowrap">
                                       <div className="font-semibold text-slate-800">
-                                        {anonymized ? 'Évaluateur Anonyme' : `${ev.evaluateur.prenom} ${ev.evaluateur.nom}`}
+                                        {ev.libelle}
                                       </div>
-                                      <div className="text-2xs text-slate-400">{anonymized ? 'Service Anonymisé' : (ev.evaluateur.service || '-')}</div>
+                                      <div className="text-2xs text-slate-400">{ev.soumis ? 'Identité masquée' : 'Non soumise · identité masquée'}</div>
                                     </td>
                                     {colleguesCriteres.map((c) => {
                                       const note = filteredNotes.find((n) => n.critereId === c.id)
@@ -1607,7 +1609,7 @@ export default function ClassementPage() {
                   {/* Notes Manager */}
                   {(() => {
                     const managerEvals = detailedNotes.evaluateursNotes.filter(
-                      (e) => e.evaluateur.role === 'MANAGER' || e.evaluateur.role === 'ADMIN' || e.notes.some((n) => n.typeEvaluateur === 'MANAGER')
+                      (e) => e.estManager || e.notes.some((n) => n.typeEvaluateur === 'MANAGER')
                     )
                     const managerCriteres = detailedNotes.criteres.filter((c) => {
                       const types = (c as any).typeEvaluateurs && (c as any).typeEvaluateurs.length > 0 ? (c as any).typeEvaluateurs : [c.typeEvaluateur]
@@ -1648,12 +1650,12 @@ export default function ClassementPage() {
                                 const maxTotal = managerNotes.reduce((s, n) => s + n.noteMaximale, 0)
                                 const scoreSur55 = maxTotal > 0 ? Math.round((total / maxTotal) * (data?.campagne?.poidsManager ?? 55) * 10) / 10 : 0
                                 return (
-                                  <tr key={ev.evaluateur.id} className="hover:bg-navy-50/50 transition-colors">
+                                  <tr key={ev.libelle} className="hover:bg-navy-50/50 transition-colors">
                                     <td className="px-3 py-2.5 whitespace-nowrap">
                                       <div className="font-semibold text-slate-800">
-                                        {anonymized ? 'Manager Anonyme' : `${ev.evaluateur.prenom} ${ev.evaluateur.nom}`}
+                                        {ev.libelle}
                                       </div>
-                                      <div className="text-2xs text-slate-400">{anonymized ? 'Service Anonymisé' : (ev.evaluateur.service || '-')}</div>
+                                      <div className="text-2xs text-slate-400">{ev.soumis ? 'Identité masquée' : 'Non soumise · identité masquée'}</div>
                                     </td>
                                     {managerCriteres.map((c) => {
                                       const note = managerNotes.find((n) => n.critereId === c.id)
