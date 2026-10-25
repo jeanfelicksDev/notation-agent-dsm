@@ -57,10 +57,18 @@ const ROLES: Record<string, { label: string; className: string }> = {
 
 const estVerrouille = (u: Utilisateur) => Boolean(u.verrouilleJusqua && new Date(u.verrouilleJusqua) > new Date())
 
+const valeursDistinctes = (valeurs: (string | null | undefined)[]) =>
+  Array.from(new Set(valeurs.filter((v): v is string => Boolean(v)))).sort((a, b) => a.localeCompare(b, 'fr'))
+
+const CLASSE_SELECT =
+  'h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-navy-600 focus:ring-2 focus:ring-navy-600/15 sm:w-48'
+
 export default function UtilisateursPage() {
   const [utilisateurs, setUtilisateurs] = useState<Utilisateur[]>([])
   const [loading, setLoading] = useState(true)
   const [recherche, setRecherche] = useState('')
+  const [departement, setDepartement] = useState('')
+  const [service, setService] = useState('')
   const params = useSearchParams()
   const [filtre, setFiltre] = useState<Filtre>(() => {
     const f = params.get('filtre')
@@ -89,17 +97,34 @@ export default function UtilisateursPage() {
   }, [])
 
   const internes = utilisateurs.filter((u) => u.role === 'UTILISATEUR' || u.role === 'MANAGER')
+
+  const departements = useMemo(() => valeursDistinctes(utilisateurs.map((u) => u.departement)), [utilisateurs])
+  const services = useMemo(
+    () => valeursDistinctes(utilisateurs.filter((u) => !departement || u.departement === departement).map((u) => u.service)),
+    [utilisateurs, departement]
+  )
+  // Périmètre département / service : s'applique à la liste comme aux compteurs des pastilles.
+  const perimetre = useMemo(
+    () => utilisateurs.filter((u) => (!departement || u.departement === departement) && (!service || u.service === service)),
+    [utilisateurs, departement, service]
+  )
+
   const compteurs = {
-    tous: utilisateurs.length,
-    sans_pin: utilisateurs.filter((u) => ROLES_A_PIN.includes(u.role) && !u.pinDefini).length,
-    verrouilles: utilisateurs.filter(estVerrouille).length,
-    managers: utilisateurs.filter((u) => u.role === 'MANAGER').length,
-    externes: utilisateurs.filter((u) => u.role === 'EXTERNE').length,
+    tous: perimetre.length,
+    sans_pin: perimetre.filter((u) => ROLES_A_PIN.includes(u.role) && !u.pinDefini).length,
+    verrouilles: perimetre.filter(estVerrouille).length,
+    managers: perimetre.filter((u) => u.role === 'MANAGER').length,
+    externes: perimetre.filter((u) => u.role === 'EXTERNE').length,
+  }
+
+  const changerDepartement = (valeur: string) => {
+    setDepartement(valeur)
+    setService('')
   }
 
   const liste = useMemo(() => {
     const q = recherche.trim().toLowerCase()
-    return utilisateurs.filter((u) => {
+    return perimetre.filter((u) => {
       if (q && !`${u.nom} ${u.prenom} ${u.matricule} ${u.service ?? ''} ${u.emploi ?? ''} ${u.departement ?? ''} ${u.telephone ?? ''}`.toLowerCase().includes(q)) return false
       if (filtre === 'sans_pin') return ROLES_A_PIN.includes(u.role) && !u.pinDefini
       if (filtre === 'verrouilles') return estVerrouille(u)
@@ -107,7 +132,7 @@ export default function UtilisateursPage() {
       if (filtre === 'externes') return u.role === 'EXTERNE'
       return true
     })
-  }, [utilisateurs, recherche, filtre])
+  }, [perimetre, recherche, filtre])
 
   const basculerQr = async (u: Utilisateur) => {
     setQrEnCours(u.id)
@@ -278,17 +303,37 @@ export default function UtilisateursPage() {
               </button>
             ))}
           </div>
-          <label className="relative block w-full lg:w-80">
-            <span className="sr-only">Rechercher</span>
-            <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
-            <input
-              type="search"
-              value={recherche}
-              onChange={(e) => setRecherche(e.target.value)}
-              placeholder="Nom, matricule, emploi, service…"
-              className="h-10 w-full rounded-lg border border-slate-200 bg-white pr-3 pl-9 text-sm outline-none focus:border-navy-600 focus:ring-2 focus:ring-navy-600/15"
-            />
-          </label>
+          <div className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
+            <label className="block">
+              <span className="sr-only">Département</span>
+              <select value={departement} onChange={(e) => changerDepartement(e.target.value)} className={CLASSE_SELECT}>
+                <option value="">Tous les départements</option>
+                {departements.map((d) => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="sr-only">Service</span>
+              <select value={service} onChange={(e) => setService(e.target.value)} className={CLASSE_SELECT}>
+                <option value="">Tous les services</option>
+                {services.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </label>
+            <label className="relative block w-full lg:w-72">
+              <span className="sr-only">Rechercher</span>
+              <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
+              <input
+                type="search"
+                value={recherche}
+                onChange={(e) => setRecherche(e.target.value)}
+                placeholder="Nom, matricule, emploi, service…"
+                className="h-10 w-full rounded-lg border border-slate-200 bg-white pr-3 pl-9 text-sm outline-none focus:border-navy-600 focus:ring-2 focus:ring-navy-600/15"
+              />
+            </label>
+          </div>
         </div>
 
         <div className="overflow-hidden rounded-[var(--radius-card)] bg-white shadow-card">
