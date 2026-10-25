@@ -376,7 +376,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
     MANAGER: 'Managers',
     CLIENT: 'Clients externes (QR Code)',
     CLIENT_INTERNE: 'Clients internes',
-    TOUS: 'Tous'
+    TOUS: 'Évaluateurs internes'
   }
 
   return (
@@ -829,17 +829,18 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                             : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                         }`}
                       >
-                        Tous ({criteres.length})
+                        Tous les critères ({criteres.length})
                       </button>
                       <button
                         onClick={() => setCritereFilter('TOUS')}
+                        title="Critères notés à la fois par le manager, les collègues et les clients internes (hors clients externes)"
                         className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
                           critereFilter === 'TOUS'
                             ? 'bg-navy-800 text-white shadow-sm'
                             : 'bg-navy-50 text-navy-900 hover:bg-navy-100'
                         }`}
                       >
-                        Tous évaluateurs ({criteres.filter(c => ['MANAGER', 'COLLEGUE', 'CLIENT_INTERNE'].every(t => typesDuCritere(c).includes(t))).length})
+                        Évaluateurs internes ({criteres.filter(c => ['MANAGER', 'COLLEGUE', 'CLIENT_INTERNE'].every(t => typesDuCritere(c).includes(t))).length})
                       </button>
                       <button
                         onClick={() => setCritereFilter('COLLEGUE')}
