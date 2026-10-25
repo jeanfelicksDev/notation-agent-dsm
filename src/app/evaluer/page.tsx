@@ -22,6 +22,7 @@ import {
 import { getAppreciationInfo, getAppreciationOptions } from '@/lib/default-criteres'
 import { BrandMark } from '@/components/BrandMark'
 import { confirmer, toast } from '@/components/ui/feedback'
+import { TransitionCollaborateur, type TransitionCollaborateurProps } from '@/components/evaluer/TransitionCollaborateur'
 import { libelleCampagne } from '@/lib/libelle'
 
 /* ─── Types ─────────────────────────────────────────────────────── */
@@ -66,6 +67,8 @@ interface Campagne {
 type NoteState = { valeur: number; commentaire: string }
 type NotesMap = Record<string, Record<string, NoteState>>
 type Sauvegarde = { etat: 'idle' | 'pending' | 'saving' | 'saved' | 'error'; at?: Date }
+/** Passage en cours d'un collaborateur à l'autre ; `cle` relance l'animation à chaque changement. */
+type Passage = Pick<TransitionCollaborateurProps, 'de' | 'vers' | 'sens'> & { cle: number }
 
 const AUTOSAVE_MS = 1200
 const MAX_COMMENTAIRE = 500
@@ -98,6 +101,11 @@ export default function EvaluerPage() {
   const [recherche, setRecherche] = useState('')
   const [filtre, setFiltre] = useState<'tous' | 'a_faire' | 'termines'>('tous')
   const [tiroir, setTiroir] = useState(false)
+
+  // Rideau affiché pendant le passage d'un collaborateur à l'autre
+  const [passage, setPassage] = useState<Passage | null>(null)
+  const finPassage = useCallback(() => setPassage(null), [])
+  const zoneNotation = useRef<HTMLElement>(null)
 
   // Collaborateurs modifiés depuis la dernière sauvegarde réussie
   const sales = useRef(new Set<string>())
@@ -291,6 +299,14 @@ export default function EvaluerPage() {
     const cible = affectations[idx]
     setCritereIndex(Math.max(0, cible.critereIds.findIndex((id) => valeur(cible.evalueId, id) === 0)))
     setTiroir(false)
+    // Le nouveau collaborateur s'affiche depuis le haut, sous le rideau
+    zoneNotation.current?.scrollTo({ top: 0 })
+    setPassage({
+      cle: Date.now(),
+      sens: idx > currentIndex ? 1 : -1,
+      de: quitte ? { nom: nomComplet(quitte), complet: quitte.statut === 'TERMINEE' || estComplet(quitte) } : null,
+      vers: { nom: nomComplet(cible), initiales: initiales(cible), service: cible.evalue.service },
+    })
   }
 
   /* ─── Soumission ─── */
@@ -618,7 +634,21 @@ export default function EvaluerPage() {
         </aside>
 
         {/* ─── Zone de notation ─── */}
-        <main className="min-w-0 flex-1 overflow-y-auto bg-[linear-gradient(180deg,#e9eef4_0%,var(--color-canvas)_340px)]">
+        <main
+          ref={zoneNotation}
+          className={`relative min-w-0 flex-1 bg-[linear-gradient(180deg,#e9eef4_0%,var(--color-canvas)_340px)] ${passage ? 'overflow-hidden' : 'overflow-y-auto'}`}
+        >
+          {passage && (
+            <TransitionCollaborateur
+              key={passage.cle}
+              de={passage.de}
+              vers={passage.vers}
+              sens={passage.sens}
+              position={currentIndex + 1}
+              termines={affectations.map((a) => a.statut === 'TERMINEE' || estComplet(a))}
+              onFin={finPassage}
+            />
+          )}
           {courant && (
             <div className="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-8 sm:py-9">
               <EnteteCollaborateur
