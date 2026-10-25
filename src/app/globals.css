@@ -61,11 +61,11 @@
 
   /* Passage d'un collaborateur noté au suivant : toutes ces animations partagent la même
      durée pour rester synchronisées. --sens vaut 1 (suivant) ou -1 (précédent). */
-  --animate-rideau: rideau 1600ms cubic-bezier(0.65, 0, 0.35, 1) both;
-  --animate-rideau-sortie: rideau-sortie 1600ms var(--ease-out-expo) both;
-  --animate-rideau-arrivee: rideau-arrivee 1600ms var(--ease-out-expo) both;
-  --animate-rideau-medaillon: rideau-medaillon 1600ms var(--ease-out-expo) both;
-  --animate-rideau-trait: rideau-trait 1600ms var(--ease-out-expo) both;
+  --animate-rideau: rideau 3200ms cubic-bezier(0.65, 0, 0.35, 1) both;
+  --animate-rideau-sortie: rideau-sortie 3200ms var(--ease-out-expo) both;
+  --animate-rideau-arrivee: rideau-arrivee 3200ms var(--ease-out-expo) both;
+  --animate-rideau-medaillon: rideau-medaillon 3200ms var(--ease-out-expo) both;
+  --animate-rideau-trait: rideau-trait 3200ms var(--ease-out-expo) both;
 
   @keyframes fade-in {
     from { opacity: 0; }
