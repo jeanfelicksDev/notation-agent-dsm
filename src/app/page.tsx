@@ -3,7 +3,8 @@
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
-import { AlertCircle, ArrowLeft, ArrowRight, ArrowUpRight, Eye, EyeOff, Loader2 } from 'lucide-react'
+import Link from 'next/link'
+import { AlertCircle, ArrowLeft, ArrowRight, ArrowUpRight, CircleCheck, Eye, EyeOff, Info, Loader2, Lock, Phone, User } from 'lucide-react'
 import { destinationPourRole } from '@/lib/roles'
 import { BrandMark } from '@/components/BrandMark'
 import { libelleCampagne } from '@/lib/libelle'
@@ -20,6 +21,12 @@ const MESSAGES_REDIRECTION: Record<string, string> = {
   session_expired: 'Votre session a expiré. Connectez-vous à nouveau.',
 }
 
+const ETAPES_GUIDE = [
+  ['Identification', 'Saisissez votre matricule officiel DSM pour démarrer votre session.'],
+  ['Code PIN', 'Définissez ou renseignez votre PIN sécurisé à 4 chiffres lors de l’accès.'],
+  ['Notation', 'Notez et soumettez l’ensemble de vos agents avant la clôture officielle.'],
+] as const
+
 function formatDateCourte(iso: string) {
   return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
 }
@@ -29,6 +36,20 @@ function joursRestants(iso: string) {
   const fin = new Date(iso)
   fin.setHours(23, 59, 59, 999)
   return Math.max(0, Math.floor((fin.getTime() - Date.now()) / 86_400_000))
+}
+
+/** « 1ere Campagne… » → 1<sup>ère</sup> Campagne… */
+function TitreCampagne({ libelle }: { libelle: string }) {
+  const texte = libelleCampagne(libelle)
+  const m = texte.match(/^(\d+)(?:ere|ère|er|e)\s+(.*)$/i)
+  if (!m) return <>{texte}</>
+  const suffixe = m[1] === '1' ? 'ère' : 'e'
+  return (
+    <>
+      {m[1]}
+      <sup className="text-[0.55em] font-semibold">{suffixe}</sup> {m[2]}
+    </>
+  )
 }
 
 export default function Accueil() {
@@ -49,6 +70,7 @@ function AccueilContenu() {
   const [confirmation, setConfirmation] = useState('')
   const [estAdmin, setEstAdmin] = useState(false)
   const [voirSecret, setVoirSecret] = useState(false)
+  const [aideOuverte, setAideOuverte] = useState(false)
   const [error, setError] = useState(() => (reason && MESSAGES_REDIRECTION[reason]) || '')
   const [loading, setLoading] = useState(false)
   const [campagne, setCampagne] = useState<CampagnePublique>(null)
@@ -141,6 +163,7 @@ function AccueilContenu() {
   }
 
   const champPin = !estAdmin
+  const estClient = profil === 'client'
   const titre = {
     identifiant: 'Connexion',
     connexion: estAdmin ? 'Votre mot de passe' : 'Votre PIN',
@@ -148,329 +171,345 @@ function AccueilContenu() {
     contact_admin: 'Compte à activer',
   }[etape]
   const jours = campagne ? joursRestants(campagne.dateFin) : null
+  const annee = campagne ? new Date(campagne.dateFin).getFullYear() : new Date().getFullYear()
 
   return (
-    <div className="relative min-h-dvh overflow-hidden bg-navy-900 text-white">
+    <div className="relative min-h-dvh overflow-hidden bg-[#071a33] text-white">
       <Fond />
-      <Isobathes />
-      <RoseDesVents />
-      <Separateur />
+      <Quadrillage />
+      <Compas />
 
-      <div className="relative grid min-h-dvh lg:grid-cols-2">
-        {/* ─── Zone gauche : la campagne ─── */}
-        <div className="flex flex-col px-5 sm:px-10 lg:px-14 xl:px-20">
-          <header className="flex items-center gap-3.5 py-6">
-            <span className="rounded-[11px] shadow-[0_6px_18px_-6px_rgb(212_175_55/0.55)]">
-              <BrandMark size={38} />
+      <div className="relative mx-auto flex min-h-dvh w-full max-w-[1480px] flex-col px-5 sm:px-10 lg:px-16">
+        {/* ─── En-tête ─── */}
+        <header className="flex items-center gap-4 border-b border-white/[0.06] py-6 sm:py-7">
+          <span className="rounded-2xl bg-gradient-to-b from-gold-300 to-gold-600 p-[3px] shadow-[0_10px_28px_-8px_rgb(212_175_55/0.6)]">
+            <BrandMark size={50} />
+          </span>
+          <div className="leading-tight">
+            <p className="flex items-center gap-2.5 text-lg font-bold tracking-[0.02em] sm:text-xl">
+              DSM TAMIS
+              <span className="rounded-full px-2.5 py-0.5 text-[10.5px] font-semibold tracking-[0.12em] text-gold-300 ring-1 ring-gold-400/50">
+                OFFICIEL
+              </span>
+            </p>
+            <p className="mt-1 hidden text-sm tracking-[0.02em] text-navy-200 sm:block">Direction des Solutions Maritimes</p>
+          </div>
+          <Link
+            href="/qr"
+            className="group ml-auto inline-flex items-center gap-2 rounded-full bg-white/[0.03] px-4 py-2.5 text-sm text-navy-100 ring-1 ring-white/15 transition-colors hover:bg-white/[0.07] hover:text-white hover:ring-gold-400/40"
+          >
+            <span className="hidden sm:inline">Vous êtes client ?</span>
+            <strong className="font-semibold text-white">Donnez votre avis</strong>
+            <ArrowUpRight className="h-4 w-4 text-gold-400 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" aria-hidden />
+          </Link>
+        </header>
+
+        <main className="grid flex-1 items-center gap-12 py-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,35rem)] lg:gap-16 xl:gap-24 lg:py-14">
+          {/* ─── Présentation et campagne ─── */}
+          <section aria-labelledby="titre-page" className="min-w-0">
+            <span className="inline-flex animate-entree items-center gap-2.5 rounded-full bg-navy-900/70 px-4 py-2 text-xs font-semibold tracking-[0.08em] text-navy-100 ring-1 ring-white/15 sm:text-[13px]">
+              <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgb(52_211_153/0.7)]" aria-hidden />
+              PORTAIL RH INTERNE SÉCURISÉ
             </span>
-            <div className="leading-tight">
-              <p className="text-[15px] font-semibold tracking-[0.01em]">
-                DSM <span className="text-gold-400">TAMIS</span>
-              </p>
-              <p className="hidden text-xs tracking-[0.02em] text-navy-200 sm:block">Direction des Solutions Maritimes</p>
-            </div>
-            <a
-              href="/qr"
-              className="group ml-auto inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-navy-100 ring-1 ring-white/15 transition-colors hover:bg-white/5 hover:text-white lg:hidden"
-            >
-              Vous êtes client ?
-              <ArrowUpRight className="h-4 w-4 text-gold-400" aria-hidden />
-            </a>
-          </header>
 
-          <div className="flex flex-1 items-center justify-center py-3">
-            <section aria-labelledby="titre-page" className="w-full max-w-xl">
-                <h1
-                  id="titre-page"
-                  className="max-w-2xl animate-entree font-display text-[2.85rem] leading-[0.98] font-medium tracking-[-0.025em] text-white sm:text-[3.75rem] xl:text-[4.4rem]"
-                >
-                  Évaluation de la performance{' '}
-                  <em className="font-normal text-gold-400 italic">des agents</em>
-                </h1>
-                <span aria-hidden className="mt-6 flex animate-entree items-center gap-2 [animation-delay:80ms]">
-                  <span className="h-px w-20 bg-gradient-to-r from-gold-500 to-gold-500/30" />
-                  <span className="h-1.5 w-1.5 rotate-45 bg-gold-500" />
-                </span>
-                <p className="mt-5 hidden max-w-[34rem] animate-entree text-base leading-relaxed text-navy-100/90 [animation-delay:120ms] sm:block sm:text-[1.075rem]">
-                  Notez, critère par critère, les collaborateurs qui vous sont attribués. Vos évaluations alimentent le classement de la campagne.
+            <h1
+              id="titre-page"
+              className="mt-8 animate-entree text-[2.9rem] leading-[1.02] font-bold tracking-[-0.035em] text-white [animation-delay:60ms] sm:text-[3.9rem] xl:text-[4.5rem]"
+            >
+              Évaluation de la performance
+              <em className="mt-1 block font-display text-[0.95em] font-normal tracking-[-0.01em] text-gold-300 italic">des agents</em>
+            </h1>
+
+            <p className="mt-6 max-w-[44rem] animate-entree text-base leading-relaxed text-navy-200 [animation-delay:120ms] sm:text-[1.2rem] sm:leading-[1.6]">
+              Notez, critère par critère, les collaborateurs qui vous sont attribués. Vos évaluations alimentent avec équité le classement
+              d’excellence de la campagne.
+            </p>
+
+            {campagne ? (
+              <div className="relative mt-10 max-w-[45rem] animate-entree overflow-hidden rounded-2xl bg-gradient-to-b from-[#12294a] to-[#0d2140] p-6 shadow-[0_30px_60px_-30px_rgb(0_0_0/0.6),inset_0_1px_0_rgb(255_255_255/0.06)] ring-1 ring-white/10 [animation-delay:180ms] sm:p-9">
+                <span aria-hidden className="absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-gold-400/60 to-transparent" />
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <span className="inline-flex items-center gap-2 rounded-full bg-emerald-400/10 py-1.5 pr-3.5 pl-3 text-sm font-medium text-emerald-300 ring-1 ring-emerald-400/30">
+                    <span className="relative flex h-2 w-2" aria-hidden>
+                      <span className="absolute inset-0 animate-pouls rounded-full bg-emerald-400" />
+                      <span className="relative h-2 w-2 rounded-full bg-emerald-400" />
+                    </span>
+                    Campagne ouverte
+                  </span>
+                  <span className="text-sm text-navy-200">Session annuelle {annee}</span>
+                </div>
+
+                <p className="mt-6 text-[1.7rem] leading-tight font-bold tracking-[-0.02em] text-white sm:text-[2rem]">
+                  <TitreCampagne libelle={campagne.libelle} />
                 </p>
 
-                {campagne ? (
-                  <div className="relative mt-8 max-w-2xl animate-entree overflow-hidden rounded-2xl bg-gradient-to-b from-white/[0.075] to-white/[0.025] p-6 sm:px-7 shadow-[inset_0_1px_0_rgb(255_255_255/0.09)] ring-1 ring-white/10 [animation-delay:180ms]">
-                    <span aria-hidden className="absolute inset-x-7 top-0 h-px bg-gradient-to-r from-transparent via-gold-400/60 to-transparent" />
-                    <div className="flex flex-col items-start gap-3.5">
-                      <span className="inline-flex items-center gap-2 rounded-full bg-emerald-400/10 py-1 pr-3 pl-2.5 text-xs font-medium tracking-[0.01em] text-emerald-300 ring-1 ring-emerald-400/25">
-                        <span className="relative flex h-1.5 w-1.5" aria-hidden>
-                          <span className="absolute inset-0 animate-pouls rounded-full bg-emerald-400" />
-                          <span className="relative h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                        </span>
-                        Campagne ouverte
-                      </span>
-                      <p className="w-full font-display text-[1.65rem] leading-tight font-medium tracking-[-0.01em] text-white sm:text-[1.9rem]">
-                        {libelleCampagne(campagne.libelle)}
-                      </p>
-                    </div>
+                <dl className="mt-7 grid grid-cols-3 divide-x divide-white/10 border-t border-white/10 pt-7">
+                  <Statistique libelle="Clôture" className="pr-4">
+                    {formatDateCourte(campagne.dateFin)}
+                  </Statistique>
+                  <Statistique libelle="Temps restant" className="px-4 text-gold-300 sm:px-6">
+                    {jours === 0 ? 'Dernier jour' : `${jours} jour${jours === 1 ? '' : 's'}`}
+                  </Statistique>
+                  <Statistique libelle="Évaluations" className="pl-4 sm:pl-6">
+                    {campagne.completionRate}%<span className="ml-2 text-xs font-normal text-navy-200">soumises</span>
+                  </Statistique>
+                </dl>
+              </div>
+            ) : (
+              <p className="mt-10 max-w-[45rem] animate-entree rounded-2xl bg-white/[0.05] p-8 text-navy-100 ring-1 ring-white/10 [animation-delay:180ms]">
+                Aucune campagne d’évaluation n’est ouverte pour le moment.
+              </p>
+            )}
 
-                    <dl className="mt-6 grid grid-cols-3 divide-x divide-white/10">
-                      <div className="pr-4">
-                        <dt className="text-[10.5px] font-medium tracking-[0.06em] text-navy-200 uppercase">Clôture</dt>
-                        <dd className="mt-2 font-display text-lg font-medium whitespace-nowrap text-white sm:text-xl xl:text-2xl">{formatDateCourte(campagne.dateFin)}</dd>
-                      </div>
-                      <div className="px-4 sm:px-5">
-                        <dt className="text-[10.5px] font-medium tracking-[0.06em] text-navy-200 uppercase">Temps restant</dt>
-                        <dd className="mt-2 font-display text-lg font-medium whitespace-nowrap text-white tabular-nums sm:text-xl xl:text-2xl">
-                          {jours === 0 ? 'Dernier jour' : `${jours} jour${jours === 1 ? '' : 's'}`}
-                        </dd>
-                      </div>
-                      <div className="pl-4 sm:pl-5">
-                        <dt className="text-[10.5px] font-medium tracking-[0.06em] text-navy-200 uppercase">Évaluations soumises</dt>
-                        <dd className="mt-2 font-display text-lg font-medium whitespace-nowrap text-gold-300 tabular-nums sm:text-xl xl:text-2xl">{campagne.completionRate} %</dd>
-                      </div>
-                    </dl>
-                    <div
-                      className="mt-5 h-[3px] overflow-hidden rounded-full bg-white/[0.08]"
-                      role="progressbar"
-                      aria-valuenow={campagne.completionRate}
-                      aria-valuemin={0}
-                      aria-valuemax={100}
-                      aria-label="Évaluations soumises"
-                    >
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-gold-600 via-gold-400 to-gold-200 shadow-[0_0_12px_rgb(212_175_55/0.6)]"
-                        style={{ width: `${campagne.completionRate}%` }}
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <p className="mt-10 max-w-xl animate-entree rounded-2xl bg-white/[0.05] p-7 text-navy-100 shadow-[inset_0_1px_0_rgb(255_255_255/0.08)] ring-1 ring-white/10 [animation-delay:180ms]">
-                    Aucune campagne d’évaluation n’est ouverte pour le moment.
-                  </p>
-                )}
+            <ol className="mt-12 hidden max-w-[45rem] animate-entree gap-8 [animation-delay:260ms] sm:grid sm:grid-cols-3">
+              {ETAPES_GUIDE.map(([titreEtape, texte], i) => (
+                <li key={titreEtape}>
+                  <span className="font-display text-[2.1rem] leading-none text-gold-300 italic" aria-label={`Étape ${i + 1}`}>
+                    {String(i + 1).padStart(2, '0')}
+                  </span>
+                  <p className="mt-4 text-[1.05rem] font-semibold text-white">{titreEtape}</p>
+                  <p className="mt-2 text-sm leading-relaxed text-navy-200">{texte}</p>
+                </li>
+              ))}
+            </ol>
+          </section>
 
-                <ol className="mt-7 hidden max-w-2xl animate-entree gap-6 [animation-delay:260ms] sm:grid sm:grid-cols-3">
-                  {[
-                    ['Identifiez-vous', 'avec votre matricule de collaborateur.'],
-                    ['Choisissez un PIN', 'à 4 chiffres lors de votre première connexion.'],
-                    ['Notez et soumettez', 'vos évaluations avant la date de clôture.'],
-                  ].map(([titre, texte], i) => (
-                    <li key={titre} className="relative pt-4">
-                      <span aria-hidden className="absolute inset-x-0 top-0 h-px bg-white/12" />
-                      <span aria-hidden className="absolute top-0 left-0 h-px w-10 bg-gold-400" />
-                      <span className="font-display text-[2rem] leading-none font-normal text-gold-400 italic" aria-label={`Étape ${i + 1}`}>
-                        {i + 1}
-                      </span>
-                      <p className="mt-3 text-sm leading-relaxed text-navy-100/90">
-                        <strong className="font-semibold text-white">{titre}</strong> {texte}
-                      </p>
-                    </li>
-                  ))}
-                </ol>
-            </section>
-          </div>
+          {/* ─── Connexion ─── */}
+          <section aria-labelledby="titre-connexion" className="relative w-full animate-entree [animation-delay:140ms] lg:justify-self-end">
+            <div aria-hidden className="pointer-events-none absolute -inset-16 -z-10 rounded-full bg-[radial-gradient(closest-side,rgb(212_175_55/0.12),transparent)] blur-2xl" />
+            <div className="relative rounded-[28px] bg-[#f4f6f9] p-7 text-slate-900 shadow-[0_50px_90px_-30px_rgb(0_0_0/0.75),0_14px_30px_-14px_rgb(0_0_0/0.45)] sm:p-12">
+              <Lock className="absolute top-7 right-7 h-5 w-5 text-slate-300" aria-hidden />
 
-          <footer className="hidden items-center gap-4 border-t border-white/10 py-6 text-sm text-navy-200 sm:flex">
-            <div className="rounded-lg bg-white p-1.5 shadow-[0_8px_20px_-8px_rgb(0_10_20/0.7)]">
-              <QRCode value={typeof window !== 'undefined' ? `${window.location.origin}/` : '/'} size={52} level="M" fgColor="#002B49" />
-            </div>
-            <p className="max-w-[15rem] leading-snug">Sur votre téléphone ? Scannez pour ouvrir la plateforme.</p>
-          </footer>
-        </div>
+              {etape !== 'identifiant' && (
+                <button
+                  type="button"
+                  onClick={retour}
+                  className="-ml-2 mb-6 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-200/60 hover:text-slate-900"
+                >
+                  <ArrowLeft className="h-4 w-4" aria-hidden />
+                  Changer d’identifiant
+                </button>
+              )}
 
-        {/* ─── Zone droite : la connexion ─── */}
-        <div className="flex flex-col px-5 sm:px-10 lg:px-14 xl:px-20">
-          <header className="hidden justify-end py-6 lg:flex">
-            <a
-              href="/qr"
-              className="group inline-flex items-center gap-1.5 rounded-full bg-white/[0.03] px-3.5 py-1.5 text-sm text-navy-100 ring-1 ring-white/15 transition-colors hover:bg-white/[0.07] hover:text-white hover:ring-gold-400/40"
-            >
-              Vous êtes client ? Donnez votre avis
-              <ArrowUpRight className="h-4 w-4 text-gold-400 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" aria-hidden />
-            </a>
-          </header>
-
-          <div className="flex flex-1 items-center justify-center pt-6 pb-10 lg:py-6">
-            <section aria-labelledby="titre-connexion" className="relative w-full max-w-[25rem] animate-entree [animation-delay:140ms]">
-                {/* Lumière dorée qui détache la carte du fond */}
-                <div aria-hidden className="pointer-events-none absolute -inset-16 -z-10 rounded-full bg-[radial-gradient(closest-side,rgb(212_175_55/0.16),transparent)] blur-2xl" />
-                <div className="relative overflow-hidden rounded-2xl bg-white p-8 text-slate-900 shadow-[0_40px_80px_-28px_rgb(0_10_20/0.75),0_12px_24px_-12px_rgb(0_10_20/0.45)] sm:p-10">
-                  <span aria-hidden className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-gold-600 via-gold-400 to-gold-600" />
-                  {etape !== 'identifiant' && (
+              {etape === 'identifiant' && (
+                <div className="mt-4 mb-12 grid grid-cols-2 gap-1 rounded-2xl bg-slate-200/50 p-1.5 ring-1 ring-slate-200" role="radiogroup" aria-label="Je suis">
+                  {([
+                    ['collaborateur', 'Collaborateur'],
+                    ['client', 'Client externe'],
+                  ] as const).map(([valeur, libelle]) => (
                     <button
+                      key={valeur}
                       type="button"
-                      onClick={retour}
-                      className="-ml-2 mb-5 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                      role="radio"
+                      aria-checked={profil === valeur}
+                      onClick={() => {
+                        setProfil(valeur)
+                        setIdentifiant('')
+                        setError('')
+                        setAideOuverte(false)
+                      }}
+                      className={`rounded-xl py-3 text-[15px] transition-all duration-200 ${
+                        profil === valeur
+                          ? 'bg-white font-medium text-navy-950 shadow-[0_1px_2px_rgb(0_43_73/0.08),0_6px_14px_-6px_rgb(0_43_73/0.2)]'
+                          : 'text-navy-500 hover:text-navy-900'
+                      }`}
                     >
-                      <ArrowLeft className="h-4 w-4" aria-hidden />
-                      Changer d’identifiant
+                      {libelle}
                     </button>
-                  )}
+                  ))}
+                </div>
+              )}
 
+              <h2 id="titre-connexion" className="font-display text-[2.6rem] leading-none font-medium tracking-[-0.02em] text-navy-950">
+                {titre}
+              </h2>
+              <p className="mt-4 text-[1.05rem] leading-relaxed text-navy-500">
+                {etape === 'identifiant' &&
+                  (estClient
+                    ? 'Le numéro de téléphone enregistré par la DSM est requis pour donner votre avis sur nos agents.'
+                    : 'Votre matricule de collaborateur DSM est requis pour poursuivre.')}
+                {etape === 'connexion' && (
+                  <>
+                    Compte <strong className="font-semibold text-slate-900">{identifiant}</strong>
+                    {champPin ? ' · le PIN à 4 chiffres que vous avez choisi.' : '.'}
+                  </>
+                )}
+                {etape === 'definir' && (
+                  <>
+                    Première connexion pour <strong className="font-semibold text-slate-900">{identifiant}</strong>. Ce PIN vous servira à chaque
+                    connexion ; seul un administrateur pourra le réinitialiser.
+                  </>
+                )}
+                {etape === 'contact_admin' &&
+                  'Ce compte administrateur n’a pas encore de mot de passe. Il doit être initialisé par la commande d’installation.'}
+              </p>
+
+              {etape !== 'contact_admin' && (
+                <form onSubmit={handleSubmit} className="mt-9 space-y-6" noValidate>
                   {etape === 'identifiant' && (
-                    <div className="mb-8 grid grid-cols-2 gap-1 rounded-xl bg-navy-50 p-1 text-sm ring-1 ring-navy-100" role="radiogroup" aria-label="Je suis">
-                      {([
-                        ['collaborateur', 'Collaborateur'],
-                        ['client', 'Client externe'],
-                      ] as const).map(([valeur, libelle]) => (
-                        <button
-                          key={valeur}
-                          type="button"
-                          role="radio"
-                          aria-checked={profil === valeur}
-                          onClick={() => {
-                            setProfil(valeur)
-                            setIdentifiant('')
-                            setError('')
-                          }}
-                          className={`rounded-lg py-2.5 font-medium transition-all duration-200 ${
-                            profil === valeur
-                              ? 'bg-white text-navy-900 shadow-[0_1px_2px_rgb(0_43_73/0.08),0_4px_10px_-4px_rgb(0_43_73/0.18)]'
-                              : 'text-navy-500 hover:text-navy-900'
-                          }`}
-                        >
-                          {libelle}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  <h2 id="titre-connexion" className="font-display text-[2.4rem] leading-none font-medium tracking-[-0.02em] text-navy-900">
-                    {titre}
-                  </h2>
-                  <p className="mt-3 text-[15px] leading-relaxed text-slate-600">
-                    {etape === 'identifiant' &&
-                      (profil === 'client'
-                        ? 'Le numéro de téléphone enregistré par la DSM, pour donner votre avis sur nos agents.'
-                        : 'Votre matricule de collaborateur DSM.')}
-                    {etape === 'connexion' && (
-                      <>
-                        Compte <strong className="font-semibold text-slate-900">{identifiant}</strong>
-                        {champPin ? ' · le PIN à 4 chiffres que vous avez choisi.' : '.'}
-                      </>
-                    )}
-                    {etape === 'definir' && (
-                      <>
-                        Première connexion pour <strong className="font-semibold text-slate-900">{identifiant}</strong>. Ce PIN vous servira à
-                        chaque connexion ; seul un administrateur pourra le réinitialiser.
-                      </>
-                    )}
-                    {etape === 'contact_admin' &&
-                      'Ce compte administrateur n’a pas encore de mot de passe. Il doit être initialisé par la commande d’installation.'}
-                  </p>
-
-                  {etape !== 'contact_admin' && (
-                    <form onSubmit={handleSubmit} className="mt-8 space-y-5" noValidate>
-                      {etape === 'identifiant' && (
-                        <Champ label={profil === 'client' ? 'Téléphone' : 'Matricule'} htmlFor="identifiant">
+                    <div>
+                      <Champ label={estClient ? 'Numéro de téléphone' : 'Matricule collaborateur'} htmlFor="identifiant">
+                        <div className="relative">
+                          {estClient ? <Phone className={ICONE_CHAMP} aria-hidden /> : <User className={ICONE_CHAMP} aria-hidden />}
                           <input
                             key={profil}
                             id="identifiant"
                             value={identifiant}
                             onChange={(e) => setIdentifiant(e.target.value)}
-                            type={profil === 'client' ? 'tel' : 'text'}
-                            inputMode={profil === 'client' ? 'tel' : 'text'}
-                            autoComplete={profil === 'client' ? 'tel' : 'username'}
-                            autoCapitalize={profil === 'client' ? 'off' : 'characters'}
+                            type={estClient ? 'tel' : 'text'}
+                            inputMode={estClient ? 'tel' : 'text'}
+                            autoComplete={estClient ? 'tel' : 'username'}
+                            autoCapitalize={estClient ? 'off' : 'characters'}
+                            placeholder={estClient ? 'Ex. : 07 00 00 00 00' : 'Ex. : 1234'}
                             spellCheck={false}
                             autoFocus
                             required
                             disabled={loading}
-                            className={INPUT}
+                            className={`${INPUT} pl-12`}
                           />
-                        </Champ>
-                      )}
-
-                      {(etape === 'connexion' || etape === 'definir') && (
-                        <Champ label={etape === 'definir' ? 'Nouveau PIN (4 chiffres)' : champPin ? 'PIN' : 'Mot de passe'} htmlFor="secret">
-                          <div className="relative">
-                            <input
-                              ref={secretRef}
-                              id="secret"
-                              type={voirSecret ? 'text' : 'password'}
-                              value={secret}
-                              onChange={(e) => setSecret(champPin ? e.target.value.replace(/\D/g, '').slice(0, 4) : e.target.value)}
-                              inputMode={champPin ? 'numeric' : undefined}
-                              maxLength={champPin ? 4 : undefined}
-                              autoComplete={etape === 'definir' ? 'new-password' : 'current-password'}
-                              required
-                              disabled={loading}
-                              className={`${INPUT} pr-12 ${champPin ? 'text-xl tracking-[0.5em] tabular-nums' : ''}`}
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setVoirSecret((v) => !v)}
-                              className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-lg text-slate-500 hover:text-slate-800"
-                              aria-label={voirSecret ? 'Masquer' : 'Afficher'}
-                            >
-                              {voirSecret ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                            </button>
-                          </div>
-                        </Champ>
-                      )}
-
-                      {etape === 'definir' && (
-                        <Champ label="Confirmez le PIN" htmlFor="confirmation">
-                          <input
-                            id="confirmation"
-                            type={voirSecret ? 'text' : 'password'}
-                            value={confirmation}
-                            onChange={(e) => setConfirmation(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                            inputMode="numeric"
-                            maxLength={4}
-                            autoComplete="new-password"
-                            required
-                            disabled={loading}
-                            className={`${INPUT} text-xl tracking-[0.5em] tabular-nums`}
-                          />
-                        </Champ>
-                      )}
-
-                      {error && (
-                        <p role="alert" className="flex gap-2 rounded-xl bg-red-50 px-3.5 py-3 text-sm text-red-800 ring-1 ring-red-100">
-                          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" aria-hidden />
-                          {error}
-                        </p>
-                      )}
-
-                      <button
-                        type="submit"
-                        disabled={loading}
-                        className="group flex h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-navy-800 to-navy-950 px-5 text-[15px] font-semibold tracking-[0.01em] text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.12),0_10px_20px_-10px_rgb(0_26_46/0.7)] transition-[box-shadow,transform] duration-200 hover:-translate-y-px hover:shadow-[inset_0_1px_0_rgb(255_255_255/0.14),0_16px_28px_-12px_rgb(0_26_46/0.75)] active:translate-y-0 disabled:translate-y-0 disabled:opacity-60"
-                      >
-                        {loading ? (
-                          <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
-                        ) : (
-                          <>
-                            {etape === 'identifiant' ? 'Continuer' : etape === 'definir' ? 'Enregistrer mon PIN' : 'Se connecter'}
-                            <ArrowRight className="h-4 w-4 text-gold-400 transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden />
-                          </>
-                        )}
-                      </button>
-
-                      {etape === 'connexion' && champPin && (
-                        <p className="text-sm text-slate-500">PIN oublié ? Demandez une réinitialisation à votre administrateur.</p>
-                      )}
-                    </form>
+                        </div>
+                      </Champ>
+                      <p className="mt-3 flex items-start gap-2 text-[13px] text-navy-400">
+                        <Info className="mt-px h-4 w-4 shrink-0 text-gold-600" aria-hidden />
+                        {estClient ? 'Le numéro communiqué à la DSM lors de votre enregistrement.' : 'Format d’identifiant habituel délivré par les Ressources Humaines.'}
+                      </p>
+                    </div>
                   )}
-                </div>
-            </section>
-          </div>
 
-          <footer className="border-t border-white/10 py-6 text-sm text-navy-200 lg:text-right">
-            Direction des Solutions Maritimes · plateforme interne
-          </footer>
-        </div>
+                  {(etape === 'connexion' || etape === 'definir') && (
+                    <Champ label={etape === 'definir' ? 'Nouveau PIN (4 chiffres)' : champPin ? 'Code PIN' : 'Mot de passe'} htmlFor="secret">
+                      <div className="relative">
+                        <input
+                          ref={secretRef}
+                          id="secret"
+                          type={voirSecret ? 'text' : 'password'}
+                          value={secret}
+                          onChange={(e) => setSecret(champPin ? e.target.value.replace(/\D/g, '').slice(0, 4) : e.target.value)}
+                          inputMode={champPin ? 'numeric' : undefined}
+                          maxLength={champPin ? 4 : undefined}
+                          autoComplete={etape === 'definir' ? 'new-password' : 'current-password'}
+                          required
+                          disabled={loading}
+                          className={`${INPUT} pr-12 ${champPin ? 'text-xl tracking-[0.5em] tabular-nums' : ''}`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setVoirSecret((v) => !v)}
+                          className="absolute inset-y-0 right-0 flex w-12 items-center justify-center rounded-r-xl text-slate-500 hover:text-slate-800"
+                          aria-label={voirSecret ? 'Masquer' : 'Afficher'}
+                        >
+                          {voirSecret ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                        </button>
+                      </div>
+                    </Champ>
+                  )}
+
+                  {etape === 'definir' && (
+                    <Champ label="Confirmez le PIN" htmlFor="confirmation">
+                      <input
+                        id="confirmation"
+                        type={voirSecret ? 'text' : 'password'}
+                        value={confirmation}
+                        onChange={(e) => setConfirmation(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                        inputMode="numeric"
+                        maxLength={4}
+                        autoComplete="new-password"
+                        required
+                        disabled={loading}
+                        className={`${INPUT} text-xl tracking-[0.5em] tabular-nums`}
+                      />
+                    </Champ>
+                  )}
+
+                  {error && (
+                    <p role="alert" className="flex gap-2 rounded-xl bg-red-50 px-3.5 py-3 text-sm text-red-800 ring-1 ring-red-100">
+                      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" aria-hidden />
+                      {error}
+                    </p>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="group relative flex h-[60px] w-full items-center justify-center gap-2.5 rounded-2xl bg-[#050d1a] px-5 text-[1.05rem] font-semibold text-white shadow-[0_18px_30px_-14px_rgb(5_13_26/0.8)] transition-[box-shadow,transform] duration-200 hover:-translate-y-px hover:shadow-[0_22px_36px_-14px_rgb(5_13_26/0.85)] active:translate-y-0 disabled:translate-y-0 disabled:opacity-60"
+                  >
+                    {/* Filet doré sous le bouton, comme sur la maquette */}
+                    <span aria-hidden className="absolute inset-x-12 -bottom-px h-[2px] rounded-full bg-gradient-to-r from-transparent via-gold-400 to-transparent blur-[1px]" />
+                    {loading ? (
+                      <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
+                    ) : (
+                      <>
+                        {etape === 'identifiant' ? 'Continuer' : etape === 'definir' ? 'Enregistrer mon PIN' : 'Se connecter'}
+                        <ArrowRight className="h-5 w-5 text-gold-300 transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden />
+                      </>
+                    )}
+                  </button>
+
+                  {etape === 'connexion' && champPin && (
+                    <p className="text-sm text-slate-500">PIN oublié ? Demandez une réinitialisation à votre administrateur.</p>
+                  )}
+                </form>
+              )}
+
+              <div className="mt-10 flex flex-wrap items-center justify-between gap-3 text-sm">
+                {etape === 'identifiant' && !estClient ? (
+                  <button
+                    type="button"
+                    onClick={() => setAideOuverte((v) => !v)}
+                    aria-expanded={aideOuverte}
+                    className="text-navy-500 underline-offset-4 hover:text-navy-900 hover:underline"
+                  >
+                    Matricule oublié ou perdu ?
+                  </button>
+                ) : (
+                  <span />
+                )}
+                <span className="inline-flex items-center gap-1.5 text-navy-400">
+                  <CircleCheck className="h-4 w-4 text-emerald-500" aria-hidden />
+                  Connexion chiffrée
+                </span>
+              </div>
+              {aideOuverte && etape === 'identifiant' && !estClient && (
+                <p className="mt-3 rounded-xl bg-white px-4 py-3 text-sm leading-relaxed text-navy-600 ring-1 ring-slate-200">
+                  Adressez-vous aux Ressources Humaines ou à l’administrateur de la plateforme : ils vous communiqueront votre matricule.
+                </p>
+              )}
+            </div>
+          </section>
+        </main>
+
+        {/* ─── Pied de page ─── */}
+        <footer className="flex flex-col gap-6 pb-8 sm:flex-row sm:items-end sm:justify-between">
+          <div className="hidden items-center gap-4 rounded-2xl bg-white/[0.04] p-3 pr-6 ring-1 ring-white/10 sm:flex">
+            <div className="rounded-lg bg-white p-1.5">
+              <QRCode value={typeof window !== 'undefined' ? `${window.location.origin}/` : '/'} size={52} level="M" fgColor="#002B49" />
+            </div>
+            <div className="text-sm leading-snug">
+              <p className="font-medium text-white">Sur votre téléphone ?</p>
+              <p className="text-navy-200">Scannez pour ouvrir la plateforme mobile</p>
+            </div>
+          </div>
+          <div className="text-sm text-navy-200 sm:text-right">
+            <p>
+              <strong className="font-medium text-white">Direction des Solutions Maritimes</strong> · Plateforme d’évaluation interne
+            </p>
+            <p className="mt-1 text-xs text-navy-300/80">Tous droits réservés © {new Date().getFullYear()} DSM TAMIS.</p>
+          </div>
+        </footer>
       </div>
     </div>
   )
 }
 
 const INPUT =
-  'block h-[52px] w-full rounded-xl border border-slate-300 bg-slate-50/60 px-4 text-base text-slate-900 shadow-[inset_0_1px_2px_rgb(0_43_73/0.05)] outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-navy-700 focus:bg-white focus:ring-4 focus:ring-navy-700/12 disabled:bg-slate-50'
+  'block h-[60px] w-full rounded-2xl border border-slate-200 bg-white px-4 text-[1.05rem] text-slate-900 shadow-[0_1px_2px_rgb(0_43_73/0.04)] outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-navy-700 focus:ring-4 focus:ring-navy-700/12 disabled:bg-slate-50'
+
+const ICONE_CHAMP = 'pointer-events-none absolute top-1/2 left-4 h-5 w-5 -translate-y-1/2 text-slate-400'
 
 function Champ({ label, htmlFor, children }: { label: string; htmlFor: string; children: React.ReactNode }) {
   return (
     <div>
-      <label htmlFor={htmlFor} className="mb-2 block text-sm font-medium text-slate-800">
+      <label htmlFor={htmlFor} className="mb-3 block text-sm font-semibold tracking-[0.06em] text-navy-900 uppercase">
         {label}
       </label>
       {children}
@@ -478,102 +517,53 @@ function Champ({ label, htmlFor, children }: { label: string; htmlFor: string; c
   )
 }
 
-/**
- * Ligne de partage entre les deux zones : un filet en dégradé que parcourt lentement une lueur dorée,
- * marqué en son milieu d'un losange. Masqué sur mobile, figé si l'utilisateur réduit les animations.
- */
-function Separateur() {
+function Statistique({ libelle, className, children }: { libelle: string; className?: string; children: React.ReactNode }) {
   return (
-    <div aria-hidden className="pointer-events-none absolute inset-y-0 left-1/2 z-10 hidden w-px -translate-x-1/2 lg:block">
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/20 to-transparent" />
-      <div className="absolute inset-x-0 top-0 h-full overflow-hidden">
-        <div className="h-40 w-px animate-balayage bg-gradient-to-b from-transparent via-gold-400 to-transparent" />
-      </div>
-      <div className="absolute top-1/2 left-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-gold-500 shadow-[0_0_0_4px_rgb(0_43_73),0_0_14px_rgb(212_175_55/0.55)]" />
+    <div className={className}>
+      <dt className="text-xs font-medium tracking-[0.1em] text-navy-200 uppercase">{libelle}</dt>
+      <dd className="mt-3 text-xl font-bold whitespace-nowrap tabular-nums sm:text-2xl">{children}</dd>
     </div>
   )
 }
 
-/** Profondeur du fond : eau plus claire en haut à gauche, plus sombre vers le large, lumière dorée côté connexion. */
+/** Profondeur du fond : bleu nuit plus clair en haut, plus sombre vers le bas, halo doré discret. */
 function Fond() {
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0">
-      <div className="absolute inset-0 bg-[radial-gradient(120%_90%_at_10%_0%,#0b3d63_0%,transparent_55%)]" />
-      <div className="absolute inset-0 bg-[radial-gradient(90%_80%_at_100%_100%,#001a2e_0%,transparent_60%)]" />
-      <div className="absolute top-[18%] right-[12%] h-[34rem] w-[34rem] rounded-full bg-[radial-gradient(closest-side,rgb(212_175_55/0.07),transparent)]" />
-      {/* Vignettage léger des bords */}
-      <div className="absolute inset-0 shadow-[inset_0_0_180px_rgb(0_14_26/0.55)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(110%_80%_at_15%_0%,#0f2f57_0%,transparent_60%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(90%_70%_at_100%_100%,#04101f_0%,transparent_65%)]" />
+      <div className="absolute top-[30%] left-[22%] h-[30rem] w-[30rem] rounded-full bg-[radial-gradient(closest-side,rgb(212_175_55/0.06),transparent)]" />
+      <div className="absolute inset-0 shadow-[inset_0_0_200px_rgb(2_10_22/0.6)]" />
     </div>
   )
 }
 
-/**
- * Isobathes : lignes de profondeur d'une carte marine, en filigrane du fond navy.
- * Une ligne sur quatre est plus marquée, comme les courbes maîtresses d'une carte.
- */
-function Isobathes() {
+/** Quadrillage de carte marine, très discret, qui s'estompe vers les bords. */
+function Quadrillage() {
   return (
-    <svg
+    <div
       aria-hidden
-      className="pointer-events-none absolute inset-0 h-full w-full text-white"
-      viewBox="0 0 1440 900"
-      preserveAspectRatio="xMidYMid slice"
-      fill="none"
-      stroke="currentColor"
-    >
-      {Array.from({ length: 18 }, (_, i) => {
-        const r = 100 + i * 58
-        const maitresse = i % 4 === 0
-        return (
-          <path
-            key={i}
-            strokeWidth={maitresse ? 1.2 : 0.8}
-            strokeOpacity={maitresse ? 0.07 : 0.035}
-            strokeDasharray={i % 4 === 2 ? '2 6' : undefined}
-            d={`M ${-40} ${900 - r * 0.2} C ${r * 0.9} ${900 - r * 1.15}, ${720 + r * 0.25} ${620 - r * 0.55}, 1480 ${560 - r * 0.62}`}
-          />
-        )
-      })}
-    </svg>
+      className="pointer-events-none absolute inset-0 opacity-[0.07] [background-image:linear-gradient(to_right,white_1px,transparent_1px),linear-gradient(to_bottom,white_1px,transparent_1px)] [background-size:120px_120px] [mask-image:radial-gradient(ellipse_at_center,black_35%,transparent_80%)]"
+    />
   )
 }
 
-/** Rose des vents de carte marine, en filigrane derrière la connexion. Géométrie pure. */
-function RoseDesVents() {
-  const rayons = Array.from({ length: 72 }, (_, i) => i * 5)
+/** Compas de carte marine en filigrane, centré en bas de page, avec sa ligne d'horizon. */
+function Compas() {
   return (
-    <svg
-      aria-hidden
-      viewBox="-300 -300 600 600"
-      className="pointer-events-none absolute top-1/2 left-3/4 hidden h-[52rem] w-[52rem] -translate-x-1/2 -translate-y-1/2 text-white lg:block"
-      fill="none"
-      stroke="currentColor"
-    >
-      <g strokeOpacity="0.06">
-        <circle r="290" strokeWidth="1" />
-        <circle r="276" strokeWidth="0.6" />
-        <circle r="200" strokeWidth="0.6" strokeDasharray="1 5" />
-        <circle r="120" strokeWidth="0.8" />
-      </g>
-      {/* Graduations du cercle extérieur */}
-      <g strokeOpacity="0.07">
-        {rayons.map((a) => (
-          <line key={a} x1="0" y1={a % 45 === 0 ? -262 : -270} x2="0" y2="-276" strokeWidth={a % 45 === 0 ? 1.2 : 0.6} transform={`rotate(${a})`} />
-        ))}
-      </g>
-      {/* Pointes : cardinales longues, intercardinales courtes */}
-      {[0, 90, 180, 270].map((a) => (
-        <g key={a} transform={`rotate(${a})`}>
-          <path d="M0 -250 L16 -16 L0 0 Z" fill="currentColor" fillOpacity="0.05" strokeOpacity="0.08" strokeWidth="0.8" />
-          <path d="M0 -250 L-16 -16 L0 0 Z" fill="currentColor" fillOpacity="0.02" strokeOpacity="0.08" strokeWidth="0.8" />
+    <div aria-hidden className="pointer-events-none absolute bottom-0 left-[45%] hidden h-[34rem] w-[34rem] -translate-x-1/2 translate-y-[38%] lg:block">
+      <div className="absolute top-1/2 left-1/2 h-px w-[66rem] -translate-x-1/2 bg-gradient-to-r from-transparent via-white/15 to-transparent" />
+      <svg viewBox="-300 -300 600 600" className="h-full w-full text-white" fill="none" stroke="currentColor">
+        <g strokeOpacity="0.09">
+          <circle r="290" strokeWidth="1" />
+          <circle r="200" strokeWidth="0.8" strokeDasharray="2 6" />
+          <circle r="120" strokeWidth="0.8" />
         </g>
-      ))}
-      {[45, 135, 225, 315].map((a) => (
-        <path key={a} transform={`rotate(${a})`} d="M0 -160 L10 -10 L0 0 L-10 -10 Z" fill="currentColor" fillOpacity="0.025" strokeOpacity="0.06" strokeWidth="0.6" />
-      ))}
-      {/* Nord en or */}
-      <path d="M0 -250 L16 -16 L0 0 Z" className="text-gold-400" stroke="currentColor" strokeOpacity="0.35" strokeWidth="0.8" fill="currentColor" fillOpacity="0.12" />
-      <circle r="5" className="text-gold-400" fill="currentColor" fillOpacity="0.3" stroke="none" />
-    </svg>
+        {[0, 90, 180, 270].map((a) => (
+          <path key={a} transform={`rotate(${a})`} d="M0 -270 L8 -10 L0 0 L-8 -10 Z" fill="currentColor" fillOpacity="0.05" strokeOpacity="0.1" strokeWidth="0.8" />
+        ))}
+        <circle r="7" className="text-gold-400" fill="currentColor" fillOpacity="0.35" stroke="none" />
+      </svg>
+    </div>
   )
 }
