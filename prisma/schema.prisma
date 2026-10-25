@@ -250,5 +250,7 @@ enum Role {
   ADMIN
   MANAGER
   UTILISATEUR
+  /// Membre du personnel enregistré dans l'annuaire, hors campagne : ni noté, ni notant, sans connexion.
+  CADRE
   EXTERNE
 }

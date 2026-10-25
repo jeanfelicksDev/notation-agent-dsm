@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { pinEstDefini } from '@/lib/auth'
 import { trouverParIdentifiant } from '@/lib/identifiant'
+import { estHorsCampagne, MESSAGE_HORS_CAMPAGNE } from '@/lib/roles'
 
 /**
  * POST /api/auth/identifier
@@ -21,6 +22,10 @@ export async function POST(request: NextRequest) {
         { error: "Identifiant inconnu. Vérifiez votre saisie ou contactez l'administrateur." },
         { status: 404 }
       )
+    }
+
+    if (estHorsCampagne(utilisateur.role)) {
+      return NextResponse.json({ error: MESSAGE_HORS_CAMPAGNE }, { status: 403 })
     }
 
     if (pinEstDefini(utilisateur.motDePasse)) {
