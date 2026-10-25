@@ -76,7 +76,6 @@ export default function UtilisateursPage() {
     return f === 'sans_pin' || f === 'verrouilles' ? f : 'tous'
   })
   const [qrEnCours, setQrEnCours] = useState<string | null>(null)
-  const [activationQr, setActivationQr] = useState(false)
   const [importOuvert, setImportOuvert] = useState(false)
   const [qrOuvert, setQrOuvert] = useState(false)
   const { listes } = useListes()
@@ -151,30 +150,6 @@ export default function UtilisateursPage() {
       toast.error('La notation QR n’a pas pu être modifiée.')
     } finally {
       setQrEnCours(null)
-    }
-  }
-
-  const activerTousQr = async () => {
-    const ok = await confirmer({
-      titre: 'Ouvrir la notation QR à tous les agents ?',
-      message: 'Tous les agents et managers pourront être évalués par les clients externes via le QR code.',
-      confirmer: 'Activer pour tous',
-    })
-    if (!ok) return
-    setActivationQr(true)
-    try {
-      const res = await fetch('/api/admin/utilisateurs/generate-qr', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enableAllAgents: true }),
-      })
-      if (!res.ok) throw new Error()
-      toast.success('Notation QR activée pour tous les agents.')
-      charger()
-    } catch {
-      toast.error('L’activation a échoué.')
-    } finally {
-      setActivationQr(false)
     }
   }
 
@@ -273,14 +248,6 @@ export default function UtilisateursPage() {
             </div>
           </div>
           <div className="flex shrink-0 gap-2">
-            <button
-              onClick={activerTousQr}
-              disabled={activationQr}
-              className="inline-flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-medium text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50 disabled:opacity-50"
-            >
-              {activationQr && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
-              Activer pour tous
-            </button>
             <button
               onClick={() => setQrOuvert(true)}
               className="inline-flex h-9 items-center gap-2 rounded-lg bg-navy-900 px-3.5 text-sm font-semibold text-white hover:bg-navy-800"
