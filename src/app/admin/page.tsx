@@ -3,12 +3,16 @@ import { ArrowRight, CalendarClock, KeyRound, Lock, Trophy, UserX } from 'lucide
 import prisma from '@/lib/prisma'
 import AdminHeader from '@/components/AdminHeader'
 import { getCampagneOuverte } from '@/lib/campagne'
+import { requireAdmin } from '@/lib/auth'
+import { redirect } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
 
 const fmt = (d: Date) => d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
 
 export default async function AdminDashboard() {
+  // Le layout n'attend plus la session (navigation instantanée) : la page protège elle-même ses données.
+  if (!(await requireAdmin())) redirect('/?reason=admin_required')
   const campagne = await getCampagneOuverte()
   const maintenant = new Date()
 

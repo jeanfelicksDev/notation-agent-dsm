@@ -6,24 +6,10 @@ import { criteresPourPaire, estEvaluateurManager } from '@/lib/criteres'
 
 export async function GET() {
   try {
-    const sessionUser = await getSessionUser()
-    if (!sessionUser) {
-      return NextResponse.json({ error: 'Session expirée' }, { status: 401 })
-    }
-
-    const [evaluateur, campagne] = await Promise.all([
-      prisma.utilisateur.findUnique({
-        where: { id: sessionUser.id },
-        select: {
-          id: true, matricule: true, nom: true, prenom: true, email: true,
-          service: true, role: true,
-        },
-      }),
-      getCampagneOuverte(),
-    ])
-
+    // Session et campagne en parallèle ; la session fournit déjà le profil de l'évaluateur.
+    const [evaluateur, campagne] = await Promise.all([getSessionUser(), getCampagneOuverte()])
     if (!evaluateur) {
-      return NextResponse.json({ error: 'Compte introuvable' }, { status: 404 })
+      return NextResponse.json({ error: 'Session expirée' }, { status: 401 })
     }
     if (evaluateur.role === 'EXTERNE') {
       return NextResponse.json({ redirect: '/qr' })
