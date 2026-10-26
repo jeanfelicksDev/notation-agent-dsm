@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Manuel – Calcul des notes et meilleur agent de la direction</title>
+<style>
+  @page { size: A4; margin: 18mm 17mm 20mm; }
+  :root { --navy: #002b49; --gold: #b8952a; --gold-l: #f6ecc8; --gris: #5b6b7b; --fond: #f3f6f9; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif; font-size: 10.6pt; line-height: 1.55; color: #1c2733; margin: 0; }
+  h1, h2, h3 { font-family: Georgia, "Times New Roman", serif; color: var(--navy); font-weight: 600; }
+  h1 { font-size: 24pt; line-height: 1.15; margin: 6mm 0 3mm; }
+  h2 { font-size: 16pt; margin: 0 0 3mm; padding-top: 1mm; display: flex; align-items: baseline; gap: 3mm; }
+  h2 .num { font-style: italic; color: var(--gold); font-weight: 400; font-size: 20pt; }
+  h3 { font-size: 12.5pt; margin: 6mm 0 2mm; }
+  p { margin: 0 0 2.6mm; }
+  section { margin-bottom: 8mm; }
+  .saut { break-before: page; }
+  .eviter { break-inside: avoid; }
+  .bandeau { font-size: 9pt; letter-spacing: .08em; text-transform: uppercase; color: var(--gold); font-weight: 600; }
+  .sous-titre { color: var(--gris); font-size: 10pt; }
+  .encadre { background: var(--fond); border-left: 3pt solid var(--navy); padding: 3mm 4mm; margin: 3mm 0 4mm; border-radius: 0 2mm 2mm 0; break-inside: avoid; }
+  .encadre.or { background: #fbf7e9; border-left-color: var(--gold); }
+  .encadre.alerte { background: #fdf1f1; border-left-color: #b42318; }
+  .encadre p:last-child, .encadre ul:last-child { margin-bottom: 0; }
+  .titre-encadre { font-weight: 700; color: var(--navy); margin-bottom: 1mm; }
+  table { width: 100%; border-collapse: collapse; margin: 2mm 0 4mm; font-size: 9.8pt; }
+  th { background: var(--navy); color: #fff; text-align: left; font-weight: 600; padding: 2mm 2.5mm; }
+  td { padding: 2mm 2.5mm; border-bottom: .6pt solid #d9e1ea; vertical-align: top; }
+  tr { break-inside: avoid; }
+  tbody tr:nth-child(even) td { background: #fafbfc; }
+  td.c, th.c { text-align: center; }
+  td.n, th.n { text-align: right; white-space: nowrap; }
+  tr.total td { font-weight: 700; background: var(--gold-l) !important; }
+  .formule { text-align: center; font-family: Georgia, serif; font-size: 11.5pt; background: var(--fond); padding: 3mm; margin: 3mm 0; border-radius: 2mm; }
+  ul, ol { margin: 0 0 3mm; padding-left: 6mm; }
+  li { margin-bottom: 1.2mm; }
+  .crit { font-weight: 700; color: var(--navy); }
+  .famille { display: flex; align-items: center; gap: 3mm; margin: 7mm 0 2mm; break-after: avoid; }
+  .famille .pastille { background: var(--navy); color: #fff; font-weight: 700; border-radius: 50%; width: 8mm; height: 8mm; display: flex; align-items: center; justify-content: center; font-size: 10pt; }
+  .famille h3 { margin: 0; }
+  .famille .compte { margin-left: auto; color: var(--gold); font-weight: 700; font-size: 10pt; }
+  .ok { color: #157347; font-weight: 700; }
+  .non { color: #c4ccd6; }
+  .pied { margin-top: 10mm; padding-top: 3mm; border-top: .6pt solid #d9e1ea; color: var(--gris); font-size: 8.5pt; text-align: center; }
+  .couverture { border-bottom: 1.2pt solid var(--gold); padding-bottom: 5mm; margin-bottom: 7mm; }
+</style>
+</head>
+<body>
+
+<div class="couverture">
+  <div class="bandeau">DSM TAMIS · Direction des Solutions Maritimes</div>
+  <h1>Comment sont notés les agents, comment sont calculées les notes, et comment est désigné le meilleur agent de la direction</h1>
+  <div class="sous-titre">Manuel explicatif pour tous · mis à jour le 26 octobre 2026 · critères de la « 1<sup>ère</sup> campagne Meilleur Agent DSM »</div>
+</div>
+
+<section>
+  <h2><span class="num">1</span> L’essentiel en quelques lignes</h2>
+  <p>Pendant une période appelée <strong>campagne</strong>, plusieurs personnes donnent leur avis sur le travail de chaque agent : son chef, ses collègues et des clients. Chacune répond à une petite liste de questions, appelées <strong>critères</strong> (par exemple : « Est-il ponctuel ? »), en choisissant une appréciation de 1 à 5.</p>
+  <p>L’application rassemble ensuite tous ces avis et les transforme en <strong>une seule note sur 100</strong> pour chaque agent. L’agent qui obtient la meilleure note de sa direction devient le <strong>meilleur agent de la direction</strong>.</p>
+  <div class="encadre or">
+    <p>Ce manuel est écrit pour être compris sans connaissance particulière en ressources humaines ni en calcul. Il suit le chemin d’une note : <strong>qui note</strong>, <strong>quoi</strong>, <strong>comment</strong>, puis <strong>comment on calcule</strong> et <strong>comment on désigne le gagnant</strong>. Toutes les règles décrites sont celles réellement programmées dans l’application DSM TAMIS.</p>
+  </div>
+</section>
+
+<section>
+  <h2><span class="num">2</span> Les mots à connaître</h2>
+  <table>
+    <thead><tr><th style="width:27%">Mot</th><th>Ce qu’il veut dire, simplement</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Campagne</strong></td><td>La période pendant laquelle on note (pour la campagne actuelle : du 21 octobre au 16 novembre 2026). Après la date de clôture, on ne peut plus noter.</td></tr>
+      <tr><td><strong>Critère</strong></td><td>Une qualité précise sur laquelle on donne son avis : la ponctualité, l’esprit d’équipe, la communication…</td></tr>
+      <tr><td><strong>Évaluateur</strong> (ou notant)</td><td>La personne qui donne la note.</td></tr>
+      <tr><td><strong>Agent noté</strong></td><td>La personne qui reçoit la note. Dans l’application, on l’appelle un <strong>Pair</strong>.</td></tr>
+      <tr><td><strong>Famille</strong></td><td>Un groupe d’évaluateurs qui regardent l’agent sous le même angle : le manager, les collègues, les clients internes, les clients externes.</td></tr>
+      <tr><td><strong>Soumettre</strong></td><td>Envoyer définitivement ses notes. Tant qu’on n’a pas soumis, les notes ne comptent pas.</td></tr>
+      <tr><td><strong>Score</strong></td><td>La note finale d’un agent, sur 100.</td></tr>
+      <tr><td><strong>Pourcentage (%)</strong></td><td>Une façon de dire « combien sur 100 ». Obtenir 4 sur 5, c’est obtenir 80 %.</td></tr>
+      <tr><td><strong>Moyenne</strong></td><td>On additionne plusieurs nombres et on divise par leur quantité. La moyenne de 80 et 90 est (80 + 90) ÷ 2 = 85.</td></tr>
+      <tr><td><strong>Invalider</strong></td><td>Écarter les notes d’un évaluateur qui a été empêché de noter par un cas de force majeure (accident, maladie grave, décès…).</td></tr>
+      <tr><td><strong>Ex aequo</strong></td><td>Deux agents exactement à égalité, qui partagent la même place.</td></tr>
+      <tr><td><strong>Provisoire</strong></td><td>Qui peut encore changer. Le classement est provisoire jusqu’à la clôture de la campagne.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2><span class="num">3</span> Qui note qui ?</h2>
+  <p>Seuls les agents qui ont le rôle <strong>Pair</strong> sont notés et classés. Chacun d’eux reçoit des avis de quatre familles de personnes :</p>
+  <table>
+    <thead><tr><th style="width:18%">Famille</th><th style="width:44%">Qui c’est</th><th>Comment elle note</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Manager</strong></td><td>Le chef de l’agent : chef de service, chef de section ou chef de département.</td><td>Sur l’application, après connexion avec son matricule et son PIN.</td></tr>
+      <tr><td><strong>Collègues</strong></td><td>Les autres Pairs du <strong>même service</strong> que l’agent.</td><td>Sur l’application, avec son matricule et son PIN.</td></tr>
+      <tr><td><strong>Clients internes</strong></td><td>Des Pairs d’<strong>un autre service</strong> de la DSM qui travaillent avec l’agent, ou un Pair que l’administrateur a désigné « client interne ».</td><td>Sur l’application, avec son matricule et son PIN.</td></tr>
+      <tr><td><strong>Clients externes</strong></td><td>Des entreprises clientes de la DSM.</td><td>Avec leur numéro de téléphone, en scannant le QR code de la DSM.</td></tr>
+    </tbody>
+  </table>
+  <div class="encadre">
+    <div class="titre-encadre">Quatre règles qui ne changent jamais</div>
+    <ul>
+      <li>Personne ne peut se noter soi-même.</li>
+      <li>On ne note que les personnes que l’administrateur nous a attribuées.</li>
+      <li>Les managers, les clients et les administrateurs <strong>notent</strong>, mais ne sont <strong>pas classés</strong>.</li>
+      <li>Les <strong>cadres</strong> font partie du personnel mais ne participent pas à la campagne : ils ne notent pas, ne sont pas notés et n’ont pas à se connecter.</li>
+    </ul>
+  </div>
+  <p><strong>Collègue ou client interne ?</strong> C’est le service qui décide. Si l’évaluateur et l’agent sont dans le même service (par exemple tous deux au service OOCL), l’évaluateur note en tant que <em>collègue</em>. S’ils sont dans deux services différents (OOCL et GSL, par exemple), il note en tant que <em>client interne</em>, car il « reçoit » le travail de l’agent comme le ferait un client.</p>
+</section>
+
+<section class="saut">
+  <h2><span class="num">4</span> La liste complète des critères, famille par famille</h2>
+  <p>La campagne actuelle compte <strong>14 critères</strong>. Chaque famille n’en note qu’une partie : celle qu’elle est capable d’observer. Un chef voit si l’agent arrive à l’heure ; un client, lui, voit surtout la qualité du service qu’il reçoit. Certains critères, comme la communication, sont notés par plusieurs familles.</p>
+  <div class="encadre or"><p>Ces critères sont ceux de la campagne en cours. L’administrateur peut ajouter, modifier ou retirer des critères d’une campagne à l’autre : la liste exacte s’affiche toujours dans l’application au moment de noter.</p></div>
+
+<div class="eviter">
+  <div class="famille"><span class="pastille">1</span><h3>Le manager note 9 critères</h3><span class="compte">9 × 5 = 45 points possibles</span></div>
+  <table>
+    <thead><tr><th style="width:26%">Critère</th><th>Ce que l’on regarde, en clair</th></tr></thead>
+    <tbody>
+      <tr><td class="crit">Ponctualité</td><td>Il respecte les horaires : il arrive à l’heure au travail et aux réunions, et il rend son travail dans les délais fixés. C’est un signe de fiabilité.</td></tr>
+      <tr><td class="crit">Réactivité</td><td>Il réagit vite face à une demande, un imprévu ou une urgence : il prend la situation en main sans attendre inutilement.</td></tr>
+      <tr><td class="crit">Respect des règles</td><td>Il applique les procédures de la DSM, le règlement intérieur et les consignes de sécurité.</td></tr>
+      <tr><td class="crit">Maîtrise des tâches</td><td>Il connaît son métier et travaille de façon autonome : son travail est précis, de qualité et efficace.</td></tr>
+      <tr><td class="crit">Prestance</td><td>L’image professionnelle qu’il donne de la DSM : une tenue adaptée à son poste, une attitude correcte et du calme, même dans une situation tendue. On ne juge ni le physique, ni le style personnel.</td></tr>
+      <tr><td class="crit">Communication</td><td>Il s’exprime clairement, à l’oral comme à l’écrit, il écoute ses interlocuteurs et il adapte son discours à la personne en face de lui.</td></tr>
+      <tr><td class="crit">Force de proposition</td><td>Il ne se contente pas d’exécuter : il propose des idées, des améliorations ou des solutions quand un problème se présente.</td></tr>
+      <tr><td class="crit">Dynamisme</td><td>Il montre de l’énergie et de la motivation au quotidien, il tient le rythme et il aborde les difficultés avec un état d’esprit positif.</td></tr>
+      <tr><td class="crit">Respect et politesse</td><td>Il reste courtois et bienveillant avec tout le monde (collègues, chefs, clients), y compris en cas de désaccord ou de tension.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="eviter">
+  <div class="famille"><span class="pastille">2</span><h3>Les collègues notent 5 critères</h3><span class="compte">5 × 5 = 25 points possibles</span></div>
+  <table>
+    <thead><tr><th style="width:26%">Critère</th><th>Ce que l’on regarde, en clair</th></tr></thead>
+    <tbody>
+      <tr><td class="crit">Esprit d’équipe</td><td>Il travaille bien avec les autres : il aide, il partage les informations et il fait passer la réussite du groupe avant son intérêt personnel.</td></tr>
+      <tr><td class="crit">Communication</td><td>Il s’exprime clairement, il écoute et il se fait comprendre.</td></tr>
+      <tr><td class="crit">Force de proposition</td><td>Il propose des idées et des solutions au lieu d’attendre qu’on les lui donne.</td></tr>
+      <tr><td class="crit">Dynamisme</td><td>Il est impliqué, motivé et positif au quotidien.</td></tr>
+      <tr><td class="crit">Respect et politesse</td><td>Il est courtois et bienveillant, même en cas de désaccord.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="eviter">
+  <div class="famille"><span class="pastille">3</span><h3>Les clients internes notent 5 critères</h3><span class="compte">5 × 5 = 25 points possibles</span></div>
+  <table>
+    <thead><tr><th style="width:26%">Critère</th><th>Ce que l’on regarde, en clair</th></tr></thead>
+    <tbody>
+      <tr><td class="crit">Appréciation globale</td><td>Votre satisfaction d’ensemble vis-à-vis de cet agent : la qualité du service qu’il vous rend, son attitude envers vous et sa capacité à répondre efficacement à vos demandes.</td></tr>
+      <tr><td class="crit">Communication</td><td>Il vous transmet des informations claires et précises, et il vous écoute.</td></tr>
+      <tr><td class="crit">Force de proposition</td><td>Il vous propose des solutions et des améliorations.</td></tr>
+      <tr><td class="crit">Dynamisme</td><td>Il traite vos demandes avec énergie et implication.</td></tr>
+      <tr><td class="crit">Respect et politesse</td><td>Il est courtois et professionnel avec vous.</td></tr>
+    </tbody>
+  </table>
+</div>
+  <p>Un client interne ne note pas l’« esprit d’équipe » : il ne fait pas partie de l’équipe de l’agent. Il note à la place l’« appréciation globale » du service reçu.</p>
+
+<div class="eviter">
+  <div class="famille"><span class="pastille">4</span><h3>Les clients externes notent 5 critères</h3><span class="compte">5 × 5 = 25 points possibles</span></div>
+  <table>
+    <thead><tr><th style="width:26%">Critère</th><th>Ce que l’on regarde, en clair</th></tr></thead>
+    <tbody>
+      <tr><td class="crit">Appréciation globale</td><td>Votre satisfaction d’ensemble : la qualité du service rendu, l’attitude de l’agent envers vous et sa capacité à répondre efficacement à vos demandes.</td></tr>
+      <tr><td class="crit">Qualité de la communication</td><td>Les échanges avec l’agent sont clairs, précis et courtois.</td></tr>
+      <tr><td class="crit">Réactivité</td><td>Le temps qu’il met à prendre en charge vos demandes.</td></tr>
+      <tr><td class="crit">Fiabilité du service rendu</td><td>Les informations qu’il vous donne sont exactes et il respecte les procédures.</td></tr>
+      <tr><td class="crit">Prestance</td><td>L’image professionnelle qu’il donne de la DSM face à vous : tenue, attitude, calme.</td></tr>
+    </tbody>
+  </table>
+</div>
+</section>
+
+<section class="eviter">
+  <h3 style="margin-top:0">Tableau récapitulatif : qui note quoi ?</h3>
+  <table>
+    <thead><tr><th>Critère</th><th class="c" style="width:14%">Manager</th><th class="c" style="width:14%">Collègues</th><th class="c" style="width:15%">Clients internes</th><th class="c" style="width:15%">Clients externes</th></tr></thead>
+    <tbody>
+      <tr><td>Ponctualité</td><td class="c ok">✓</td><td class="c non">—</td><td class="c non">—</td><td class="c non">—</td></tr>
+      <tr><td>Réactivité</td><td class="c ok">✓</td><td class="c non">—</td><td class="c non">—</td><td class="c ok">✓</td></tr>
+      <tr><td>Respect des règles</td><td class="c ok">✓</td><td class="c non">—</td><td class="c non">—</td><td class="c non">—</td></tr>
+      <tr><td>Maîtrise des tâches</td><td class="c ok">✓</td><td class="c non">—</td><td class="c non">—</td><td class="c non">—</td></tr>
+      <tr><td>Prestance</td><td class="c ok">✓</td><td class="c non">—</td><td class="c non">—</td><td class="c ok">✓</td></tr>
+      <tr><td>Communication <span class="sous-titre">(« Qualité de la communication » pour les clients externes)</span></td><td class="c ok">✓</td><td class="c ok">✓</td><td class="c ok">✓</td><td class="c ok">✓</td></tr>
+      <tr><td>Force de proposition</td><td class="c ok">✓</td><td class="c ok">✓</td><td class="c ok">✓</td><td class="c non">—</td></tr>
+      <tr><td>Dynamisme</td><td class="c ok">✓</td><td class="c ok">✓</td><td class="c ok">✓</td><td class="c non">—</td></tr>
+      <tr><td>Respect et politesse</td><td class="c ok">✓</td><td class="c ok">✓</td><td class="c ok">✓</td><td class="c non">—</td></tr>
+      <tr><td>Esprit d’équipe</td><td class="c non">—</td><td class="c ok">✓</td><td class="c non">—</td><td class="c non">—</td></tr>
+      <tr><td>Appréciation globale</td><td class="c non">—</td><td class="c non">—</td><td class="c ok">✓</td><td class="c ok">✓</td></tr>
+      <tr><td>Fiabilité du service rendu</td><td class="c non">—</td><td class="c non">—</td><td class="c non">—</td><td class="c ok">✓</td></tr>
+      <tr class="total"><td>Nombre de critères notés</td><td class="c">9</td><td class="c">5</td><td class="c">5</td><td class="c">5</td></tr>
+    </tbody>
+  </table>
+  <p class="sous-titre">Le critère « Réactivité » existe en deux versions : celle du manager (réagir vite à une demande ou une urgence) et celle des clients externes (le délai de prise en charge de leurs demandes).</p>
+</section>
+
+<section>
+  <div class="eviter"><h2><span class="num">5</span> Étape 1 — Noter un critère</h2>
+  <p>Pour chaque critère, l’évaluateur choisit l’appréciation qui correspond le mieux à ce qu’il a observé. Chaque appréciation vaut un nombre de points, de 1 à 5 :</p>
+  <table>
+    <thead><tr><th style="width:24%">Appréciation</th><th style="width:10%" class="c">Points</th><th>Ce qu’elle signifie</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Excellent</strong></td><td class="c">5</td><td>Dépasse largement les attentes.</td></tr>
+      <tr><td><strong>Très satisfaisant</strong></td><td class="c">4</td><td>Répond pleinement aux attentes, avec un travail de qualité.</td></tr>
+      <tr><td><strong>Satisfaisant</strong></td><td class="c">3</td><td>Répond globalement aux attentes du poste.</td></tr>
+      <tr><td><strong>À améliorer</strong></td><td class="c">2</td><td>Plusieurs points doivent progresser.</td></tr>
+      <tr><td><strong>Insuffisant</strong></td><td class="c">1</td><td>En dessous des attentes ; des actions correctives sont nécessaires.</td></tr>
+    </tbody>
+  </table></div>
+  <ul>
+    <li>Il n’existe pas de zéro : la note la plus basse est 1.</li>
+    <li>Les clients externes choisissent des étoiles, de 1 à 5, ce qui revient exactement au même.</li>
+    <li>Le commentaire est facultatif. Il aide à comprendre une note, mais il ne change pas le score.</li>
+  </ul>
+  <div class="encadre"><p><strong>Conseil aux évaluateurs :</strong> notez ce que vous avez réellement observé pendant la période, pas une impression générale ni un fait isolé. « Satisfaisant » (3) veut dire que le travail est conforme à ce qu’on attend : ce n’est pas une mauvaise note.</p></div>
+</section>
+
+<section class="eviter">
+  <h2><span class="num">6</span> Étape 2 — Le score de chaque évaluateur</h2>
+  <p>On additionne les points qu’un évaluateur a donnés à l’agent, puis on les compare au maximum qu’il aurait pu donner. Le résultat est un pourcentage.</p>
+  <div class="formule">score d’un évaluateur = points donnés ÷ points maximum possibles × 100</div>
+  <p><strong>Exemple :</strong> une collègue note les 5 critères des collègues et donne 4, 5, 4, 4 et 4. Elle a donné 21 points sur 25 possibles, soit 21 ÷ 25 × 100 = <strong>84 %</strong>.</p>
+  <p><strong>Pourquoi passer par un pourcentage ?</strong> Parce que tout le monde ne note pas le même nombre de critères : le manager en note 9 (45 points possibles), les autres familles en notent 5 (25 points possibles). Le pourcentage permet de comparer ces notes de tailles différentes, comme on compare un devoir noté sur 20 et un autre noté sur 40.</p>
+</section>
+
+<section class="eviter">
+  <h2><span class="num">7</span> Étape 3 — La moyenne de chaque famille</h2>
+  <p>Dans chaque famille, on fait la moyenne des pourcentages de ses évaluateurs. Chaque personne compte pour une voix : un évaluateur très sévère ou très généreux ne pèse pas plus qu’un autre.</p>
+  <p>Pour le calcul, l’application regroupe les avis en <strong>trois blocs</strong> :</p>
+  <ul>
+    <li><strong>Manager :</strong> la moyenne des managers qui ont noté l’agent (souvent un seul).</li>
+    <li><strong>Collègues :</strong> la moyenne des collègues <em>et</em> des clients internes, réunis dans le même bloc.</li>
+    <li><strong>Clients externes :</strong> la moyenne des clients externes, un avis par client.</li>
+  </ul>
+  <p><strong>Exemple :</strong> une collègue donne 84 % et un client interne donne 80 %. La moyenne du bloc « collègues » vaut (84 + 80) ÷ 2 = <strong>82 %</strong>.</p>
+</section>
+
+<section>
+  <h2><span class="num">8</span> Étape 4 — Le mélange des blocs : la note sur 100</h2>
+  <p>La note finale est sur 100 points. On peut l’imaginer comme un gâteau partagé en parts :</p>
+  <ul>
+    <li><strong>55 points</strong> viennent du manager ;</li>
+    <li><strong>45 points</strong> viennent des collègues et des clients.</li>
+  </ul>
+  <div class="eviter"><p>Les 45 points se partagent selon les avis que l’agent a reçus :</p>
+  <table>
+    <thead><tr><th style="width:42%">L’agent a reçu des avis de…</th><th>Comment ses 45 points sont calculés</th></tr></thead>
+    <tbody>
+      <tr><td>collègues (ou clients internes) <strong>et</strong> clients externes</td><td>20 points selon les collègues + 25 points selon les clients externes</td></tr>
+      <tr><td>collègues (ou clients internes) seulement</td><td>les 45 points selon les collègues</td></tr>
+      <tr><td>clients externes seulement</td><td>les 45 points selon les clients externes</td></tr>
+      <tr><td>personne</td><td>0 point (sauf cas de force majeure, voir la section 11)</td></tr>
+    </tbody>
+  </table></div>
+  <p>Chaque pourcentage est ensuite transformé en points : on applique simplement le pourcentage aux points disponibles. 80 % de 55 points, c’est 0,80 × 55 = 44 points.</p>
+  <div class="encadre or"><p>Ces chiffres (55 / 20 / 25) sont ceux de la campagne actuelle. L’administrateur peut les modifier pour une autre campagne, mais la part du manager et celle des collègues et clients totalisent toujours 100 points.</p></div>
+</section>
+
+<section class="eviter">
+  <h2><span class="num">9</span> Un exemple complet : la note d’Awa</h2>
+  <p>Awa obtient <strong>84,8 sur 100</strong>. Voici comment, pas à pas (exemple inventé pour l’explication).</p>
+  <ol>
+    <li>Son manager note ses 9 critères et lui donne 38 points sur 45, soit <strong>84,4 %</strong>.</li>
+    <li>Une collègue de son service lui donne 21 sur 25 (84 %) et un client interne d’un autre service lui donne 20 sur 25 (80 %). Moyenne du bloc « collègues » : <strong>82 %</strong>.</li>
+    <li>Un client externe note ses 5 critères et lui donne 22 étoiles sur 25, soit <strong>88 %</strong>.</li>
+    <li>On transforme chaque pourcentage en points :</li>
+  </ol>
+  <table>
+    <thead><tr><th>Bloc</th><th class="n">Pourcentage</th><th class="n">Points disponibles</th><th class="n">Points gagnés</th></tr></thead>
+    <tbody>
+      <tr><td>Manager</td><td class="n">84,4 %</td><td class="n">55</td><td class="n">46,44</td></tr>
+      <tr><td>Collègues et clients internes</td><td class="n">82 %</td><td class="n">20</td><td class="n">16,40</td></tr>
+      <tr><td>Clients externes</td><td class="n">88 %</td><td class="n">25</td><td class="n">22,00</td></tr>
+      <tr class="total"><td>Total</td><td></td><td class="n">100</td><td class="n">84,84</td></tr>
+    </tbody>
+  </table>
+  <p>L’application affiche les scores avec un chiffre après la virgule : Awa a donc <strong>84,8</strong>. Comme elle a reçu des avis de collègues et de clients externes, ses 45 points se partagent en 20 + 25.</p>
+</section>
+
+<section>
+  <h2><span class="num">10</span> Les pièges à connaître</h2>
+  <div class="encadre alerte">
+    <div class="titre-encadre">Une famille qui n’a pas noté rapporte zéro point</div>
+    <p>Si le manager d’Awa avait simplement oublié de noter, elle n’aurait que 16,40 + 22,00 = <strong>38,4 sur 100</strong> au lieu de 84,8. Il est donc essentiel que chacun soumette ses notes à temps. Seule exception : l’évaluateur empêché par un cas de force majeure (section 11).</p>
+  </div>
+  <ul>
+    <li><strong>Le brouillon ne compte pas.</strong> L’application enregistre automatiquement les notes pendant la saisie, mais elles ne comptent qu’après le clic sur « Soumettre ».</li>
+    <li><strong>La soumission est définitive.</strong> Après « Soumettre », on ne peut plus modifier ni les notes ni les commentaires.</li>
+    <li><strong>Tout doit être noté.</strong> On ne peut soumettre que si chaque critère de chaque agent attribué a reçu une note.</li>
+    <li><strong>La date limite compte.</strong> Après le dernier jour de la campagne, la notation est fermée.</li>
+  </ul>
+</section>
+
+<section>
+  <h2><span class="num">11</span> Le cas de force majeure : un évaluateur empêché</h2>
+  <p>Il arrive qu’un évaluateur ne puisse pas noter pour une raison grave : accident, maladie grave, décès… Dans ce cas, l’administrateur <strong>invalide</strong> ses notes depuis l’onglet « Suivi » de la campagne, en indiquant le motif. L’agent noté n’est pas pénalisé : l’absence de cette note n’est pas comptée comme un zéro.</p>
+  <ul>
+    <li>Les notes sont écartées, pas effacées : l’administrateur peut les rétablir à tout moment.</li>
+    <li>L’évaluateur invalidé ne note plus les agents concernés.</li>
+    <li>Si un collègue est empêché, la moyenne se fait sur les autres collègues.</li>
+    <li>Si un bloc n’a plus aucune note à cause de l’invalidation, il est <strong>neutralisé</strong> : la note est recalculée sur 100 avec les blocs restants.</li>
+  </ul>
+  <p><strong>Exemple :</strong> le manager d’Awa a eu un accident et n’a pas pu noter. L’administrateur invalide ses notes.</p>
+  <table class="eviter">
+    <thead><tr><th>Situation</th><th>Calcul</th><th class="n">Note d’Awa</th></tr></thead>
+    <tbody>
+      <tr><td>Manager absent, <strong>sans</strong> invalidation</td><td>0 + 16,40 + 22,00</td><td class="n">38,4</td></tr>
+      <tr><td>Manager invalidé pour force majeure</td><td>(16,40 + 22,00) ÷ 45 × 100</td><td class="n">85,3</td></tr>
+    </tbody>
+  </table>
+  <p>Les 45 points des collègues et des clients sont ramenés sur 100. À l’inverse, si ce sont tous les collègues qui sont invalidés et qu’il n’y a aucun avis client, la note est celle du manager seul. Une note simplement oubliée, sans invalidation par l’administration, compte toujours pour 0.</p>
+</section>
+
+<section>
+  <h2><span class="num">12</span> Comment est désigné le meilleur agent de la direction</h2>
+  <p>Le meilleur agent de la direction est le Pair qui a <strong>la note finale la plus haute</strong> parmi tous les agents de sa direction.</p>
+  <ol>
+    <li><strong>On regroupe les agents par direction</strong>, celle inscrite sur leur fiche. Seuls les Pairs sont classés.</li>
+    <li><strong>On les range de la meilleure à la moins bonne note.</strong> Le premier de la liste est le meilleur agent de la direction.</li>
+    <li><strong>En cas d’égalité</strong>, on regarde d’abord qui a le meilleur pourcentage manager, puis le meilleur pourcentage collègues.</li>
+    <li><strong>Si tout est vraiment identique</strong>, les deux agents sont ex aequo : ils partagent la 1<sup>re</sup> place, et le suivant est 3<sup>e</sup>.</li>
+    <li><strong>Pendant la campagne, le classement est provisoire</strong> : il bouge à chaque nouvelle soumission. À la clôture, l’administrateur l’enregistre et il devient définitif.</li>
+  </ol>
+  <p>La même méthode désigne aussi le premier de chaque service, le premier de chaque département et le premier toutes entités confondues. Les récompenses de chaque niveau sont détaillées à la section 13.</p>
+  <p>Le palmarès annuel prend, pour chaque agent, la moyenne de ses notes sur les campagnes terminées de l’année, puis applique le même classement.</p>
+</section>
+
+<section class="eviter">
+  <h2><span class="num">13</span> Les récompenses</h2>
+  <p>Chaque campagne récompense le premier de chaque entité, sur trois niveaux. Voici les récompenses de la « 1<sup>ère</sup> campagne Meilleur Agent DSM » :</p>
+  <table>
+    <thead><tr><th>Niveau</th><th>Qui est récompensé ?</th><th>Récompense</th></tr></thead>
+    <tbody>
+      <tr class="total"><td>1 · Direction</td><td>Le meilleur agent de la direction : le « Super Lauréat »</td><td>Gadgets AGL + affichage photo + <strong>250 000 FCFA</strong></td></tr>
+      <tr><td>2 · Département</td><td>Le premier de chaque département</td><td>Gadgets AGL + affichage photo + <strong>100 000 FCFA</strong></td></tr>
+      <tr><td>3 · Service</td><td>Le premier de chaque service</td><td>Gadgets AGL</td></tr>
+    </tbody>
+  </table>
+  <ul>
+    <li><strong>Seuls les Pairs sont récompensés</strong>, comme pour le classement (section 12).</li>
+    <li><strong>Il y a un lauréat par entité.</strong> Une direction qui compte quatre départements et dix services désigne donc un lauréat de direction, quatre lauréats de département et dix lauréats de service.</li>
+    <li><strong>Le premier toutes entités confondues</strong> est le meilleur agent de la direction, puisque tous les agents appartiennent à la même direction. Ce titre ne donne pas de récompense en plus de celle de la direction.</li>
+    <li><strong>Les récompenses se cumulent.</strong> Un agent premier à plusieurs niveaux reçoit toutes les récompenses des niveaux où il est premier. Le meilleur agent de la direction est forcément aussi le premier de son département et de son service : il reçoit donc les trois récompenses, soit 350 000 FCFA, l’affichage photo et les gadgets AGL.</li>
+    <li><strong>Les récompenses sont remises sur le classement définitif</strong>, celui que l’administrateur enregistre à la clôture de la campagne. Le classement provisoire, affiché pendant la campagne, ne donne droit à rien.</li>
+  </ul>
+  <div class="encadre or">
+    <div class="titre-encadre">Les récompenses peuvent changer d’une campagne à l’autre</div>
+    <p>L’administrateur les inscrit dans l’onglet « Prix » de chaque campagne. Le tableau ci-dessus vaut pour la 1<sup>ère</sup> campagne ; les récompenses à jour sont toujours affichées dans l’application, sur la page du classement.</p>
+  </div>
+</section>
+
+<section class="eviter">
+  <h2><span class="num">14</span> À retenir</h2>
+  <ol>
+    <li>Quatre familles notent l’agent : le manager (9 critères), les collègues (5), les clients internes (5) et les clients externes (5).</li>
+    <li>Chaque critère est noté de 1 (Insuffisant) à 5 (Excellent).</li>
+    <li>Les notes d’un évaluateur deviennent un pourcentage.</li>
+    <li>Chaque bloc fait la moyenne de ses évaluateurs ; collègues et clients internes sont réunis.</li>
+    <li>Manager = 55 points ; collègues = 20 points ; clients externes = 25 points (ou 45 points pour un seul des deux s’il est seul).</li>
+    <li>Seules les notes soumises comptent ; un bloc qui n’a pas noté vaut 0, sauf cas de force majeure reconnu par l’administration.</li>
+    <li>La note la plus haute de la direction désigne le meilleur agent de la direction.</li>
+    <li>Le premier de la direction gagne 250 000 FCFA, le premier de chaque département 100 000 FCFA, le premier de chaque service des gadgets AGL, sur le classement définitif. Les récompenses se cumulent.</li>
+  </ol>
+</section>
+
+<div class="pied">DSM TAMIS · Direction des Solutions Maritimes · document interne, mis à jour le 26 octobre 2026</div>
+
+</body>
+</html>
