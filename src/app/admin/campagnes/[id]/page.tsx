@@ -1289,10 +1289,13 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
     }
   }
 
-  /** Le notant de la paire est un pair ou un cadre : il peut être désigné « client interne ». */
-  const noteCommeUnPair = (role?: string) => role === 'UTILISATEUR' || estCadre(role)
-  const peutEtreClientInterne = (cible: User) =>
-    noteCommeUnPair(perspective === 'BY_EVALUE' ? cible.role : selectedUser?.role)
+  /**
+   * Le notant de la paire est un pair, un cadre ou un manager : il peut être désigné « client interne ».
+   * Un manager client interne note alors les critères Clients internes et compte dans ce bloc.
+   */
+  const peutNoterEnClientInterne = (role?: string) => role === 'UTILISATEUR' || role === 'MANAGER' || estCadre(role)
+  const notantDeLaPaire = (cible: User) => (perspective === 'BY_EVALUE' ? cible : selectedUser)
+  const peutEtreClientInterne = (cible: User) => peutNoterEnClientInterne(notantDeLaPaire(cible)?.role)
 
   const basculerInterne = (id: string) =>
     setInternes(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]))
@@ -1817,7 +1820,11 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
                         </button>
                         {optionInterne && (
                           <label
-                            title="Ce pair notera ce collaborateur sur les critères « Clients internes »"
+                            title={
+                              notantDeLaPaire(user)?.role === 'MANAGER'
+                                ? 'Ce manager notera ce collaborateur sur les critères « Clients internes » ; ses notes compteront dans ce bloc, pas dans celui du manager'
+                                : 'Ce notant notera ce collaborateur sur les critères « Clients internes »'
+                            }
                             className="flex cursor-pointer items-center gap-2 border-t border-emerald-200/70 px-4 py-2 text-xs font-medium text-emerald-950"
                           >
                             <input

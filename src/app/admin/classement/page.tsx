@@ -121,6 +121,8 @@ interface DetailedNote {
 interface EvaluateurNotes {
   evaluateur: { id: string; nom: string; prenom: string; matricule: string; role: string; service: string | null }
   notes: DetailedNote[]
+  /** Bloc du score où comptent ses notes (un manager client interne compte avec les clients internes) */
+  bloc: 'MANAGER' | 'COLLEGUES'
 }
 
 interface ClientNotes {
@@ -1460,9 +1462,7 @@ export default function ClassementPage() {
                 <>
                   {/* Notes Collègues & Clients Internes */}
                   {(() => {
-                    const colleguesEvals = detailedNotes.evaluateursNotes.filter(
-                      (e) => e.evaluateur.role !== 'MANAGER' && e.evaluateur.role !== 'ADMIN'
-                    )
+                    const colleguesEvals = detailedNotes.evaluateursNotes.filter((e) => e.bloc === 'COLLEGUES')
                     const colleguesCriteres = detailedNotes.criteres.filter((c) => {
                       const types = (c as any).typeEvaluateurs && (c as any).typeEvaluateurs.length > 0 ? (c as any).typeEvaluateurs : [c.typeEvaluateur]
                       return types.includes('COLLEGUE') || types.includes('CLIENT_INTERNE') || types.includes('TOUS')
@@ -1606,9 +1606,7 @@ export default function ClassementPage() {
 
                   {/* Notes Manager */}
                   {(() => {
-                    const managerEvals = detailedNotes.evaluateursNotes.filter(
-                      (e) => e.evaluateur.role === 'MANAGER' || e.evaluateur.role === 'ADMIN' || e.notes.some((n) => n.typeEvaluateur === 'MANAGER')
-                    )
+                    const managerEvals = detailedNotes.evaluateursNotes.filter((e) => e.bloc === 'MANAGER')
                     const managerCriteres = detailedNotes.criteres.filter((c) => {
                       const types = (c as any).typeEvaluateurs && (c as any).typeEvaluateurs.length > 0 ? (c as any).typeEvaluateurs : [c.typeEvaluateur]
                       return types.includes('MANAGER') || types.includes('TOUS')
