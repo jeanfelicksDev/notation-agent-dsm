@@ -207,23 +207,13 @@ function AccueilContenu() {
         <main className="grid flex-1 items-center gap-12 py-10 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:gap-[clamp(3rem,6vw,10rem)] lg:py-14 2xl:grid-cols-[minmax(0,1fr)_auto] 2xl:gap-[clamp(3rem,4vw,7rem)] 2xl:py-8">
           {/* ─── Présentation et campagne ─── */}
           <section aria-labelledby="titre-page" className="min-w-0 lg:max-w-[clamp(40rem,46vw,60rem)]">
-            <span className="inline-flex animate-entree items-center gap-2.5 rounded-full bg-navy-900/70 px-4 py-2 text-xs font-semibold tracking-[0.08em] text-navy-100 ring-1 ring-white/15 sm:text-xs">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgb(52_211_153/0.7)]" aria-hidden />
-              PORTAIL RH INTERNE SÉCURISÉ
-            </span>
-
             <h1
               id="titre-page"
-              className="mt-8 animate-entree text-[2.9rem] leading-[1.02] font-semibold tracking-[-0.035em] text-white [animation-delay:60ms] sm:text-[3.9rem] xl:text-[clamp(4.5rem,3.6vw,5.25rem)]"
+              className="animate-entree text-[2.9rem] leading-[1.02] font-semibold tracking-[-0.035em] text-white [animation-delay:60ms] sm:text-[3.9rem] xl:text-[clamp(4.5rem,3.6vw,5.25rem)]"
             >
               Évaluation de la performance
               <em className="mt-1 block font-display text-[0.95em] font-normal tracking-[-0.01em] text-gold-300 italic">des agents de la DSM</em>
             </h1>
-
-            <p className="mt-6 max-w-[44rem] animate-entree text-base leading-relaxed text-navy-200 [animation-delay:120ms] sm:text-[1.2rem] sm:leading-[1.6] 2xl:max-w-[50rem] 2xl:text-[1.25rem]">
-              Notez, critère par critère, les collaborateurs qui vous sont attribués. Vos évaluations alimentent avec équité le classement
-              d’excellence de la campagne.
-            </p>
 
             {campagne ? (
               <div className="relative mt-10 max-w-[45rem] 2xl:mt-8 2xl:max-w-none animate-entree overflow-hidden rounded-2xl bg-gradient-to-b from-[#12294a] to-[#0d2140] p-6 shadow-[0_30px_60px_-30px_rgb(0_0_0/0.6),inset_0_1px_0_rgb(255_255_255/0.06)] ring-1 ring-white/10 [animation-delay:180ms] sm:p-9">
