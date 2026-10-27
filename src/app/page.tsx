@@ -21,6 +21,10 @@ const MESSAGES_REDIRECTION: Record<string, string> = {
   session_expired: 'Votre session a expiré. Connectez-vous à nouveau.',
 }
 
+/** Longueur des identifiants saisis : matricule DSM (4 caractères) et téléphone client (10 chiffres). */
+const LONGUEUR_MATRICULE = 4
+const LONGUEUR_TELEPHONE = 10
+
 const ETAPES_GUIDE = [
   ['Identification', 'Saisissez votre matricule officiel DSM pour démarrer votre session.'],
   ['Code PIN', 'Définissez ou renseignez votre PIN sécurisé à 4 chiffres lors de l’accès.'],
@@ -335,12 +339,19 @@ function AccueilContenu() {
                               key={profil}
                               id="identifiant"
                               value={identifiant}
-                              onChange={(e) => setIdentifiant(e.target.value)}
+                              onChange={(e) =>
+                                setIdentifiant(
+                                  estClient
+                                    ? e.target.value.replace(/\D/g, '').slice(0, LONGUEUR_TELEPHONE)
+                                    : e.target.value.trim().slice(0, LONGUEUR_MATRICULE)
+                                )
+                              }
+                              maxLength={estClient ? undefined : LONGUEUR_MATRICULE}
                               type={estClient ? 'tel' : 'text'}
-                              inputMode={estClient ? 'tel' : 'text'}
+                              inputMode={estClient ? 'numeric' : 'text'}
                               autoComplete={estClient ? 'tel' : 'username'}
                               autoCapitalize={estClient ? 'off' : 'characters'}
-                              placeholder={estClient ? 'Ex. : 07 00 00 00 00' : 'Ex. : 1234'}
+                              placeholder={estClient ? 'Ex. : 0700000000' : 'Ex. : 1234'}
                               spellCheck={false}
                               autoFocus
                               required
