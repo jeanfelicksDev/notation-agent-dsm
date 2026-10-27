@@ -217,7 +217,7 @@ function AccueilContenu() {
               className="mt-8 animate-entree text-[2.9rem] leading-[1.02] font-semibold tracking-[-0.035em] text-white [animation-delay:60ms] sm:text-[3.9rem] xl:text-[clamp(4.5rem,3.6vw,5.25rem)]"
             >
               Évaluation de la performance
-              <em className="mt-1 block font-display text-[0.95em] font-normal tracking-[-0.01em] text-gold-300 italic">des agents</em>
+              <em className="mt-1 block font-display text-[0.95em] font-normal tracking-[-0.01em] text-gold-300 italic">des agents de la DSM</em>
             </h1>
 
             <p className="mt-6 max-w-[44rem] animate-entree text-base leading-relaxed text-navy-200 [animation-delay:120ms] sm:text-[1.2rem] sm:leading-[1.6] 2xl:max-w-[50rem] 2xl:text-[1.25rem]">
