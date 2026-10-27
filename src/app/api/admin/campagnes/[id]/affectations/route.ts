@@ -84,6 +84,12 @@ export async function POST(
       return NextResponse.json({ success: true, count: newAffectationsData.length })
     }
 
+    // 1 bis. Les Pairs d'un même service se notent tous entre eux (paires manquantes seulement)
+    if (mode === 'pairs_service') {
+      const ajoutees = await affecterPairsDuService(id)
+      return NextResponse.json({ success: true, ajoutees })
+    }
+
     // 2. Mode PAR COLLABORATEUR (Évalué) : la liste `evaluateurIds` devient celle des évaluateurs de `evalueId`.
     if (mode === 'by_evalue' || (evalueId && Array.isArray(evaluateurIds))) {
       if (!evalueId || !Array.isArray(evaluateurIds)) {
@@ -105,6 +111,59 @@ export async function POST(
     }
     console.error('Affectation error:', error)
     return NextResponse.json({ error: 'Erreur lors de la mise à jour des affectations' }, { status: 500 })
+  }
+}
+
+/**
+ * Chaque Pair est noté par tous les autres Pairs de son service. N'ajoute que les paires manquantes :
+ * les affectations existantes (managers, clients internes, statuts, notes) restent intactes.
+ */
+async function affecterPairsDuService(campagneId: string): Promise<number> {
+  const pairs = await prisma.utilisateur.findMany({
+    where: { role: 'UTILISATEUR', service: { not: null } },
+    select: { id: true, service: true },
+  })
+  const parService = new Map<string, string[]>()
+  for (const p of pairs) {
+    const service = p.service!.trim()
+    if (!service) continue
+    parService.set(service, [...(parService.get(service) ?? []), p.id])
+  }
+
+  const data = [...parService.values()].flatMap((ids) =>
+    ids.flatMap((evaluateurId) =>
+      ids.filter((evalueId) => evalueId !== evaluateurId).map((evalueId) => ({ campagneId, evaluateurId, evalueId }))
+    )
+  )
+  if (data.length === 0) return 0
+  const { count } = await prisma.affectation.createMany({ data, skipDuplicates: true })
+  return count
+}
+
+/**
+ * DELETE — remet à zéro la répartition de la campagne : toutes ses affectations et les notes internes
+ * qui en dépendent (brouillons comme évaluations soumises), ainsi que les scores enregistrés.
+ * Les avis clients (QR) sont conservés.
+ */
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const admin = await requireAdmin()
+  if (!admin) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
+
+  const { id } = await params
+  try {
+    // Les scores enregistrés reposaient sur ces notes : ils partent aussi
+    const [notes, affectations] = await prisma.$transaction([
+      prisma.note.deleteMany({ where: { campagneId: id } }),
+      prisma.affectation.deleteMany({ where: { campagneId: id } }),
+      prisma.scoreFinal.deleteMany({ where: { campagneId: id } }),
+    ])
+    return NextResponse.json({ success: true, affectations: affectations.count, notes: notes.count })
+  } catch (error) {
+    console.error('Réinitialisation error:', error)
+    return NextResponse.json({ error: 'Erreur lors de la réinitialisation des affectations' }, { status: 500 })
   }
 }
 

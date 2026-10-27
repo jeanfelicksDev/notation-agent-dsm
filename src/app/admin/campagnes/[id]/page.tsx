@@ -11,6 +11,8 @@ import {
   ExternalLink, Building2, FolderGit2, Sparkles, Crown, ListOrdered, Eye, EyeOff, Filter
 } from 'lucide-react'
 import AdminHeader from '@/components/AdminHeader'
+import OutilsRepartition from '@/components/OutilsRepartition'
+import ReconductionAffectations from '@/components/ReconductionAffectations'
 import { confirmer, toast } from '@/components/ui/feedback'
 import { typesDuCritere } from '@/lib/criteres'
 import { estCadre } from '@/lib/roles'
@@ -959,12 +961,16 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
               )}
 
               {activeTab === 'affectations' && (
-                <AffectationsManager 
-                  campagneId={id} 
-                  users={allUsers} 
-                  initialAffectations={affectations}
-                  onUpdate={loadAffectations}
-                />
+                <div className="space-y-5">
+                  <OutilsRepartition campagneId={id} affectations={affectations} onUpdate={loadAffectations} />
+                  <ReconductionAffectations campagneId={id} nbActuelles={affectations.length} onUpdate={loadAffectations} />
+                  <AffectationsManager
+                    campagneId={id}
+                    users={allUsers}
+                    initialAffectations={affectations}
+                    onUpdate={loadAffectations}
+                  />
+                </div>
               )}
 
               {activeTab === 'suivi' && (
