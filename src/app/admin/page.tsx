@@ -70,7 +70,7 @@ export default async function AdminDashboard() {
     <>
       <AdminHeader title="Tableau de bord" subtitle={fmt(maintenant)} />
 
-      <main className="mx-auto w-full max-w-7xl space-y-6 px-5 py-6 sm:px-8 sm:py-8">
+      <main className="mx-auto w-full max-w-[104rem] space-y-6 px-5 py-6 sm:px-8 sm:py-8">
         {campagne ? (
           <section className="rounded-[var(--radius-card)] bg-white p-6 shadow-card sm:p-8" aria-labelledby="campagne-titre">
             <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">

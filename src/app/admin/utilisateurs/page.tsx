@@ -234,7 +234,7 @@ export default function UtilisateursPage() {
         }
       />
 
-      <main className="mx-auto w-full max-w-7xl space-y-5 px-5 py-6 sm:px-8 sm:py-8">
+      <main className="mx-auto w-full max-w-[104rem] space-y-5 px-5 py-6 sm:px-8 sm:py-8">
         <section className="flex flex-col gap-4 rounded-[var(--radius-card)] bg-white p-5 shadow-card md:flex-row md:items-center md:justify-between">
           <div className="flex items-start gap-3.5">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gold-50 text-gold-700">
