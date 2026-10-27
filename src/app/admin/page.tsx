@@ -22,7 +22,7 @@ export default async function AdminDashboard() {
     campagne
       ? prisma.affectation.groupBy({
           by: ['statut'],
-          where: { campagneId: campagne.id, evaluateur: { role: { not: 'EXTERNE' } } },
+          where: { campagneId: campagne.id, evaluateur: { role: { notIn: ['EXTERNE', 'CADRE'] } } },
           _count: { _all: true },
         })
       : Promise.resolve([]),

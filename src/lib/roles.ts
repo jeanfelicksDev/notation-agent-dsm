@@ -19,15 +19,15 @@ export function libelleRole(role: string | null | undefined) {
 }
 
 /** Comptes qui se connectent avec un PIN et notent depuis /evaluer. */
-export const ROLES_A_PIN: readonly string[] = ['UTILISATEUR', 'MANAGER']
+export const ROLES_A_PIN: readonly string[] = ['UTILISATEUR', 'MANAGER', 'CADRE']
 
-/** Personnel de l'annuaire qui ne participe pas aux campagnes : ni noté, ni notant, sans connexion. */
-export function estHorsCampagne(role: string | null | undefined) {
+/**
+ * Cadre : notant facultatif. S'il le souhaite, il note avec les mêmes critères que les pairs,
+ * mais il n'est jamais noté ni classé, et ses évaluations en attente ne sont pas relancées.
+ */
+export function estCadre(role: string | null | undefined): boolean {
   return role === 'CADRE'
 }
-
-export const MESSAGE_HORS_CAMPAGNE =
-  "Votre compte ne participe pas à la campagne de notation : aucune connexion n'est nécessaire."
 
 /** Page d'accueil d'un utilisateur selon son rôle. */
 export function destinationPourRole(role: string): string {

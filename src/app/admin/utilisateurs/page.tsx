@@ -24,7 +24,7 @@ import {
 } from 'lucide-react'
 import AdminHeader from '@/components/AdminHeader'
 import { confirmer, toast } from '@/components/ui/feedback'
-import { estHorsCampagne, ROLES_A_PIN } from '@/lib/roles'
+import { estCadre, ROLES_A_PIN } from '@/lib/roles'
 import { libelleRoleDepuis } from '@/lib/listes'
 import { useListes } from '@/components/listes'
 
@@ -114,7 +114,7 @@ export default function UtilisateursPage() {
     sans_pin: perimetre.filter((u) => ROLES_A_PIN.includes(u.role) && !u.pinDefini).length,
     verrouilles: perimetre.filter(estVerrouille).length,
     managers: perimetre.filter((u) => u.role === 'MANAGER').length,
-    cadres: perimetre.filter((u) => estHorsCampagne(u.role)).length,
+    cadres: perimetre.filter((u) => estCadre(u.role)).length,
     externes: perimetre.filter((u) => u.role === 'EXTERNE').length,
   }
 
@@ -130,7 +130,7 @@ export default function UtilisateursPage() {
       if (filtre === 'sans_pin') return ROLES_A_PIN.includes(u.role) && !u.pinDefini
       if (filtre === 'verrouilles') return estVerrouille(u)
       if (filtre === 'managers') return u.role === 'MANAGER'
-      if (filtre === 'cadres') return estHorsCampagne(u.role)
+      if (filtre === 'cadres') return estCadre(u.role)
       if (filtre === 'externes') return u.role === 'EXTERNE'
       return true
     })
@@ -357,8 +357,6 @@ export default function UtilisateursPage() {
                               </span>
                             ) : u.role === 'EXTERNE' ? (
                               <span className="text-xs text-slate-400">Par téléphone</span>
-                            ) : estHorsCampagne(u.role) ? (
-                              <span className="text-xs text-slate-400">Hors campagne</span>
                             ) : u.pinDefini ? (
                               <span className="inline-flex items-center gap-1.5 text-xs text-emerald-700">
                                 <Check className="h-3.5 w-3.5" aria-hidden /> {u.role === 'ADMIN' ? 'Mot de passe' : 'PIN défini'}

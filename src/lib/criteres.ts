@@ -39,7 +39,8 @@ export function estEvaluateurManager(role: string | null | undefined) {
 }
 
 /**
- * Critères qu'un évaluateur interne doit noter pour un collaborateur donné :
+ * Critères qu'un évaluateur interne doit noter pour un collaborateur donné
+ * (un cadre, notant facultatif, suit exactement les règles des pairs) :
  * - manager → critères MANAGER ;
  * - pair désigné « client interne » lors de la répartition → critères CLIENT_INTERNE ;
  * - collègue du même service → critères COLLEGUE ;

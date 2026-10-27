@@ -13,7 +13,7 @@ import {
 import AdminHeader from '@/components/AdminHeader'
 import { confirmer, toast } from '@/components/ui/feedback'
 import { typesDuCritere } from '@/lib/criteres'
-import { estHorsCampagne } from '@/lib/roles'
+import { estCadre } from '@/lib/roles'
 import { getAppreciationInfo } from '@/lib/default-criteres'
 
 interface Critere {
@@ -114,8 +114,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
   const loadUsers = () => {
     fetch('/api/admin/utilisateurs')
       .then(res => res.json())
-      // Les cadres sont dans l'annuaire mais ne participent pas aux campagnes.
-      .then(data => setAllUsers(Array.isArray(data) ? data.filter((u: User) => !estHorsCampagne(u.role)) : []))
+      .then(data => setAllUsers(Array.isArray(data) ? data : []))
   }
 
   const loadAffectations = () => {
@@ -1194,12 +1193,14 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
         return { label: 'Client Ext.', badge: 'bg-amber-100 text-amber-800 border-amber-200' }
       case 'ADMIN':
         return { label: 'Admin', badge: 'bg-red-100 text-red-800 border-red-200' }
+      case 'CADRE':
+        return { label: 'Cadre · facultatif', badge: 'bg-slate-100 text-slate-700 border-slate-300' }
       default:
         return { label: 'Pair', badge: 'bg-navy-100 text-navy-900 border-navy-200' }
     }
   }
 
-  // Règle métier DSM : seuls les collaborateurs pairs sont notés (ni managers, ni clients externes, ni admins)
+  // Règle métier DSM : seuls les collaborateurs pairs sont notés (ni managers, ni cadres, ni clients externes, ni admins)
   const isNoteEligible = (u: User) => u.role === 'UTILISATEUR'
 
   // Liste de gauche (selon perspective)
@@ -1226,7 +1227,7 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
         return a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom)
       }
       if (sortOrder === 'role') {
-        const order: Record<string, number> = { MANAGER: 1, UTILISATEUR: 2, EXTERNE: 3, ADMIN: 4 }
+        const order: Record<string, number> = { MANAGER: 1, UTILISATEUR: 2, CADRE: 3, EXTERNE: 4, ADMIN: 5 }
         return (order[a.role] || 99) - (order[b.role] || 99) || a.nom.localeCompare(b.nom)
       }
       if (sortOrder === 'count_desc') {
@@ -1270,7 +1271,7 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
     })
     .sort((a, b) => {
       if (targetSort === 'role') {
-        const order: Record<string, number> = { MANAGER: 1, UTILISATEUR: 2, EXTERNE: 3, ADMIN: 4 }
+        const order: Record<string, number> = { MANAGER: 1, UTILISATEUR: 2, CADRE: 3, EXTERNE: 4, ADMIN: 5 }
         return (order[a.role] || 99) - (order[b.role] || 99) || a.nom.localeCompare(b.nom)
       }
       return a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom)
@@ -1288,9 +1289,10 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
     }
   }
 
-  /** Le notant de la paire est un pair : il peut être désigné « client interne ». */
+  /** Le notant de la paire est un pair ou un cadre : il peut être désigné « client interne ». */
+  const noteCommeUnPair = (role?: string) => role === 'UTILISATEUR' || estCadre(role)
   const peutEtreClientInterne = (cible: User) =>
-    perspective === 'BY_EVALUE' ? cible.role === 'UTILISATEUR' : selectedUser?.role === 'UTILISATEUR'
+    noteCommeUnPair(perspective === 'BY_EVALUE' ? cible.role : selectedUser?.role)
 
   const basculerInterne = (id: string) =>
     setInternes(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]))
@@ -1936,10 +1938,12 @@ function SuiviDashboard({ campagneId, affectations, users, onUpdate }: { campagn
     return matchesSearch && matchesCat
   })
 
-  const countTerminee = filteredTracking.filter(d => d.statut === 'TERMINEE').length
-  const countBrouillon = filteredTracking.filter(d => d.statut === 'BROUILLON').length
-  const countAttente = filteredTracking.filter(d => d.statut === 'EN_ATTENTE').length
-  const total = filteredTracking.length
+  // Le vote des cadres est facultatif : un cadre ne compte dans l'avancement que s'il a soumis
+  const comptes = filteredTracking.filter(d => !estCadre(d.user.role) || d.statut === 'TERMINEE')
+  const countTerminee = comptes.filter(d => d.statut === 'TERMINEE').length
+  const countBrouillon = comptes.filter(d => d.statut === 'BROUILLON').length
+  const countAttente = comptes.filter(d => d.statut === 'EN_ATTENTE').length
+  const total = comptes.length
   const countInvalidee = trackingData.filter(d => d.statut === 'INVALIDEE').length
 
   return (
@@ -2066,7 +2070,7 @@ function SuiviDashboard({ campagneId, affectations, users, onUpdate }: { campagn
                         ? 'bg-amber-100 text-amber-800'
                         : 'bg-navy-100 text-navy-900'
                     }`}>
-                      {data.user.role === 'MANAGER' ? 'Manager' : data.user.role === 'EXTERNE' ? 'Client Ext.' : 'Pair'}
+                      {data.user.role === 'MANAGER' ? 'Manager' : data.user.role === 'EXTERNE' ? 'Client Ext.' : estCadre(data.user.role) ? 'Cadre · facultatif' : 'Pair'}
                     </span>
                   </div>
                   <p className="text-sm text-slate-500 font-medium">Matricule: {data.user.matricule} • Doit évaluer {data.totalToEvaluate} agents</p>
