@@ -11,7 +11,7 @@ import {
   ExternalLink, Building2, FolderGit2, Sparkles, Crown, ListOrdered, Eye, EyeOff, Filter
 } from 'lucide-react'
 import AdminHeader from '@/components/AdminHeader'
-import OutilsRepartition from '@/components/OutilsRepartition'
+import OutilsRepartition, { type PerspectiveRepartition } from '@/components/OutilsRepartition'
 import ReconductionAffectations from '@/components/ReconductionAffectations'
 import { confirmer, toast } from '@/components/ui/feedback'
 import { typesDuCritere } from '@/lib/criteres'
@@ -77,6 +77,8 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
 
   const [allUsers, setAllUsers] = useState<User[]>([])
   const [affectations, setAffectations] = useState<any[]>([])
+  // Agent à ouvrir dans la répartition depuis le contrôle (n change à chaque clic, même sur le même agent)
+  const [focusRepartition, setFocusRepartition] = useState<FocusRepartition | null>(null)
   const [closing, setClosing] = useState(false)
   const [calculating, setCalculating] = useState(false)
 
@@ -962,13 +964,20 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
 
               {activeTab === 'affectations' && (
                 <div className="space-y-5">
-                  <OutilsRepartition campagneId={id} affectations={affectations} onUpdate={loadAffectations} />
+                  <OutilsRepartition
+                    campagneId={id}
+                    agents={allUsers}
+                    affectations={affectations}
+                    onUpdate={loadAffectations}
+                    onSelectionner={(agentId, perspective) => setFocusRepartition(f => ({ agentId, perspective, n: (f?.n ?? 0) + 1 }))}
+                  />
                   <ReconductionAffectations campagneId={id} nbActuelles={affectations.length} onUpdate={loadAffectations} />
                   <AffectationsManager
                     campagneId={id}
                     users={allUsers}
                     initialAffectations={affectations}
                     onUpdate={loadAffectations}
+                    focus={focusRepartition}
                   />
                 </div>
               )}
@@ -1148,7 +1157,9 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
   )
 }
 
-function AffectationsManager({ campagneId, users, initialAffectations, onUpdate }: { campagneId: string, users: User[], initialAffectations: any[], onUpdate: () => void }) {
+type FocusRepartition = { agentId: string; perspective: PerspectiveRepartition; n: number }
+
+function AffectationsManager({ campagneId, users, initialAffectations, onUpdate, focus }: { campagneId: string, users: User[], initialAffectations: any[], onUpdate: () => void, focus?: FocusRepartition | null }) {
   const [perspective, setPerspective] = useState<'BY_EVALUE' | 'BY_EVALUATEUR'>('BY_EVALUE')
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<'ALL' | 'PAIR' | 'MANAGER' | 'EXTERNE'>('ALL')
@@ -1163,6 +1174,22 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
   const [targetSort, setTargetSort] = useState<'name_asc' | 'role'>('name_asc')
   const [showSelectedOnly, setShowSelectedOnly] = useState(false)
   const [saving, setSaving] = useState(false)
+
+  // Demande venue du contrôle de la répartition : ouvrir cet agent dans la bonne disposition.
+  // Appliquée pendant le rendu, une seule fois par demande (focus.n), puis défilement jusqu'à l'éditeur.
+  const [focusApplique, setFocusApplique] = useState(0)
+  if (focus && focus.n !== focusApplique) {
+    setFocusApplique(focus.n)
+    const agent = users.find(u => u.id === focus.agentId)
+    if (agent) {
+      setPerspective(focus.perspective)
+      setSelectedUser(agent)
+      setSearch('')
+    }
+  }
+  useEffect(() => {
+    if (focus) document.getElementById('repartition-editeur')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [focus])
 
   // Calcule les cibles courantes selon la perspective
   useEffect(() => {
@@ -1361,7 +1388,7 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
   }
 
   return (
-    <div className="space-y-5 text-slate-800">
+    <div id="repartition-editeur" className="scroll-mt-6 space-y-5 text-slate-800">
       {/* ⇄ Barre de Permutation des Colonnes (Notants ↔ Notés) & Agrandissement x1.2 */}
       <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-3.5 w-full md:w-auto">
