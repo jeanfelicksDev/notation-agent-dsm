@@ -1,0 +1,1448 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#002B49">
+<title>Se connecter pour participer à la campagne · DSM TAMIS</title>
+<!-- Polices de la plateforme ; sans connexion, les polices système prennent le relais. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;1,8..60,400;1,8..60,500&display=swap">
+<style>
+:root{
+  --navy-950:#001a2e;--navy-900:#002b49;--navy-800:#0b3554;--navy-700:#173f61;--navy-600:#2b5174;--navy-500:#456a8c;
+  --navy-400:#6c8aa8;--navy-300:#9fb4c9;--navy-200:#c9d6e3;--navy-100:#e4ebf2;--navy-50:#f3f6f9;
+  --gold-200:#eedc96;--gold-300:#e5c965;--gold-400:#dcbb48;--gold-500:#d4af37;--gold-600:#b8952a;
+  --fond:#071a33;--carte:#f4f6f9;--encre:#0f172a;--ardoise:#64748b;--trait:#e2e8f0;
+  --sans:"IBM Plex Sans","Segoe UI",system-ui,-apple-system,sans-serif;
+  --serif:"Source Serif 4",Georgia,"Times New Roman",serif;
+  --ease:cubic-bezier(.16,1,.3,1);
+  --ease-io:cubic-bezier(.65,0,.35,1);
+  --barre:76px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:#030c19;color:#fff;font-family:var(--sans);-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4,p,ol,ul{margin:0;padding:0}
+ol,ul{list-style:none}
+button{font:inherit}
+.ic{width:1em;height:1em;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+/* ───────── Scène 16:9 (1600 × 900), mise à l'échelle de la fenêtre ───────── */
+#cadre{position:fixed;inset:0 0 var(--barre) 0}
+body.plein #cadre{bottom:0}
+#stage{position:absolute;left:50%;top:50%;width:1600px;height:900px;overflow:hidden;transform:translate(-50%,-50%) scale(var(--k,.5));background:var(--fond);border-radius:8px;box-shadow:0 30px 80px -20px rgb(0 0 0/.7)}
+body.plein #stage{border-radius:0}
+.fond{position:absolute;inset:0;pointer-events:none;background:radial-gradient(110% 80% at 15% 0%,#0f2f57 0%,transparent 60%),radial-gradient(90% 70% at 100% 100%,#04101f 0%,transparent 65%)}
+.fond::after{content:"";position:absolute;inset:0;box-shadow:inset 0 0 220px rgb(2 10 22/.65)}
+.quadrillage{position:absolute;inset:0;pointer-events:none;opacity:.07;background-image:linear-gradient(to right,#fff 1px,transparent 1px),linear-gradient(to bottom,#fff 1px,transparent 1px);background-size:120px 120px;-webkit-mask-image:radial-gradient(ellipse at center,#000 35%,transparent 80%);mask-image:radial-gradient(ellipse at center,#000 35%,transparent 80%)}
+.compas{position:absolute;left:1060px;top:360px;width:820px;height:820px;pointer-events:none;color:#fff;animation:rotation 240s linear infinite}
+@keyframes rotation{to{transform:rotate(360deg)}}
+
+/* En-tête permanent */
+.entete{position:absolute;left:120px;right:120px;top:38px;z-index:5;display:flex;align-items:center;gap:16px;padding-bottom:22px;border-bottom:1px solid rgb(255 255 255/.06)}
+.marque{display:inline-flex;padding:3px;border-radius:16px;background:linear-gradient(var(--gold-300),var(--gold-600));box-shadow:0 10px 28px -8px rgb(212 175 55/.6)}
+.marque > span{display:grid;place-items:center;width:46px;height:46px;border-radius:12px;background:var(--gold-500);color:var(--navy-900);font-size:24px}
+.marque .ic{stroke-width:2.4}
+.marque.petite{padding:2px;border-radius:11px}
+.marque.petite > span{width:32px;height:32px;border-radius:9px;font-size:17px}
+.nom{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:600;letter-spacing:.02em}
+.nom small{padding:3px 10px;border-radius:999px;font-size:11px;font-weight:600;letter-spacing:.12em;color:var(--gold-300);box-shadow:inset 0 0 0 1px rgb(220 187 72/.5)}
+.sous-nom{margin-top:4px;font-size:14px;color:var(--navy-200)}
+.rail{display:flex;gap:10px;margin-left:auto}
+.rail li{display:flex;align-items:center;gap:10px;padding:8px 18px 8px 14px;border-radius:999px;font-size:15px;color:var(--navy-300);background:rgb(255 255 255/.03);box-shadow:inset 0 0 0 1px rgb(255 255 255/.08);transition:color .5s,background .5s,box-shadow .5s}
+.rail b{font-family:var(--serif);font-style:italic;font-weight:400;font-size:20px;line-height:1;color:rgb(229 201 101/.4);transition:color .5s}
+.rail .ic{display:none;color:var(--gold-300);font-size:16px}
+.rail li.courant{color:#fff;background:rgb(212 175 55/.12);box-shadow:inset 0 0 0 1px rgb(220 187 72/.55)}
+.rail li.courant b{color:var(--gold-300)}
+.rail li.fait{color:var(--navy-100)}
+.rail li.fait b{display:none}
+.rail li.fait .ic{display:block}
+
+/* ───────── Scènes et révélations pilotées par les « temps » (b0, b1…) ───────── */
+.scene{position:absolute;inset:0;opacity:0;visibility:hidden;transition:opacity .6s var(--ease),visibility 0s linear .6s}
+.scene.active{opacity:1;visibility:visible;transition:opacity .8s var(--ease) .1s,visibility 0s}
+[data-b]{opacity:0;transform:translateY(24px);transition:opacity .7s var(--ease) var(--d,0ms),transform 1s var(--ease) var(--d,0ms)}
+[data-b][data-fx="zoom"]{transform:scale(.94) translateY(16px)}
+[data-b][data-fx="droite"]{transform:translateX(48px)}
+.b0 [data-b="0"],.b1 [data-b="1"],.b2 [data-b="2"],.b3 [data-b="3"],.b4 [data-b="4"]{opacity:1;transform:none}
+.b1 [data-h="1"],.b2 [data-h="2"],.b3 [data-h="3"]{opacity:0!important;transition-delay:0ms!important}
+.instant,.instant *,.instant *::before,.instant *::after{transition:none!important}
+
+.kicker{display:flex;align-items:center;gap:14px;font-size:15px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--gold-300)}
+.kicker::before{content:"";width:34px;height:1px;background:var(--gold-400)}
+.titre-scene h2{margin-top:14px;font-family:var(--serif);font-weight:500;font-size:60px;line-height:1.05;letter-spacing:-.02em}
+.haut{position:absolute;left:120px;top:150px}
+.colonne{position:absolute;left:120px;top:186px;width:720px}
+.consignes{margin-top:44px;display:grid;gap:20px}
+.consignes li{display:flex;align-items:center;gap:18px;font-size:25px;color:var(--navy-100)}
+.consignes li b{color:#fff;font-weight:600}
+.consignes i{display:grid;place-items:center;width:44px;height:44px;flex:none;border-radius:50%;font-family:var(--serif);font-size:21px;color:var(--gold-300);background:rgb(212 175 55/.08);box-shadow:inset 0 0 0 1px rgb(220 187 72/.5)}
+
+/* Sous-titres */
+#sous-titre{position:absolute;left:50%;bottom:34px;z-index:8;width:max-content;max-width:1240px;transform:translateX(-50%);padding:16px 30px;border-radius:16px;background:rgb(2 10 22/.84);box-shadow:inset 0 0 0 1px rgb(255 255 255/.08),0 20px 40px -20px rgb(0 0 0/.7);font-size:27px;line-height:1.42;text-align:center;text-wrap:balance;transition:opacity .3s}
+#sous-titre:empty,#stage.sans-st #sous-titre{opacity:0}
+#sous-titre.nouveau{animation:st .45s var(--ease)}
+@keyframes st{from{opacity:0;transform:translate(-50%,8px)}}
+
+/* Curseur animé */
+.curseur{position:absolute;left:0;top:0;z-index:20;pointer-events:none;opacity:0;transform:translate(var(--x,1500px),var(--y,900px));transition:transform 1s var(--ease-io),opacity .4s;filter:drop-shadow(0 6px 10px rgb(0 0 0/.45))}
+.curseur.visible{opacity:1}
+.curseur svg{display:block;width:28px;height:36px;margin:-3px 0 0 -3px;transform-origin:3px 3px}
+.curseur.clic svg{animation:presse .28s ease}
+.onde{position:absolute;left:-20px;top:-20px;width:40px;height:40px;border-radius:50%;border:2px solid var(--gold-300);opacity:0}
+.curseur.clic .onde{animation:onde .65s ease-out}
+@keyframes presse{50%{transform:scale(.8)}}
+@keyframes onde{0%{opacity:1;transform:scale(.3)}100%{opacity:0;transform:scale(1.7)}}
+
+/* Mise en avant dorée */
+.halo::before{content:"";position:absolute;inset:-3px;border-radius:inherit;pointer-events:none;animation:anneau 1.6s ease-out infinite}
+@keyframes anneau{0%{box-shadow:0 0 0 2px rgb(220 187 72/.95)}100%{box-shadow:0 0 0 16px rgb(220 187 72/0)}}
+.bulle{position:absolute;z-index:6;padding:11px 18px;border-radius:14px;background:var(--navy-900);color:#fff;font-size:16px;font-weight:500;white-space:nowrap;box-shadow:0 18px 34px -12px rgb(0 0 0/.6),inset 0 0 0 1px rgb(220 187 72/.45)}
+.bulle::after{content:"";position:absolute;top:-6px;width:13px;height:13px;background:var(--navy-900);transform:rotate(45deg)}
+
+/* ───────── 1 · Introduction ───────── */
+.intro{position:absolute;left:120px;top:192px;width:1240px}
+.pastille{display:inline-flex;align-items:center;gap:10px;padding:8px 16px 8px 14px;border-radius:999px;font-size:14px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--navy-100);background:rgb(255 255 255/.04);box-shadow:inset 0 0 0 1px rgb(255 255 255/.1)}
+.point{position:relative;width:9px;height:9px;border-radius:50%;background:#34d399}
+.point::after{content:"";position:absolute;inset:0;border-radius:50%;background:#34d399;animation:pouls 2s ease-out infinite}
+@keyframes pouls{to{transform:scale(2.6);opacity:0}}
+.intro h1{margin-top:30px;font-size:96px;line-height:1.02;font-weight:600;letter-spacing:-.035em}
+.intro h1 em{display:block;margin-top:6px;font-family:var(--serif);font-size:.86em;font-weight:400;letter-spacing:-.01em;color:var(--gold-300)}
+.chapo{margin-top:26px;font-size:24px;color:var(--navy-200)}
+.trois-etapes{position:absolute;left:120px;top:604px;width:1360px;display:grid;grid-template-columns:repeat(3,1fr);gap:28px}
+.trois-etapes li{display:flex;align-items:flex-start;gap:20px;padding:22px 26px;border-radius:20px;background:rgb(255 255 255/.04);box-shadow:inset 0 0 0 1px rgb(255 255 255/.08)}
+.trois-etapes b{font-family:var(--serif);font-style:italic;font-weight:400;font-size:44px;line-height:1;color:var(--gold-300)}
+.trois-etapes p{font-size:22px;font-weight:600}
+.trois-etapes span{display:block;margin-top:6px;font-size:17px;color:var(--navy-200)}
+
+/* ───────── 2 · Prérequis ───────── */
+.trio{position:absolute;left:120px;top:290px;width:1360px;display:grid;grid-template-columns:repeat(3,1fr);gap:36px}
+.besoin{position:relative;height:420px;padding:30px;border-radius:26px;background:linear-gradient(#12294a,#0d2140);box-shadow:0 30px 60px -30px rgb(0 0 0/.6),inset 0 1px 0 rgb(255 255 255/.06),inset 0 0 0 1px rgb(255 255 255/.08)}
+.besoin::before{content:"";position:absolute;left:40px;right:40px;top:0;height:1px;background:linear-gradient(90deg,transparent,rgb(220 187 72/.6),transparent)}
+.visuel{display:grid;place-items:center;height:200px;border-radius:18px;background:rgb(255 255 255/.03);box-shadow:inset 0 0 0 1px rgb(255 255 255/.06)}
+.besoin h3{margin-top:28px;font-size:28px;font-weight:600;letter-spacing:-.01em}
+.besoin p{margin-top:10px;font-size:19px;line-height:1.5;color:var(--navy-200)}
+.badge{width:270px;overflow:hidden;border-radius:16px;background:#fff;color:var(--navy-900);transform:rotate(-4deg);box-shadow:0 24px 40px -18px rgb(0 0 0/.7)}
+.badge-tete{display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--navy-900);color:#fff;font-size:14px;font-weight:600;letter-spacing:.06em}
+.badge-ancre{display:grid;place-items:center;width:24px;height:24px;border-radius:7px;background:var(--gold-500);color:var(--navy-900);font-size:14px}
+.badge-corps{display:flex;align-items:center;gap:16px;padding:16px}
+.badge-photo{display:grid;place-items:center;width:58px;height:66px;border-radius:10px;background:var(--navy-100);color:var(--navy-400);font-size:30px}
+.badge-corps small{display:block;font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--navy-400)}
+.badge-corps strong{display:block;margin-top:4px;font-family:var(--serif);font-size:40px;font-weight:500;line-height:1;letter-spacing:.12em}
+.cases-pin{display:flex;gap:14px}
+.cases-pin i{display:grid;place-items:center;width:62px;height:76px;border-radius:14px;background:#fff;box-shadow:0 16px 30px -16px rgb(0 0 0/.7)}
+.cases-pin i::after{content:"";width:16px;height:16px;border-radius:50%;background:var(--navy-900);transform:scale(0);transition:transform .4s var(--ease)}
+.b1 .cases-pin i::after{transform:scale(1)}
+.cases-pin i:nth-child(1)::after{transition-delay:.9s}
+.cases-pin i:nth-child(2)::after{transition-delay:1.15s}
+.cases-pin i:nth-child(3)::after{transition-delay:1.4s}
+.cases-pin i:nth-child(4)::after{transition-delay:1.65s}
+.appareils{display:flex;align-items:flex-end;justify-content:center;gap:18px;color:var(--gold-300)}
+.appareils .portable{font-size:132px;stroke-width:1.2}
+.appareils .mobile{font-size:86px;stroke-width:1.3}
+
+/* ───────── 3 · Ouvrir la plateforme ───────── */
+.navigateur{position:absolute;left:120px;top:272px;width:960px;height:468px;overflow:hidden;border-radius:18px;background:#fff;box-shadow:0 50px 90px -30px rgb(0 0 0/.75),inset 0 0 0 1px rgb(255 255 255/.1)}
+.nav-barre{display:flex;align-items:center;gap:18px;height:54px;padding:0 18px;background:#dfe5ec;border-bottom:1px solid #cfd7e1}
+.feux{display:flex;gap:8px}
+.feux i{width:12px;height:12px;border-radius:50%;background:#f87171}
+.feux i:nth-child(2){background:#fbbf24}
+.feux i:nth-child(3){background:#34d399}
+.adresse{flex:1;display:flex;align-items:center;gap:10px;height:34px;padding:0 16px;border-radius:999px;background:#fff;color:#1e293b;font-size:15px}
+.adresse > .ic{color:#16a34a;font-size:14px}
+.url .generique{display:none;color:#64748b;font-style:italic}
+.url.generique .generique{display:inline}
+.url.generique .caret{display:none}
+.nav-page{position:relative;height:calc(100% - 54px)}
+.page-accueil{position:absolute;inset:0;overflow:hidden;opacity:0;transition:opacity .9s var(--ease);background:radial-gradient(110% 80% at 15% 0%,#0f2f57,transparent 60%),#071a33;color:#fff}
+.navigateur.charge .page-accueil{opacity:1}
+.pa-tete{position:absolute;left:34px;right:34px;top:18px;display:flex;align-items:center;gap:10px;padding-bottom:14px;border-bottom:1px solid rgb(255 255 255/.06);font-size:14px;font-weight:600;letter-spacing:.02em}
+.pa-marque{display:grid;place-items:center;width:30px;height:30px;border-radius:8px;background:var(--gold-500);color:var(--navy-900);font-size:16px}
+.pa-avis{margin-left:auto;padding:6px 12px;border-radius:999px;font-size:11.5px;font-weight:500;color:var(--navy-100);box-shadow:inset 0 0 0 1px rgb(255 255 255/.15)}
+.pa-titre{position:absolute;left:34px;top:84px;width:470px;font-size:36px;line-height:1.05;font-weight:600;letter-spacing:-.03em}
+.pa-titre em{display:block;margin-top:2px;font-family:var(--serif);font-weight:400;font-size:.9em;color:var(--gold-300)}
+.pa-campagne{position:absolute;left:34px;top:190px;width:440px;padding:16px 18px;border-radius:14px;background:linear-gradient(#12294a,#0d2140);box-shadow:inset 0 0 0 1px rgb(255 255 255/.08)}
+.pa-ouverte{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:999px;font-size:10.5px;color:#6ee7b7;background:rgb(52 211 153/.1);box-shadow:inset 0 0 0 1px rgb(52 211 153/.3)}
+.pa-ouverte::before{content:"";width:6px;height:6px;border-radius:50%;background:#34d399}
+.pa-campagne p{margin-top:10px;font-size:17px;font-weight:600}
+.pa-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px;padding-top:12px;border-top:1px solid rgb(255 255 255/.1)}
+.pa-stats i{height:8px;border-radius:4px;background:rgb(255 255 255/.12)}
+.pa-carte{position:absolute;right:56px;top:84px;width:280px;padding:20px 22px;border-radius:18px;background:var(--carte);color:var(--navy-950);box-shadow:0 30px 50px -20px rgb(0 0 0/.7)}
+.pa-onglets{display:grid;grid-template-columns:1fr 1fr;gap:3px;padding:4px;border-radius:10px;background:#e2e8f0;font-size:10.5px;text-align:center;color:var(--navy-500)}
+.pa-onglets span{padding:6px 0;border-radius:7px}
+.pa-onglets span:first-child{background:#fff;color:var(--navy-950);font-weight:500}
+.pa-carte strong{display:block;margin-top:16px;font-family:var(--serif);font-size:24px;font-weight:500}
+.pa-champ{margin-top:14px;height:34px;border-radius:9px;background:#fff;box-shadow:inset 0 0 0 1px #e2e8f0}
+.pa-bouton{display:grid;place-items:center;margin-top:12px;height:36px;border-radius:10px;background:#050d1a;color:#fff;font-size:12px;font-weight:600}
+.pa-qr{position:absolute;left:34px;bottom:18px;display:flex;align-items:center;gap:12px;padding:8px 16px 8px 8px;border-radius:12px;background:rgb(255 255 255/.04);box-shadow:inset 0 0 0 1px rgb(255 255 255/.1);font-size:11.5px;line-height:1.35;color:var(--navy-200)}
+.pa-qr b{color:#fff;font-weight:500}
+.pa-qr .qr{width:48px;height:48px;padding:3px;border-radius:6px;background:#fff}
+.qr svg{display:block;width:100%;height:100%}
+.telephone{position:absolute;left:1186px;top:176px;width:290px;height:566px;padding:12px;border-radius:46px;background:#0b1626;box-shadow:0 50px 90px -30px rgb(0 0 0/.8),inset 0 0 0 2px #2a3b52}
+.ecran{position:relative;height:100%;overflow:hidden;border-radius:36px;background:radial-gradient(120% 80% at 50% 35%,#334760,#0c1220 70%)}
+.encoche{position:absolute;top:12px;left:50%;width:96px;height:26px;margin-left:-48px;border-radius:14px;background:#000}
+.ecran-titre{position:absolute;top:76px;left:0;right:0;text-align:center;font-size:15px;color:rgb(255 255 255/.85)}
+.viseur{position:absolute;left:46px;top:132px;width:174px;height:174px}
+.viseur .qr{position:absolute;inset:20px;overflow:hidden;border-radius:6px;transform:rotate(-3deg)}
+.coin{position:absolute;width:32px;height:32px;border:3px solid #fff;transition:border-color .3s}
+.coin:nth-child(1){left:0;top:0;border-right:0;border-bottom:0;border-top-left-radius:14px}
+.coin:nth-child(2){right:0;top:0;border-left:0;border-bottom:0;border-top-right-radius:14px}
+.coin:nth-child(3){left:0;bottom:0;border-right:0;border-top:0;border-bottom-left-radius:14px}
+.coin:nth-child(4){right:0;bottom:0;border-left:0;border-top:0;border-bottom-right-radius:14px}
+.ligne-scan{position:absolute;left:10px;right:10px;top:10%;height:2px;opacity:0;background:var(--gold-300);box-shadow:0 0 14px var(--gold-300)}
+.telephone.scan .ligne-scan{opacity:1;animation:scan 1.3s ease-in-out infinite alternate}
+.telephone.trouve .ligne-scan{opacity:0;animation:none}
+.telephone.trouve .coin{border-color:#34d399}
+@keyframes scan{from{top:8%}to{top:90%}}
+.ouvrir-lien{position:absolute;left:22px;right:22px;bottom:70px;display:flex;align-items:center;gap:10px;padding:14px 16px;border-radius:16px;background:#fff;color:var(--navy-900);font-size:15px;font-weight:600;opacity:0;transform:translateY(16px);transition:opacity .5s,transform .6s var(--ease)}
+.ouvrir-lien .ic{color:var(--gold-600)}
+.telephone.trouve .ouvrir-lien{opacity:1;transform:none}
+
+/* ───────── 4 à 6 · Carte de connexion (réplique de la page d'accueil) ───────── */
+.lueur{position:absolute;left:820px;top:40px;width:760px;height:760px;border-radius:50%;pointer-events:none;background:radial-gradient(closest-side,rgb(212 175 55/.13),transparent);filter:blur(30px)}
+.carte-connexion{position:absolute;left:940px;top:128px;width:520px;padding:40px 44px 34px;border-radius:30px;background:var(--carte);color:var(--encre);box-shadow:0 50px 90px -30px rgb(0 0 0/.75),0 14px 30px -14px rgb(0 0 0/.45)}
+.cadenas{position:absolute;top:30px;right:30px;font-size:22px;color:#cbd5e1}
+.onglets{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin:6px 0 34px;padding:6px;border-radius:18px;background:rgb(226 232 240/.5);box-shadow:inset 0 0 0 1px #e2e8f0}
+.onglet{position:relative;padding:13px 0;border-radius:13px;text-align:center;font-size:16px;color:var(--navy-500)}
+.onglet.actif{background:#fff;color:var(--navy-950);font-weight:500;box-shadow:0 1px 2px rgb(0 43 73/.08),0 6px 14px -6px rgb(0 43 73/.2)}
+.carte-connexion h3{font-family:var(--serif);font-size:44px;font-weight:500;line-height:1;letter-spacing:-.02em;color:var(--navy-950)}
+.desc{margin-top:14px;font-size:17px;line-height:1.55;color:var(--navy-500)}
+.desc strong{color:var(--encre);font-weight:600}
+.etiquette{display:block;margin:28px 0 10px;font-size:14px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--navy-900)}
+.champ + .etiquette{margin-top:22px}
+.champ{position:relative;display:flex;align-items:center;height:58px;padding:0 16px;border:1px solid var(--trait);border-radius:16px;background:#fff;font-size:18px;color:var(--encre);box-shadow:0 1px 2px rgb(0 43 73/.04);transition:border-color .25s,box-shadow .25s}
+.champ.avec-icone{padding-left:48px}
+.champ.avec-icone > .ic{position:absolute;left:16px;top:50%;margin-top:-10px;font-size:20px;color:#94a3b8}
+.champ.focus{border-color:var(--navy-700);box-shadow:0 0 0 4px rgb(23 63 97/.12)}
+.champ .ph{color:#94a3b8}
+.champ.rempli .ph{display:none}
+.champ.pin .val{font-size:24px;letter-spacing:.5em}
+.champ .oeil{position:absolute;right:16px;top:50%;margin-top:-10px;font-size:20px;color:#64748b}
+.caret{display:inline-block;width:2px;height:1.25em;margin:0 2px 0 1px;background:currentColor;opacity:0;vertical-align:middle}
+.focus .caret{animation:clignote 1s steps(1) infinite}
+@keyframes clignote{0%{opacity:1}50%{opacity:0}}
+.aide{display:flex;gap:8px;margin-top:10px;font-size:13px;line-height:1.4;color:var(--navy-400)}
+.aide .ic{margin-top:1px;font-size:15px;color:var(--gold-600)}
+.bouton{position:relative;display:flex;align-items:center;justify-content:center;height:60px;margin-top:26px;border-radius:16px;background:#050d1a;color:#fff;font-size:17px;font-weight:600;box-shadow:0 18px 30px -14px rgb(5 13 26/.8);transition:transform .15s,background .4s}
+.bouton::after{content:"";position:absolute;left:48px;right:48px;bottom:-1px;height:2px;border-radius:2px;background:linear-gradient(90deg,transparent,var(--gold-400),transparent);filter:blur(1px)}
+.bouton .lib,.bouton .ok{display:inline-flex;align-items:center;gap:10px}
+.bouton .lib .ic{font-size:20px;color:var(--gold-300)}
+.bouton .spin,.bouton .ok{display:none}
+.bouton.appuye{transform:scale(.98)}
+.bouton.chargement .lib,.bouton.succes .lib{display:none}
+.bouton.chargement .spin{display:block}
+.bouton.succes{background:#047857}
+.bouton.succes .ok{display:inline-flex}
+.spin{width:22px;height:22px;border-radius:50%;border:2.5px solid rgb(255 255 255/.3);border-top-color:#fff;animation:tourne .8s linear infinite}
+@keyframes tourne{to{transform:rotate(360deg)}}
+.pied{display:flex;justify-content:space-between;align-items:center;margin-top:28px;font-size:14px;color:var(--navy-500)}
+.chiffre{display:inline-flex;align-items:center;gap:6px;color:var(--navy-400)}
+.chiffre .ic{font-size:16px;color:#10b981}
+.retour{display:inline-flex;align-items:center;gap:6px;margin:0 0 22px -8px;padding:4px 8px;font-size:15px;color:#475569}
+.note{margin-top:16px;font-size:14px;color:var(--ardoise)}
+.bulle-sous{left:214px;top:112px}
+.bulle-sous::after{left:50%;margin-left:-6px}
+.refuses{margin-top:36px;padding:22px 26px;border-radius:20px;background:rgb(239 68 68/.08);box-shadow:inset 0 0 0 1px rgb(248 113 113/.3)}
+.refuses p{display:flex;align-items:center;gap:10px;font-size:19px;font-weight:600;color:#fecaca}
+.refuses p .ic{color:#f87171}
+.refuses ul{display:flex;gap:12px;margin-top:16px}
+.refuses li{position:relative;padding:8px 16px;border-radius:12px;background:rgb(255 255 255/.06);font-size:24px;letter-spacing:.18em;font-variant-numeric:tabular-nums;color:var(--navy-200)}
+.refuses li::after{content:"";position:absolute;left:10px;right:10px;top:50%;height:2px;background:#f87171;transform:rotate(-8deg)}
+
+/* ───────── 7 · Notation ───────── */
+.appli{position:absolute;left:120px;top:262px;width:1360px;height:478px;overflow:hidden;display:grid;grid-template-rows:66px 1fr;border-radius:20px;background:#f8fafc;color:var(--encre);box-shadow:0 50px 90px -30px rgb(0 0 0/.75)}
+.appli-tete{display:flex;align-items:center;gap:16px;padding:0 22px;background:linear-gradient(90deg,#0b2a4d,#071a33);color:#fff}
+.at-titre{flex:1;min-width:0}
+.at-titre p:first-child{font-family:var(--serif);font-size:18px;font-weight:500}
+.at-titre p:last-child{margin-top:2px;font-size:12.5px;color:var(--navy-200)}
+.progression{width:200px}
+.progression > div:first-child{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;color:var(--navy-200)}
+.progression b{font-family:var(--serif);font-size:14px;font-weight:500;color:#fff}
+.progression b small{color:var(--navy-300)}
+.barre-prog{height:5px;margin-top:6px;overflow:hidden;border-radius:5px;background:rgb(255 255 255/.1)}
+.brouillon{display:inline-flex;flex:none;align-items:center;gap:6px;font-size:12.5px;color:var(--navy-200);opacity:0;transition:opacity .5s}
+.brouillon.enregistre{opacity:1}
+.brouillon .ic{color:#34d399}
+.soumettre{position:relative;display:inline-flex;flex:none;align-items:center;gap:8px;padding:10px 18px;border-radius:12px;font-size:14px;font-weight:600;color:var(--navy-100);background:rgb(255 255 255/.07);box-shadow:inset 0 0 0 1px rgb(255 255 255/.15);transition:background .4s,color .4s}
+.soumettre.halo{color:var(--navy-950);background:linear-gradient(var(--gold-300),var(--gold-500))}
+.deco{font-size:18px;color:var(--navy-200)}
+.appli-corps{display:grid;grid-template-columns:310px 1fr;min-height:0}
+.liste-collab{position:relative;padding:20px 18px;background:#fff;border-right:1px solid var(--trait)}
+.liste-collab.halo::before{inset:8px;border-radius:14px}
+.liste-collab h4{display:flex;align-items:baseline;gap:8px;font-family:var(--serif);font-size:19px;font-weight:500;color:var(--navy-900)}
+.liste-collab h4 small{font-family:var(--sans);font-size:12px;color:#94a3b8}
+.recherche{display:flex;align-items:center;gap:8px;height:38px;margin:14px 0 12px;padding:0 12px;border:1px solid var(--trait);border-radius:10px;font-size:13px;color:#94a3b8}
+.collab{display:flex;align-items:center;gap:12px;margin-top:6px;padding:8px 10px;border-radius:12px}
+.collab.actif{background:var(--navy-50);box-shadow:inset 3px 0 0 var(--gold-500)}
+.avatar{display:grid;place-items:center;width:34px;height:34px;flex:none;border-radius:50%;background:var(--navy-100);color:var(--navy-700);font-size:12px;font-weight:600}
+.lignes{flex:1;display:grid;gap:6px}
+.lignes i{display:block;height:8px;border-radius:4px;background:#e2e8f0}
+.lignes i:first-child{width:78%;background:#cbd5e1}
+.lignes i:last-child{width:46%}
+.statut{width:9px;height:9px;border-radius:50%;background:#e2e8f0}
+.collab.actif .statut{background:var(--gold-400)}
+.critere{padding:26px 36px}
+.critere .k{font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--gold-600)}
+.critere h4{margin-top:6px;font-family:var(--serif);font-size:30px;font-weight:500;color:var(--navy-900)}
+.options{display:grid;gap:8px;margin-top:20px}
+.option{display:flex;align-items:center;gap:14px;padding:9px 16px;border-radius:12px;background:#fff;box-shadow:inset 0 0 0 1px var(--trait);font-size:15px;font-weight:500;transition:background .3s,color .3s,box-shadow .3s,transform .15s}
+.option b{display:grid;place-items:center;width:30px;height:30px;border-radius:8px;background:var(--navy-50);color:var(--navy-700);font-size:14px}
+.option span{margin-left:auto;font-size:13px;font-weight:400;color:var(--ardoise)}
+.option.choisie{background:var(--navy-900);color:#fff;box-shadow:none}
+.option.choisie b{background:var(--gold-400);color:var(--navy-950)}
+.option.choisie span{color:var(--navy-200)}
+.option.appuye{transform:scale(.99)}
+.bulle-soumettre{right:150px;top:340px}
+.bulle-soumettre::after{right:80px}
+
+/* ───────── 8 · Aide ───────── */
+.trio-aide{position:absolute;left:120px;top:286px;width:1360px;display:grid;grid-template-columns:repeat(3,1fr);gap:32px}
+.aide-carte{min-height:300px;padding:30px 32px;border-radius:24px;background:linear-gradient(#12294a,#0d2140);box-shadow:0 30px 60px -30px rgb(0 0 0/.6),inset 0 0 0 1px rgb(255 255 255/.08)}
+.pastille-ic{display:grid;place-items:center;width:58px;height:58px;border-radius:16px;font-size:28px;color:var(--gold-300);background:rgb(212 175 55/.12);box-shadow:inset 0 0 0 1px rgb(220 187 72/.35)}
+.aide-carte h3{margin-top:24px;font-size:28px;font-weight:600}
+.aide-carte p{margin-top:12px;font-size:20px;line-height:1.55;color:var(--navy-200)}
+.aide-carte p b{color:#fff;font-weight:600}
+.bandeau{position:absolute;left:120px;top:624px;width:1360px;display:flex;align-items:center;gap:18px;padding:22px 30px;border-radius:20px;font-size:23px;color:#d1fae5;background:rgb(16 185 129/.08);box-shadow:inset 0 0 0 1px rgb(52 211 153/.3)}
+.bandeau .ic{font-size:30px;color:#34d399}
+
+/* ───────── 9 · Fin ───────── */
+.fin{position:absolute;left:0;right:0;top:196px;text-align:center}
+.fin h2{font-size:100px;font-weight:600;line-height:1;letter-spacing:-.035em}
+.recap{display:flex;justify-content:center;gap:18px;margin-top:52px}
+.recap li{display:flex;align-items:center;gap:14px;padding:14px 28px 14px 16px;border-radius:999px;font-size:23px;background:rgb(255 255 255/.05);box-shadow:inset 0 0 0 1px rgb(255 255 255/.1)}
+.coche{display:grid;place-items:center;width:38px;height:38px;border-radius:50%;font-size:20px;color:var(--navy-950);background:var(--gold-500)}
+.coche .ic{stroke-width:3}
+.merci{margin-top:56px;font-family:var(--serif);font-size:46px;font-style:italic;color:var(--gold-300)}
+.actions-fin{display:flex;justify-content:center;gap:16px;margin-top:36px}
+#lien-plateforme{display:none}
+body.en-ligne #lien-plateforme{display:inline-flex}
+.revoir.principal{background:linear-gradient(var(--gold-300),var(--gold-500));text-decoration:none;box-shadow:inset 0 1px 0 rgb(255 255 255/.45),0 20px 40px -18px rgb(212 175 55/.7)}
+.revoir{display:inline-flex;align-items:center;gap:12px;padding:16px 30px;border:0;border-radius:16px;background:#fff;color:var(--navy-950);font-size:20px;font-weight:600;cursor:pointer;box-shadow:0 20px 40px -18px rgb(0 0 0/.8);transition:transform .2s}
+.revoir:hover{transform:translateY(-2px)}
+.revoir:focus-visible{outline:3px solid var(--gold-400);outline-offset:3px}
+
+/* ───────── Écran de démarrage ───────── */
+#demarrage{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:20px;background:rgb(3 12 25/.72);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+#demarrage[hidden]{display:none}
+.demarrage-carte{width:min(560px,100%);padding:40px 44px;border-radius:28px;background:linear-gradient(#12294a,#0b1f3b);box-shadow:0 40px 80px -30px rgb(0 0 0/.9),inset 0 0 0 1px rgb(255 255 255/.1)}
+.demarrage-carte h1{margin-top:24px;font-family:var(--serif);font-size:clamp(28px,4vw,40px);font-weight:500;line-height:1.12;letter-spacing:-.01em}
+.demarrage-carte h1 em{color:var(--gold-300)}
+.demarrage-carte > p{margin-top:14px;font-size:17px;line-height:1.55;color:var(--navy-200)}
+#b-lancer{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;height:62px;margin-top:28px;border:0;border-radius:16px;font-size:19px;font-weight:600;color:var(--navy-950);background:linear-gradient(var(--gold-300),var(--gold-500));cursor:pointer;box-shadow:inset 0 1px 0 rgb(255 255 255/.45),0 14px 30px -12px rgb(212 175 55/.7);transition:transform .2s}
+#b-lancer:hover{transform:translateY(-1px)}
+#b-lancer:focus-visible{outline:3px solid #fff;outline-offset:3px}
+.note-son{display:flex;align-items:flex-start;gap:10px;margin-top:18px;font-size:14px;line-height:1.5;color:var(--navy-300)}
+.note-son .ic{margin-top:2px;font-size:17px;color:var(--gold-300)}
+.lien-edge{display:flex;align-items:center;justify-content:center;gap:10px;height:52px;margin-top:16px;border-radius:14px;font-size:16px;font-weight:500;color:#fff;text-decoration:none;background:rgb(255 255 255/.06);box-shadow:inset 0 0 0 1px rgb(255 255 255/.16);transition:background .2s}
+.lien-edge:hover{background:rgb(255 255 255/.12)}
+.lien-edge:focus-visible{outline:3px solid var(--gold-400);outline-offset:3px}
+.lien-edge[hidden]{display:none}
+.lien-edge .ic{font-size:18px;color:var(--gold-300)}
+
+/* ───────── Barre de contrôle ───────── */
+#barre{position:fixed;left:0;right:0;bottom:0;z-index:40;display:flex;align-items:center;gap:6px;height:var(--barre);padding:0 18px;background:linear-gradient(#071a33f0,#04101f);border-top:1px solid rgb(255 255 255/.07);transition:opacity .4s,transform .4s}
+body.plein.inactif #barre{opacity:0;transform:translateY(100%)}
+body.plein.inactif{cursor:none}
+.ctrl{display:grid;place-items:center;width:44px;height:44px;flex:none;border:0;border-radius:12px;background:transparent;color:var(--navy-100);font-size:21px;cursor:pointer}
+.ctrl:hover{background:rgb(255 255 255/.08);color:#fff}
+.ctrl:focus-visible,.seg:focus-visible{outline:2px solid var(--gold-400);outline-offset:2px}
+.ctrl[aria-pressed="false"].bascule{opacity:.45}
+#b-lecture{width:52px;height:52px;border-radius:50%;color:var(--navy-950);background:var(--gold-500)}
+#b-lecture:hover{background:var(--gold-300)}
+.piste{flex:1;min-width:0;padding:0 14px}
+.piste-info{display:flex;justify-content:space-between;gap:12px;margin-bottom:6px;font-size:13px;color:var(--navy-200);white-space:nowrap}
+.piste-info b{overflow:hidden;text-overflow:ellipsis;color:#fff;font-weight:500}
+#segments{display:flex;gap:4px}
+.seg{position:relative;flex:var(--n) 1 0;height:18px;padding:0;border:0;background:none;cursor:pointer}
+.seg::before,.seg i{content:"";position:absolute;left:0;right:0;top:6px;height:6px;border-radius:3px}
+.seg::before{background:rgb(255 255 255/.14)}
+.seg:hover::before{background:rgb(255 255 255/.26)}
+.seg i{background:var(--gold-400);transform:scaleX(0);transform-origin:left}
+.reglages-wrap{position:relative}
+#reglages{position:absolute;right:0;bottom:56px;display:grid;gap:14px;width:320px;padding:18px;border-radius:16px;font-size:14px;color:var(--navy-100);background:#0d2140;box-shadow:0 20px 50px -10px rgb(0 0 0/.7),inset 0 0 0 1px rgb(255 255 255/.1)}
+#reglages[hidden]{display:none}
+#reglages label{display:grid;gap:6px}
+#reglages select{height:38px;padding:0 10px;border:1px solid rgb(255 255 255/.15);border-radius:10px;font:inherit;color:#fff;background:#071a33}
+#reglages input[type=range]{accent-color:var(--gold-500)}
+.ligne-debit{display:flex;justify-content:space-between}
+#b-tester{height:38px;border:0;border-radius:10px;font-weight:500;color:#fff;background:rgb(255 255 255/.08);cursor:pointer}
+#b-tester:hover{background:rgb(255 255 255/.14)}
+.note-voix{font-size:12.5px;line-height:1.5;color:var(--navy-300)}
+@media (max-width:640px){.piste-info{display:none}#b-prec,#b-suiv{display:none}}
+@media (prefers-reduced-motion:reduce){
+  .compas,.point::after,.halo::before{animation:none}
+  [data-b]{transform:none!important}
+  .curseur{transition-duration:.01s}
+}
+</style>
+</head>
+<body>
+
+<!-- Pictogrammes (formes Lucide, comme dans la plateforme) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-ancre" viewBox="0 0 24 24"><path d="M12 22V8"/><path d="M5 12H2a10 10 0 0 0 20 0h-3"/><circle cx="12" cy="5" r="3"/></symbol>
+  <symbol id="i-cadenas" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></symbol>
+  <symbol id="i-fleche" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
+  <symbol id="i-retour" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></symbol>
+  <symbol id="i-ok-rond" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-coche" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-oeil" viewBox="0 0 24 24"><path d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-croix" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></symbol>
+  <symbol id="i-portable" viewBox="0 0 24 24"><path d="M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0 1.28 2.55a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45L4 16"/></symbol>
+  <symbol id="i-mobile" viewBox="0 0 24 24"><rect width="14" height="20" x="5" y="2" rx="2"/><path d="M12 18h.01"/></symbol>
+  <symbol id="i-loupe" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+  <symbol id="i-envoi" viewBox="0 0 24 24"><path d="M14.54 21.69a.5.5 0 0 0 .94-.03l6.5-19a.5.5 0 0 0-.64-.63l-19 6.5a.5.5 0 0 0-.02.93l7.93 3.18a2 2 0 0 1 1.11 1.11z"/><path d="m21.85 2.15-10.94 10.94"/></symbol>
+  <symbol id="i-sortie" viewBox="0 0 24 24"><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/></symbol>
+  <symbol id="i-question" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></symbol>
+  <symbol id="i-cle" viewBox="0 0 24 24"><path d="M2.59 17.41A2 2 0 0 0 2 18.83V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.17a2 2 0 0 0 1.42-.59l.81-.81a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></symbol>
+  <symbol id="i-minuteur" viewBox="0 0 24 24"><path d="M10 2h4"/><path d="m12 14 3-3"/><circle cx="12" cy="14" r="8"/></symbol>
+  <symbol id="i-bouclier" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></symbol>
+  <symbol id="i-lecture" viewBox="0 0 24 24"><path d="M6 3.5v17a1 1 0 0 0 1.5.86l14-8.5a1 1 0 0 0 0-1.72l-14-8.5A1 1 0 0 0 6 3.5z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/><rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-precedent" viewBox="0 0 24 24"><path d="M19 20 9 12l10-8z"/><path d="M5 19V5"/></symbol>
+  <symbol id="i-suivant" viewBox="0 0 24 24"><path d="m5 4 10 8-10 8z"/><path d="M19 5v14"/></symbol>
+  <symbol id="i-rejouer" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></symbol>
+  <symbol id="i-son" viewBox="0 0 24 24"><path d="M11 4.7a.7.7 0 0 0-1.2-.5L6.41 7.59A1.4 1.4 0 0 1 5.42 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.42a1.4 1.4 0 0 1 1 .41l3.38 3.39A.7.7 0 0 0 11 19.3z"/><path d="M16 9a5 5 0 0 1 0 6"/><path d="M19.36 18.36a9 9 0 0 0 0-12.72"/></symbol>
+  <symbol id="i-muet" viewBox="0 0 24 24"><path d="M11 4.7a.7.7 0 0 0-1.2-.5L6.41 7.59A1.4 1.4 0 0 1 5.42 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.42a1.4 1.4 0 0 1 1 .41l3.38 3.39A.7.7 0 0 0 11 19.3z"/><path d="M22 9l-6 6"/><path d="m16 9 6 6"/></symbol>
+  <symbol id="i-st" viewBox="0 0 24 24"><rect width="18" height="14" x="3" y="5" rx="2"/><path d="M7 15h4M15 15h2M7 11h2M13 11h4"/></symbol>
+  <symbol id="i-reglages" viewBox="0 0 24 24"><path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4"/></symbol>
+  <symbol id="i-plein" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></symbol>
+</svg>
+
+<div id="cadre">
+<div id="stage" data-etape="0">
+  <div class="fond"></div>
+  <div class="quadrillage"></div>
+  <svg class="compas" viewBox="-300 -300 600 600" fill="none" stroke="currentColor" aria-hidden="true">
+    <g stroke-opacity=".09"><circle r="290"/><circle r="200" stroke-dasharray="2 6"/><circle r="120"/></g>
+    <g fill="currentColor" fill-opacity=".05" stroke-opacity=".1">
+      <path d="M0 -270 L8 -10 L0 0 L-8 -10 Z"/><path transform="rotate(90)" d="M0 -270 L8 -10 L0 0 L-8 -10 Z"/>
+      <path transform="rotate(180)" d="M0 -270 L8 -10 L0 0 L-8 -10 Z"/><path transform="rotate(270)" d="M0 -270 L8 -10 L0 0 L-8 -10 Z"/>
+    </g>
+    <circle r="7" fill="#d4af37" fill-opacity=".35" stroke="none"/>
+  </svg>
+
+  <header class="entete">
+    <span class="marque"><span><svg class="ic"><use href="#i-ancre"/></svg></span></span>
+    <div>
+      <p class="nom">DSM TAMIS <small>GUIDE DE CONNEXION</small></p>
+      <p class="sous-nom">Direction des Solutions Maritimes</p>
+    </div>
+    <ol class="rail" aria-hidden="true">
+      <li data-etape="1"><b>01</b><svg class="ic"><use href="#i-coche"/></svg>Identification</li>
+      <li data-etape="2"><b>02</b><svg class="ic"><use href="#i-coche"/></svg>Code PIN</li>
+      <li data-etape="3"><b>03</b><svg class="ic"><use href="#i-coche"/></svg>Notation</li>
+    </ol>
+  </header>
+
+  <!-- 1 · Introduction -->
+  <section class="scene" id="sc-intro">
+    <div class="intro">
+      <p class="pastille" data-b="0"><span class="point"></span>Campagne d’évaluation des agents · Mode d’emploi</p>
+      <h1 data-b="0" style="--d:150ms">Comment se connecter <em>pour participer à la campagne</em></h1>
+      <p class="chapo" data-b="0" style="--d:350ms">Un guide pas à pas, de la page d’accueil à votre première notation.</p>
+    </div>
+    <ol class="trois-etapes">
+      <li data-b="1" style="--d:700ms"><b>01</b><div><p>Identification</p><span>Votre matricule DSM</span></div></li>
+      <li data-b="1" style="--d:2500ms"><b>02</b><div><p>Code PIN</p><span>4 chiffres, rien qu’à vous</span></div></li>
+      <li data-b="1" style="--d:4300ms"><b>03</b><div><p>Notation</p><span>Vos collaborateurs, critère par critère</span></div></li>
+    </ol>
+  </section>
+
+  <!-- 2 · Ce qu'il vous faut -->
+  <section class="scene" id="sc-prerequis">
+    <div class="haut titre-scene" data-b="0"><p class="kicker">Avant de commencer</p><h2>Munissez-vous de…</h2></div>
+    <div class="trio">
+      <article class="besoin" data-b="0" style="--d:700ms">
+        <div class="visuel">
+          <div class="badge">
+            <div class="badge-tete"><span class="badge-ancre"><svg class="ic"><use href="#i-ancre"/></svg></span>DSM TAMIS</div>
+            <div class="badge-corps"><span class="badge-photo"><svg class="ic"><use href="#i-user"/></svg></span><div><small>Matricule</small><strong>0427</strong></div></div>
+          </div>
+        </div>
+        <h3>Votre matricule DSM</h3>
+        <p>4 caractères, délivré par les Ressources Humaines.</p>
+      </article>
+      <article class="besoin" data-b="1">
+        <div class="visuel"><div class="cases-pin"><i></i><i></i><i></i><i></i></div></div>
+        <h3>Un code PIN</h3>
+        <p>4 chiffres, que vous choisirez vous-même à la première connexion.</p>
+      </article>
+      <article class="besoin" data-b="2">
+        <div class="visuel appareils"><svg class="ic portable"><use href="#i-portable"/></svg><svg class="ic mobile"><use href="#i-mobile"/></svg></div>
+        <h3>Un ordinateur ou un téléphone</h3>
+        <p>Connecté à Internet, avec Edge, Chrome ou Safari.</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- 3 · Ouvrir la plateforme -->
+  <section class="scene" id="sc-ouvrir">
+    <div class="haut titre-scene" data-b="0"><p class="kicker">Avant de commencer</p><h2>Ouvrez la plateforme</h2></div>
+    <div class="navigateur" data-b="0" style="--d:250ms">
+      <div class="nav-barre">
+        <span class="feux"><i></i><i></i><i></i></span>
+        <div class="adresse"><svg class="ic"><use href="#i-cadenas"/></svg><span class="url"><span class="val"></span><span class="caret"></span><span class="generique">Lien communiqué par l’administration</span></span></div>
+      </div>
+      <div class="nav-page">
+        <div class="page-accueil">
+          <div class="pa-tete"><span class="pa-marque"><svg class="ic"><use href="#i-ancre"/></svg></span>DSM TAMIS<span class="pa-avis">Vous êtes client ? Donnez votre avis</span></div>
+          <p class="pa-titre">Évaluation de la performance<em>des agents de la DSM</em></p>
+          <div class="pa-campagne"><span class="pa-ouverte">Campagne ouverte</span><p>Campagne d’évaluation des agents</p><div class="pa-stats"><i></i><i></i><i></i></div></div>
+          <div class="pa-carte"><div class="pa-onglets"><span>Collaborateur</span><span>Client externe</span></div><strong>Connexion</strong><div class="pa-champ"></div><div class="pa-bouton">Continuer →</div></div>
+          <div class="pa-qr"><span class="qr"></span><p><b>Sur votre téléphone ?</b><br>Scannez pour ouvrir la plateforme mobile</p></div>
+        </div>
+      </div>
+    </div>
+    <div class="telephone" data-b="1" data-fx="droite">
+      <div class="ecran">
+        <span class="encoche"></span>
+        <p class="ecran-titre">Visez le QR code</p>
+        <div class="viseur"><span class="coin"></span><span class="coin"></span><span class="coin"></span><span class="coin"></span><span class="qr"></span><span class="ligne-scan"></span></div>
+        <div class="ouvrir-lien"><svg class="ic"><use href="#i-globe"/></svg>Ouvrir la plateforme DSM</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 · Étape 01 : identification -->
+  <section class="scene" id="sc-identification" data-avec-curseur="1320,820">
+    <div class="colonne">
+      <div class="titre-scene" data-b="0"><p class="kicker">Étape 01</p><h2>Identifiez-vous</h2></div>
+      <ol class="consignes">
+        <li data-b="0" style="--d:400ms"><i>1</i><span>Onglet <b>Collaborateur</b> sélectionné</span></li>
+        <li data-b="1"><i>2</i><span>Votre <b>matricule</b> à 4 caractères</span></li>
+        <li data-b="2"><i>3</i><span>Bouton <b>Continuer</b></span></li>
+      </ol>
+    </div>
+    <div class="lueur"></div>
+    <div class="carte-connexion" data-b="0" data-fx="zoom" style="--d:150ms">
+      <svg class="ic cadenas"><use href="#i-cadenas"/></svg>
+      <div class="onglets"><span class="onglet actif">Collaborateur</span><span class="onglet">Client externe</span></div>
+      <span class="bulle bulle-sous" data-b="0" data-h="1" style="--d:4200ms">Réservé aux clients de la DSM</span>
+      <h3>Connexion</h3>
+      <p class="desc">Votre matricule de collaborateur DSM est requis pour poursuivre.</p>
+      <span class="etiquette">Matricule collaborateur</span>
+      <div class="champ avec-icone" data-champ="matricule"><svg class="ic"><use href="#i-user"/></svg><span class="val"></span><span class="caret"></span><span class="ph">Ex. : 1234</span></div>
+      <p class="aide"><svg class="ic"><use href="#i-info"/></svg>Format d’identifiant habituel délivré par les Ressources Humaines.</p>
+      <div class="bouton"><span class="lib">Continuer<svg class="ic"><use href="#i-fleche"/></svg></span><span class="spin"></span></div>
+      <div class="pied"><span>Matricule oublié ou perdu ?</span><span class="chiffre"><svg class="ic"><use href="#i-ok-rond"/></svg>Connexion chiffrée</span></div>
+    </div>
+  </section>
+
+  <!-- 5 · Étape 02 : première connexion -->
+  <section class="scene" id="sc-premiere" data-avec-curseur="1200,620">
+    <div class="colonne">
+      <div class="titre-scene" data-b="0"><p class="kicker">Étape 02 · Première connexion</p><h2>Créez votre code PIN</h2></div>
+      <ol class="consignes">
+        <li data-b="1"><i>1</i><span><b>4 chiffres</b> de votre choix</span></li>
+        <li data-b="1" style="--d:2600ms"><i>2</i><span><b>Une seconde fois</b> pour confirmer</span></li>
+        <li data-b="3"><i>3</i><span>Bouton <b>Enregistrer mon PIN</b></span></li>
+      </ol>
+      <div class="refuses" data-b="2">
+        <p><svg class="ic"><use href="#i-croix"/></svg>Codes trop simples : refusés</p>
+        <ul><li>1234</li><li>4321</li><li>0000</li><li>7777</li></ul>
+      </div>
+    </div>
+    <div class="lueur"></div>
+    <div class="carte-connexion" data-b="0" data-fx="zoom">
+      <svg class="ic cadenas"><use href="#i-cadenas"/></svg>
+      <span class="retour"><svg class="ic"><use href="#i-retour"/></svg>Changer d’identifiant</span>
+      <h3>Choisissez votre PIN</h3>
+      <p class="desc">Première connexion pour <strong>0427</strong>. Ce PIN vous servira à chaque connexion ; seul un administrateur pourra le réinitialiser.</p>
+      <span class="etiquette">Nouveau PIN (4 chiffres)</span>
+      <div class="champ pin" data-champ="pin"><span class="val"></span><span class="caret"></span><svg class="ic oeil"><use href="#i-oeil"/></svg></div>
+      <span class="etiquette">Confirmez le PIN</span>
+      <div class="champ pin" data-champ="confirmation"><span class="val"></span><span class="caret"></span></div>
+      <div class="bouton"><span class="lib">Enregistrer mon PIN<svg class="ic"><use href="#i-fleche"/></svg></span><span class="spin"></span><span class="ok"><svg class="ic"><use href="#i-coche"/></svg>PIN enregistré</span></div>
+    </div>
+  </section>
+
+  <!-- 6 · Étape 02 : connexions suivantes -->
+  <section class="scene" id="sc-suivantes" data-avec-curseur="1200,640">
+    <div class="colonne">
+      <div class="titre-scene" data-b="0"><p class="kicker">Étape 02 · Connexions suivantes</p><h2>Encore plus rapide</h2></div>
+      <ol class="consignes">
+        <li data-b="0" style="--d:400ms"><i>1</i><span>Votre <b>matricule</b>, puis <b>Continuer</b></span></li>
+        <li data-b="0" style="--d:3400ms"><i>2</i><span>Votre <b>code PIN</b></span></li>
+        <li data-b="1"><i>3</i><span>Bouton <b>Se connecter</b></span></li>
+      </ol>
+    </div>
+    <div class="lueur"></div>
+    <div class="carte-connexion" data-b="0" data-fx="zoom">
+      <svg class="ic cadenas"><use href="#i-cadenas"/></svg>
+      <span class="retour"><svg class="ic"><use href="#i-retour"/></svg>Changer d’identifiant</span>
+      <h3>Votre PIN</h3>
+      <p class="desc">Compte <strong>0427</strong> · le PIN à 4 chiffres que vous avez choisi.</p>
+      <span class="etiquette">Code PIN</span>
+      <div class="champ pin" data-champ="pin"><span class="val"></span><span class="caret"></span><svg class="ic oeil"><use href="#i-oeil"/></svg></div>
+      <div class="bouton"><span class="lib">Se connecter<svg class="ic"><use href="#i-fleche"/></svg></span><span class="spin"></span><span class="ok"><svg class="ic"><use href="#i-coche"/></svg>Connexion réussie</span></div>
+      <p class="note">PIN oublié ? Demandez une réinitialisation à votre administrateur.</p>
+      <div class="pied"><span></span><span class="chiffre"><svg class="ic"><use href="#i-ok-rond"/></svg>Connexion chiffrée</span></div>
+    </div>
+  </section>
+
+  <!-- 7 · Étape 03 : notation -->
+  <section class="scene" id="sc-notation" data-avec-curseur="1240,820">
+    <div class="haut titre-scene" data-b="0"><p class="kicker">Étape 03</p><h2>Notez vos collaborateurs</h2></div>
+    <div class="appli" data-b="0" data-fx="zoom" style="--d:200ms">
+      <div class="appli-tete">
+        <span class="marque petite"><span><svg class="ic"><use href="#i-ancre"/></svg></span></span>
+        <div class="at-titre"><p>Campagne d’évaluation des agents</p><p>Évaluation entre collègues · jusqu’à la clôture</p></div>
+        <div class="progression"><div><span>Progression</span><b>0 <small>/ 8</small></b></div><div class="barre-prog"></div></div>
+        <span class="brouillon"><svg class="ic"><use href="#i-coche"/></svg>Brouillon enregistré</span>
+        <span class="soumettre"><svg class="ic"><use href="#i-envoi"/></svg>Soumettre</span>
+        <svg class="ic deco"><use href="#i-sortie"/></svg>
+      </div>
+      <div class="appli-corps">
+        <aside class="liste-collab">
+          <h4>Vos collaborateurs <small>8</small></h4>
+          <div class="recherche"><svg class="ic"><use href="#i-loupe"/></svg>Nom, matricule, service…</div>
+          <div class="collab actif" data-b="0" style="--d:900ms"><span class="avatar">KA</span><span class="lignes"><i></i><i></i></span><span class="statut"></span></div>
+          <div class="collab" data-b="0" style="--d:1000ms"><span class="avatar">BD</span><span class="lignes"><i></i><i></i></span><span class="statut"></span></div>
+          <div class="collab" data-b="0" style="--d:1100ms"><span class="avatar">YT</span><span class="lignes"><i></i><i></i></span><span class="statut"></span></div>
+          <div class="collab" data-b="0" style="--d:1200ms"><span class="avatar">AM</span><span class="lignes"><i></i><i></i></span><span class="statut"></span></div>
+          <div class="collab" data-b="0" style="--d:1300ms"><span class="avatar">SC</span><span class="lignes"><i></i><i></i></span><span class="statut"></span></div>
+        </aside>
+        <div class="critere">
+          <p class="k">Critère 1 sur 6</p>
+          <h4>Communication</h4>
+          <div class="options">
+            <div class="option" data-note="5"><b>5</b>Excellent<span>Dépasse largement les attentes.</span></div>
+            <div class="option" data-note="4"><b>4</b>Très satisfaisant<span>Répond pleinement aux attentes.</span></div>
+            <div class="option" data-note="3"><b>3</b>Satisfaisant<span>Répond globalement aux attentes du poste.</span></div>
+            <div class="option" data-note="2"><b>2</b>À améliorer<span>Plusieurs points nécessitent une amélioration.</span></div>
+            <div class="option" data-note="1"><b>1</b>Insuffisant<span>Performance en dessous des attentes.</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <span class="bulle bulle-soumettre" data-b="2" style="--d:4200ms">Définitif : vérifiez vos notes avant d’envoyer</span>
+  </section>
+
+  <!-- 8 · En cas de difficulté -->
+  <section class="scene" id="sc-aide">
+    <div class="haut titre-scene" data-b="0"><p class="kicker">Besoin d’aide ?</p><h2>En cas de difficulté</h2></div>
+    <div class="trio-aide">
+      <article class="aide-carte" data-b="0" style="--d:500ms"><span class="pastille-ic"><svg class="ic"><use href="#i-question"/></svg></span><h3>Matricule oublié ?</h3><p>Adressez-vous aux <b>Ressources Humaines</b> ou à l’<b>administrateur</b> de la plateforme.</p></article>
+      <article class="aide-carte" data-b="1"><span class="pastille-ic"><svg class="ic"><use href="#i-cle"/></svg></span><h3>PIN oublié ?</h3><p>Seul l’<b>administrateur</b> peut le réinitialiser. Vous en choisirez ensuite un nouveau.</p></article>
+      <article class="aide-carte" data-b="2"><span class="pastille-ic"><svg class="ic"><use href="#i-minuteur"/></svg></span><h3>Compte bloqué ?</h3><p>Après <b>5 PIN erronés</b>, le compte est bloqué <b>15 minutes</b>. Patientez, puis réessayez.</p></article>
+    </div>
+    <p class="bandeau" data-b="3"><svg class="ic"><use href="#i-bouclier"/></svg>Votre PIN est personnel : ne le communiquez à personne.</p>
+  </section>
+
+  <!-- 9 · Récapitulatif -->
+  <section class="scene" id="sc-fin">
+    <div class="fin">
+      <h2 data-b="0">Vous êtes prêt !</h2>
+      <ol class="recap">
+        <li data-b="0" style="--d:1300ms"><span class="coche"><svg class="ic"><use href="#i-coche"/></svg></span>Votre matricule</li>
+        <li data-b="0" style="--d:2500ms"><span class="coche"><svg class="ic"><use href="#i-coche"/></svg></span>Votre code PIN</li>
+        <li data-b="0" style="--d:3800ms"><span class="coche"><svg class="ic"><use href="#i-coche"/></svg></span>Vos notations</li>
+      </ol>
+      <p class="merci" data-b="1">Merci pour votre participation à la campagne.</p>
+      <div class="actions-fin" data-b="1" style="--d:700ms">
+        <a class="revoir principal" id="lien-plateforme" href="/">Se connecter maintenant<svg class="ic"><use href="#i-fleche"/></svg></a>
+        <button type="button" class="revoir" id="b-revoir"><svg class="ic"><use href="#i-rejouer"/></svg>Revoir la présentation</button>
+      </div>
+    </div>
+  </section>
+
+  <p id="sous-titre"></p>
+</div>
+</div>
+
+<div id="barre" role="toolbar" aria-label="Contrôles de la présentation">
+  <button type="button" class="ctrl" id="b-prec" aria-label="Scène précédente" title="Scène précédente (←)"><svg class="ic"><use href="#i-precedent"/></svg></button>
+  <button type="button" class="ctrl" id="b-lecture" aria-label="Lecture" title="Lecture / pause (Espace)"><svg class="ic"><use href="#i-lecture"/></svg></button>
+  <button type="button" class="ctrl" id="b-suiv" aria-label="Scène suivante" title="Scène suivante (→)"><svg class="ic"><use href="#i-suivant"/></svg></button>
+  <div class="piste">
+    <p class="piste-info"><b id="titre-courant"></b><span id="compteur"></span></p>
+    <div id="segments"></div>
+  </div>
+  <button type="button" class="ctrl bascule" id="b-st" aria-pressed="true" aria-label="Sous-titres" title="Sous-titres (S)"><svg class="ic"><use href="#i-st"/></svg></button>
+  <button type="button" class="ctrl" id="b-son" aria-pressed="false" aria-label="Couper la voix off" title="Voix off (M)"><svg class="ic"><use href="#i-son"/></svg></button>
+  <div class="reglages-wrap">
+    <button type="button" class="ctrl" id="b-reglages" aria-expanded="false" aria-controls="reglages" aria-label="Réglages de la voix" title="Réglages de la voix"><svg class="ic"><use href="#i-reglages"/></svg></button>
+    <div id="reglages" hidden>
+      <label>Voix off<select id="choix-voix"></select></label>
+      <label><span class="ligne-debit">Vitesse<output id="debit-val">1,00×</output></span><input type="range" id="debit" min="0.8" max="1.2" step="0.05" value="1"></label>
+      <button type="button" id="b-tester">Tester la voix</button>
+      <p class="note-voix" id="note-voix-reglages"></p>
+    </div>
+  </div>
+  <button type="button" class="ctrl" id="b-plein" aria-label="Plein écran" title="Plein écran (F)"><svg class="ic"><use href="#i-plein"/></svg></button>
+</div>
+
+<div id="demarrage">
+  <div class="demarrage-carte" role="dialog" aria-modal="true" aria-labelledby="titre-demarrage">
+    <span class="marque"><span><svg class="ic"><use href="#i-ancre"/></svg></span></span>
+    <h1 id="titre-demarrage">Se connecter pour <em>participer à la campagne</em></h1>
+    <p>Présentation animée avec voix off et sous-titres · environ 3 minutes.</p>
+    <button type="button" id="b-lancer"><svg class="ic"><use href="#i-lecture"/></svg>Lancer la présentation</button>
+    <p class="note-son"><svg class="ic"><use href="#i-son"/></svg><span id="note-voix-demarrage">Activez le son de votre appareil.</span></p>
+    <a id="lien-edge" class="lien-edge" hidden><svg class="ic"><use href="#i-globe"/></svg>Ouvrir dans Microsoft Edge (voix naturelle)</a>
+  </div>
+</div>
+
+<script>
+'use strict'
+
+/* ───────── Réglages ───────── */
+// Servie par la plateforme (lien envoyé par mail), la présentation en connaît l'adresse.
+// Ouverte comme simple fichier, la scène 3 affiche un libellé générique.
+const EN_LIGNE = /^https?:$/.test(location.protocol)
+const ADRESSE_PLATEFORME = EN_LIGNE ? location.host : ''
+const LARGEUR = 1600
+const HAUTEUR = 900
+const HAUTEUR_BARRE = 76
+const PAUSE_APRES_TEMPS_MS = 500
+const TRANSITION_SCENE_MS = 750
+const MOTS_PAR_SECONDE = 2.6
+const CLES_STOCKAGE = { voix: 'dsm-guide-voix', debit: 'dsm-guide-debit' }
+
+/*
+ * Chaque scène est découpée en « temps » : une phrase de voix off (aussi affichée en sous-titre)
+ * et, éventuellement, les gestes du curseur à jouer pendant qu'elle est lue.
+ * « min » : durée minimale du temps, pour laisser les animations se terminer.
+ */
+const SCENES = [
+  { id: 'intro', titre: 'Introduction', etape: 0, temps: [
+    { texte: 'Bienvenue ! Ce guide vous montre, pas à pas, comment vous connecter à la plateforme d’évaluation de la DSM pour participer à la campagne.' },
+    { texte: 'Trois étapes suffisent : vous identifier avec votre matricule, saisir votre code PIN, puis noter vos collaborateurs.', min: 5200 },
+  ] },
+  { id: 'prerequis', titre: 'Avant de commencer', etape: 0, temps: [
+    { texte: 'Avant de commencer, munissez-vous de votre matricule DSM. Il compte quatre caractères et vous a été délivré par les Ressources Humaines.' },
+    { texte: 'Il vous faut aussi un code PIN à quatre chiffres. Pas d’inquiétude : vous le choisirez vous-même lors de votre première connexion.', min: 2400 },
+    { texte: 'Enfin, un ordinateur ou un téléphone connecté à Internet suffit.' },
+  ] },
+  { id: 'ouvrir', titre: 'Ouvrir la plateforme', etape: 0, temps: [
+    {
+      texte: 'Ouvrez votre navigateur, Edge ou Chrome par exemple, et rendez-vous sur la plateforme grâce au lien communiqué par l’administration.',
+      min: 3600,
+      faire(o) {
+        o.ajouter('.url', 'focus')
+        const finSaisie = ADRESSE_PLATEFORME
+          ? 900 + o.taperPlusTard(900, '.url', ADRESSE_PLATEFORME, { vitesse: 60 })
+          : (o.plusTard(900, () => o.ajouter('.url', 'generique')), 1600)
+        o.plusTard(finSaisie + 400, () => { o.retirer('.url', 'focus'); o.ajouter('.navigateur', 'charge') })
+      },
+    },
+    {
+      texte: 'Vous préférez votre téléphone ? Scannez simplement le QR code affiché en bas de la page d’accueil.',
+      min: 3800,
+      faire(o) {
+        o.ajouter('.pa-qr', 'halo')
+        o.plusTard(1400, () => o.ajouter('.telephone', 'scan'))
+        o.plusTard(3300, () => o.ajouter('.telephone', 'trouve'))
+      },
+    },
+  ] },
+  { id: 'identification', titre: 'Étape 01 · Identification', etape: 1, temps: [
+    {
+      texte: 'Sur la page d’accueil, vérifiez que l’onglet « Collaborateur » est bien sélectionné. L’onglet « Client externe » est réservé aux clients de la DSM.',
+      min: 5000,
+      faire(o) {
+        o.plusTard(700, () => o.viser('.onglet.actif'))
+        o.plusTard(1700, () => o.ajouter('.onglet.actif', 'halo'))
+      },
+    },
+    {
+      texte: 'Cliquez dans le champ « Matricule collaborateur » et saisissez votre matricule à quatre caractères.',
+      min: 4200,
+      faire(o) {
+        o.retirer('.onglet.actif', 'halo')
+        o.plusTard(200, () => o.viser('[data-champ="matricule"]', 0.3))
+        o.plusTard(1300, () => { o.clic(); o.focus('[data-champ="matricule"]') })
+        o.taperPlusTard(2400, '[data-champ="matricule"]', '0427')
+      },
+    },
+    {
+      texte: 'Cliquez ensuite sur « Continuer ».',
+      min: 2600,
+      faire(o) {
+        o.plusTard(200, () => o.viser('.bouton'))
+        o.plusTard(1250, () => { o.clic('.bouton'); o.ajouter('.bouton', 'chargement') })
+      },
+    },
+  ] },
+  { id: 'premiere', titre: 'Étape 02 · Première connexion', etape: 2, temps: [
+    {
+      texte: 'S’il s’agit de votre première connexion, la plateforme vous invite à créer votre code PIN.',
+      faire(o) { o.plusTard(1200, () => o.focus('[data-champ="pin"]')) },
+    },
+    {
+      texte: 'Saisissez quatre chiffres de votre choix, puis saisissez-les une seconde fois pour les confirmer.',
+      min: 5400,
+      faire(o) {
+        o.plusTard(100, () => o.viser('[data-champ="pin"]', 0.3))
+        o.plusTard(1100, () => { o.clic(); o.focus('[data-champ="pin"]') })
+        o.taperPlusTard(1400, '[data-champ="pin"]', '5826', { masque: true })
+        o.plusTard(3000, () => o.viser('[data-champ="confirmation"]', 0.3))
+        o.plusTard(3950, () => { o.clic(); o.focus('[data-champ="confirmation"]') })
+        o.taperPlusTard(4250, '[data-champ="confirmation"]', '5826', { masque: true })
+      },
+    },
+    { texte: 'Évitez les codes trop simples, comme 1234 ou quatre fois le même chiffre : ils sont refusés.' },
+    {
+      texte: 'Cliquez enfin sur « Enregistrer mon PIN ». Retenez-le bien : il vous servira à chaque connexion.',
+      min: 3200,
+      faire(o) {
+        o.focus(null)
+        o.plusTard(200, () => o.viser('.bouton'))
+        o.plusTard(1300, () => { o.clic('.bouton'); o.ajouter('.bouton', 'chargement') })
+        o.plusTard(2500, () => { o.retirer('.bouton', 'chargement'); o.ajouter('.bouton', 'succes') })
+      },
+    },
+  ] },
+  { id: 'suivantes', titre: 'Étape 02 · Connexions suivantes', etape: 2, temps: [
+    {
+      texte: 'Lors de vos connexions suivantes, c’est encore plus rapide : après votre matricule, saisissez simplement votre code PIN…',
+      min: 5200,
+      faire(o) {
+        o.plusTard(2900, () => o.viser('[data-champ="pin"]', 0.3))
+        o.plusTard(3900, () => { o.clic(); o.focus('[data-champ="pin"]') })
+        o.taperPlusTard(4200, '[data-champ="pin"]', '5826', { masque: true })
+      },
+    },
+    {
+      texte: '… et cliquez sur « Se connecter ».',
+      min: 3200,
+      faire(o) {
+        o.focus(null)
+        o.plusTard(100, () => o.viser('.bouton'))
+        o.plusTard(1150, () => { o.clic('.bouton'); o.ajouter('.bouton', 'chargement') })
+        o.plusTard(2300, () => { o.retirer('.bouton', 'chargement'); o.ajouter('.bouton', 'succes') })
+      },
+    },
+  ] },
+  { id: 'notation', titre: 'Étape 03 · Notation', etape: 3, temps: [
+    {
+      texte: 'Vous voilà connecté ! La liste des collaborateurs que vous devez évaluer s’affiche à gauche.',
+      faire(o) { o.plusTard(2400, () => o.ajouter('.liste-collab', 'halo')) },
+    },
+    {
+      texte: 'Notez-les critère par critère. Vos notes sont enregistrées automatiquement en brouillon : vous pouvez vous arrêter et reprendre plus tard.',
+      min: 3600,
+      faire(o) {
+        o.retirer('.liste-collab', 'halo')
+        o.plusTard(300, () => o.viser('.option[data-note="4"]', 0.3))
+        o.plusTard(1400, () => { o.clic('.option[data-note="4"]'); o.ajouter('.option[data-note="4"]', 'choisie') })
+        o.plusTard(3600, () => o.ajouter('.brouillon', 'enregistre'))
+      },
+    },
+    {
+      texte: 'Une fois toutes vos évaluations terminées, cliquez sur « Soumettre » avant la date de clôture. Attention : la soumission est définitive.',
+      min: 4800,
+      faire(o) {
+        o.plusTard(1200, () => o.viser('.soumettre', 0.5, 0.7))
+        o.plusTard(2300, () => o.ajouter('.soumettre', 'halo'))
+      },
+    },
+  ] },
+  { id: 'aide', titre: 'En cas de difficulté', etape: 0, temps: [
+    { texte: 'En cas de difficulté : si vous avez oublié votre matricule, adressez-vous aux Ressources Humaines ou à l’administrateur de la plateforme.' },
+    { texte: 'Si vous avez oublié votre PIN, seul l’administrateur peut le réinitialiser. Vous en choisirez alors un nouveau.' },
+    { texte: 'Après cinq PIN erronés, le compte est bloqué pendant quinze minutes, par sécurité.' },
+    { texte: 'Et surtout, gardez votre PIN pour vous : ne le communiquez à personne.' },
+  ] },
+  { id: 'fin', titre: 'Récapitulatif', etape: 4, temps: [
+    { texte: 'En résumé : votre matricule, votre code PIN, et vous voilà prêt à noter.', min: 4400 },
+    { texte: 'Merci pour votre participation à la campagne d’évaluation !', min: 2000 },
+  ] },
+]
+
+/* Le texte affiché reste exact ; seule la lecture à voix haute est adaptée. */
+const PRONONCIATION = [
+  [/[«»]/g, ''],
+  [/\b1234\b/g, 'un, deux, trois, quatre'],
+  [/\bPIN\b/g, 'pine'], // « code PIN » se prononce [pin], pas comme l'arbre
+  [/…/g, ','],
+]
+
+const $ = (selecteur, racine = document) => racine.querySelector(selecteur)
+const stage = $('#stage')
+const scenesEl = SCENES.map((s) => $('#sc-' + s.id))
+const gabarits = new Map()
+const etat = { scene: 0, temps: 0, lecture: false, fini: false, gen: 0, minuteurs: [], sousTitres: true }
+let segments = []
+
+/* ───────── Minuteurs annulables ───────── */
+function programmer(ms, fn) {
+  etat.minuteurs.push(setTimeout(fn, ms))
+}
+function annulerMinuteurs() {
+  etat.minuteurs.forEach(clearTimeout)
+  etat.minuteurs = []
+}
+/** Attente liée à une lecture : si la lecture est interrompue entre-temps, la promesse ne se résout jamais. */
+function attendre(ms, gen) {
+  return new Promise((resolve) => {
+    if (gen === etat.gen) programmer(ms, resolve)
+  })
+}
+
+/* ───────── Voix off (synthèse vocale du navigateur) ───────── */
+function pourLaVoix(texte) {
+  return PRONONCIATION.reduce((t, [motif, remplacement]) => t.replace(motif, remplacement), texte)
+    .replace(/^[\s,]+/, '')
+    .replace(/\s+([.,])/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function decouperPhrases(texte) {
+  return texte.match(/[^.!?]+[.!?]+|[^.!?]+$/g)?.map((p) => p.trim()).filter(Boolean) ?? [texte]
+}
+
+/*
+ * Voix classées de la plus humaine à la plus synthétique : voix neuronales d'Edge (« Natural »),
+ * puis Google (Chrome), puis voix installées dans Windows. Eloise, voix d'enfant, passe après les autres.
+ */
+const PREFERENCES_VOIX = [/vivienne/i, /denise/i, /r[ée]my/i, /henri/i, /google/i, /julie/i, /paul/i, /hortense/i]
+const EST_EDGE = /Edg\//.test(navigator.userAgent)
+// Le lien « microsoft-edge: » n'ouvre que des pages web : Edge l'ignore pour un fichier local.
+const EST_FICHIER = location.protocol === 'file:'
+const PEUT_OUVRIR_EDGE = /Windows/.test(navigator.userAgent) && EN_LIGNE
+
+function estNaturelle(v) {
+  return /natural|neural|premium|enhanced/i.test(v.name)
+}
+
+function rangVoix(v) {
+  const preference = PREFERENCES_VOIX.findIndex((motif) => motif.test(v.name))
+  return (/fr[-_]FR/i.test(v.lang) ? 0 : 100)
+    + (estNaturelle(v) ? 0 : 50)
+    + (/eloise/i.test(v.name) ? 40 : 0)
+    + (preference < 0 ? PREFERENCES_VOIX.length : preference)
+}
+
+function trierVoix(liste) {
+  return [...liste].sort((a, b) => rangVoix(a) - rangVoix(b))
+}
+
+function meilleureVoix(liste) {
+  return trierVoix(liste)[0] ?? null
+}
+
+/** « Microsoft Denise Online (Natural) - French (France) » → « Denise ». */
+function nomCourt(v) {
+  const nom = v.name.replace(/^Microsoft\s+/i, '').replace(/\s+-\s+.*$/, '').replace(/\s+Online\s*\(Natural\)/i, '')
+  return /fr[-_]FR/i.test(v.lang) ? nom : `${nom} (${v.lang})`
+}
+
+function nomVoix(v) {
+  if (estNaturelle(v)) return `${nomCourt(v)} · voix naturelle`
+  return v.localService ? nomCourt(v) : `${nomCourt(v)} · en ligne`
+}
+
+function lireStockage(cle) {
+  try { return localStorage.getItem(cle) } catch { return null }
+}
+function ecrireStockage(cle, valeur) {
+  try { localStorage.setItem(cle, valeur) } catch { /* stockage indisponible (fichier local, navigation privée) */ }
+}
+
+const Voix = {
+  disponible: 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window,
+  liste: [],
+  choisie: null,
+  prefere: lireStockage(CLES_STOCKAGE.voix), // voix choisie à la main dans les réglages
+  debit: Number(lireStockage(CLES_STOCKAGE.debit)) || 1,
+  coupee: false,
+  chargee: false,
+  enCours: [],
+
+  init() {
+    if (!this.disponible) return majNotesVoix()
+    const charger = () => {
+      this.liste = trierVoix(speechSynthesis.getVoices().filter((v) => /^fr\b/i.test(v.lang.replace('_', '-'))))
+      if (this.liste.length) this.chargee = true
+      // Les voix arrivent en plusieurs fois (locales, puis en ligne) : seul un choix manuel est conservé.
+      this.choisie = this.liste.find((v) => v.name === this.prefere) ?? meilleureVoix(this.liste)
+      remplirChoixVoix()
+      majNotesVoix()
+    }
+    charger()
+    speechSynthesis.addEventListener?.('voiceschanged', charger)
+    // Certains navigateurs ne signalent jamais la fin du chargement : on tranche après un délai.
+    setTimeout(() => { this.chargee = true; majNotesVoix() }, 2000)
+  },
+
+  utilisable() {
+    return this.disponible && !this.coupee && Boolean(this.choisie)
+  },
+
+  estimation(texte) {
+    return Math.round((texte.split(/\s+/).length / (MOTS_PAR_SECONDE * this.debit)) * 1000) + 400
+  },
+
+  dire(texte, gen) {
+    const estimation = this.estimation(texte)
+    if (!this.utilisable()) return attendre(estimation, gen)
+    return new Promise((resolve) => {
+      let fini = false
+      const terminer = () => {
+        if (fini || gen !== etat.gen) return
+        fini = true
+        resolve()
+      }
+      const phrases = decouperPhrases(pourLaVoix(texte))
+      programmer(estimation * 2 + 4000, terminer) // garde-fou si la fin de lecture n'est jamais signalée
+      programmer(60, () => { // Chrome ignore parfois une lecture lancée juste après une annulation
+        this.enCours = phrases.map((phrase, i) => {
+          const u = new SpeechSynthesisUtterance(phrase)
+          u.voice = this.choisie
+          u.lang = this.choisie.lang
+          u.rate = this.debit
+          u.onend = () => { if (i === phrases.length - 1) terminer() }
+          u.onerror = (e) => this.surErreur(e, () => programmer(estimation, terminer))
+          return u
+        })
+        speechSynthesis.resume()
+        this.enCours.forEach((u) => speechSynthesis.speak(u))
+      })
+    })
+  },
+
+  surErreur(e, secours) {
+    if (e.error === 'interrupted' || e.error === 'canceled') return
+    // Voix en ligne injoignable (hors connexion…) : on bascule sur une voix installée pour la suite.
+    if (this.choisie && !this.choisie.localService) {
+      const locale = meilleureVoix(this.liste.filter((v) => v.localService))
+      if (locale) {
+        this.choisie = locale
+        remplirChoixVoix()
+        majNotesVoix()
+      }
+    }
+    secours()
+  },
+
+  arreter() {
+    if (this.disponible) speechSynthesis.cancel()
+    this.enCours = []
+  },
+}
+
+function remplirChoixVoix() {
+  const select = $('#choix-voix')
+  select.replaceChildren()
+  select.disabled = !Voix.liste.length
+  if (!Voix.liste.length) return select.add(new Option('Aucune voix française', ''))
+  Voix.liste.forEach((v) => select.add(new Option(nomVoix(v), v.name, false, v.name === Voix.choisie?.name)))
+}
+
+function majNotesVoix() {
+  const choisie = Voix.choisie
+  const naturelle = Boolean(choisie && estNaturelle(choisie))
+  let note
+  if (!Voix.disponible) note = 'Ce navigateur ne lit pas la voix off : suivez les sous-titres.'
+  else if (!choisie) note = Voix.chargee
+    ? 'Aucune voix française n’est installée sur cet appareil : suivez les sous-titres.'
+    : 'Recherche d’une voix française…'
+  else if (naturelle) note = `Activez le son de votre appareil. Voix off : ${nomCourt(choisie)} (voix naturelle).`
+  else note = `Voix off : ${nomCourt(choisie)} (voix de synthèse).` + (EST_EDGE ? '' : EST_FICHIER
+    ? ' Pour une voix plus humaine, ouvrez ce fichier avec Microsoft Edge (clic droit › Ouvrir avec › Microsoft Edge).'
+    : ' Pour une voix plus humaine, ouvrez cette page dans Microsoft Edge.')
+  $('#note-voix-demarrage').textContent = note
+  // Edge propose des voix neuronales ; sous Windows, un lien rouvre cette page web dans Edge.
+  $('#lien-edge').hidden = !(Voix.chargee && PEUT_OUVRIR_EDGE && !EST_EDGE && !naturelle)
+  $('#note-voix-reglages').textContent = Voix.liste.some(estNaturelle)
+    ? 'Les voix naturelles sont les plus humaines ; elles demandent une connexion Internet.'
+    : note
+}
+
+/* ───────── Outils d'animation d'une scène ───────── */
+/** Position d'un élément dans la scène, sans tenir compte des animations en cours. */
+function position(el, racine) {
+  let x = 0
+  let y = 0
+  for (let n = el; n && n !== racine; n = n.offsetParent) {
+    x += n.offsetLeft
+    y += n.offsetTop
+  }
+  return { x, y, l: el.offsetWidth, h: el.offsetHeight }
+}
+
+/** En mode « instantané », chaque geste prend directement son état final (reprise, navigation). */
+function outils(scene, instant) {
+  const q = (selecteur) => scene.querySelector(selecteur)
+  const plusTard = (ms, fn) => (instant ? fn() : programmer(ms, fn))
+  const taper = (selecteur, texte, { masque = false, vitesse = 170 } = {}) => {
+    const champ = q(selecteur)
+    const valeur = champ?.querySelector('.val')
+    if (!valeur) return
+    const afficher = (n) => {
+      valeur.textContent = masque ? '•'.repeat(n) : texte.slice(0, n)
+      champ.classList.toggle('rempli', n > 0)
+    }
+    if (instant) return afficher(texte.length)
+    for (let i = 1; i <= texte.length; i++) programmer(i * vitesse, () => afficher(i))
+  }
+  return {
+    plusTard,
+    ajouter: (selecteur, classe) => q(selecteur)?.classList.add(classe),
+    retirer: (selecteur, classe) => q(selecteur)?.classList.remove(classe),
+    focus(selecteur) {
+      scene.querySelectorAll('.champ.focus').forEach((c) => c.classList.remove('focus'))
+      if (selecteur) q(selecteur)?.classList.add('focus')
+    },
+    viser(selecteur, fx = 0.5, fy = 0.55) {
+      const cible = q(selecteur)
+      const curseur = q('.curseur')
+      if (!cible || !curseur) return
+      const p = position(cible, scene)
+      curseur.style.setProperty('--x', `${Math.round(p.x + p.l * fx)}px`)
+      curseur.style.setProperty('--y', `${Math.round(p.y + p.h * fy)}px`)
+      curseur.classList.add('visible')
+    },
+    clic(selecteur) {
+      if (instant) return
+      const curseur = q('.curseur')
+      if (curseur) {
+        curseur.classList.remove('clic')
+        void curseur.offsetWidth // relance l'animation
+        curseur.classList.add('clic')
+      }
+      const cible = selecteur && q(selecteur)
+      if (cible) {
+        cible.classList.add('appuye')
+        programmer(180, () => cible.classList.remove('appuye'))
+      }
+    },
+    /** Tape un texte après un délai ; renvoie la durée de la frappe. */
+    taperPlusTard(delai, selecteur, texte, options) {
+      plusTard(delai, () => taper(selecteur, texte, options))
+      return instant ? 0 : texte.length * (options?.vitesse ?? 170)
+    },
+  }
+}
+
+/* ───────── Décor généré une fois ───────── */
+/** Motif de QR code purement décoratif (non scannable). */
+function qrDecoratif(n = 25) {
+  let graine = 20250
+  const alea = () => (graine = (graine * 16807) % 2147483647) / 2147483647
+  const reperes = [[0, 0], [n - 7, 0], [0, n - 7]]
+  const dansRepere = (x, y) => reperes.some(([a, b]) => x >= a - 1 && x <= a + 7 && y >= b - 1 && y <= b + 7)
+  let modules = ''
+  for (let y = 0; y < n; y++) {
+    for (let x = 0; x < n; x++) if (!dansRepere(x, y) && alea() < 0.48) modules += `M${x} ${y}h1v1h-1z`
+  }
+  const cadres = reperes.map(([a, b]) => `M${a} ${b}h7v7h-7zM${a + 1} ${b + 1}v5h5v-5zM${a + 2} ${b + 2}h3v3h-3z`).join('')
+  return `<svg viewBox="-1 -1 ${n + 2} ${n + 2}" shape-rendering="crispEdges" aria-hidden="true"><rect x="-1" y="-1" width="${n + 2}" height="${n + 2}" fill="#fff"/><path fill="#002B49" fill-rule="evenodd" d="${cadres}"/><path fill="#002B49" d="${modules}"/></svg>`
+}
+
+function preparerDecor() {
+  const qr = qrDecoratif()
+  document.querySelectorAll('.qr').forEach((el) => { el.innerHTML = qr })
+  document.querySelectorAll('[data-avec-curseur]').forEach((scene) => {
+    const [x, y] = scene.dataset.avecCurseur.split(',')
+    scene.insertAdjacentHTML('beforeend',
+      `<div class="curseur" style="--x:${x}px;--y:${y}px"><svg viewBox="0 0 22 28" aria-hidden="true"><path d="M2 2v20.5l5.2-5 3.4 7.9 3.7-1.6-3.4-7.7H18z" fill="#fff" stroke="#0b1b2e" stroke-width="1.6" stroke-linejoin="round"/></svg><span class="onde"></span></div>`)
+  })
+  scenesEl.forEach((el) => gabarits.set(el.id, el.innerHTML))
+}
+
+/* ───────── Déroulé ───────── */
+/** Remet la scène dans son état initial puis applique instantanément ses `nbTemps` premiers temps. */
+function preparerScene(i, nbTemps) {
+  const el = scenesEl[i]
+  const active = el.classList.contains('active')
+  el.innerHTML = gabarits.get(el.id)
+  el.className = active ? 'scene active instant' : 'scene instant'
+  const o = outils(el, true)
+  for (let t = 0; t < nbTemps; t++) {
+    el.classList.add('b' + t)
+    SCENES[i].temps[t].faire?.(o)
+  }
+  void el.offsetWidth // fige l'état sans transition
+  el.classList.remove('instant')
+}
+
+function afficherScene(i) {
+  scenesEl.forEach((el, j) => el.classList.toggle('active', j === i))
+  const etape = SCENES[i].etape
+  stage.dataset.etape = etape
+  stage.querySelectorAll('.rail li').forEach((li) => {
+    const n = Number(li.dataset.etape)
+    li.classList.toggle('courant', n === etape)
+    li.classList.toggle('fait', n < etape)
+  })
+}
+
+/** Espaces insécables de la typographie française : « » et : ; ! ? ne se retrouvent jamais seuls en début de ligne. */
+function insecables(texte) {
+  return texte.replace(/«\s+/g, '« ').replace(/\s+([»:;!?])/g, ' $1')
+}
+
+function afficherSousTitre(texte) {
+  const st = $('#sous-titre')
+  st.textContent = insecables(texte)
+  st.classList.remove('nouveau')
+  void st.offsetWidth
+  if (texte) st.classList.add('nouveau')
+}
+
+async function jouerTemps(i, t, gen) {
+  const el = scenesEl[i]
+  const temps = SCENES[i].temps[t]
+  el.classList.add('b' + t)
+  temps.faire?.(outils(el, false))
+  afficherSousTitre(temps.texte)
+  animerSegment(Math.max(temps.min ?? 0, Voix.estimation(temps.texte)) + PAUSE_APRES_TEMPS_MS)
+  await Promise.all([Voix.dire(temps.texte, gen), attendre(temps.min ?? 0, gen)])
+  await attendre(PAUSE_APRES_TEMPS_MS, gen)
+}
+
+async function jouer() {
+  const gen = ++etat.gen
+  etat.lecture = true
+  etat.fini = false
+  majControles()
+  for (;;) {
+    const scene = SCENES[etat.scene]
+    while (etat.temps < scene.temps.length) {
+      await jouerTemps(etat.scene, etat.temps, gen)
+      if (gen !== etat.gen) return
+      etat.temps += 1
+      majProgression()
+    }
+    if (etat.scene >= SCENES.length - 1) break
+    etat.scene += 1
+    etat.temps = 0
+    preparerScene(etat.scene, 0)
+    afficherScene(etat.scene)
+    afficherSousTitre('')
+    majProgression()
+    await attendre(TRANSITION_SCENE_MS, gen)
+    if (gen !== etat.gen) return
+  }
+  etat.lecture = false
+  etat.fini = true
+  majControles()
+}
+
+function arreter() {
+  etat.gen += 1
+  annulerMinuteurs()
+  Voix.arreter()
+  etat.lecture = false
+}
+
+/** Place la présentation sur une scène ; sans lecture, la scène est montrée complète. */
+function allerA(i, temps, lancer) {
+  arreter()
+  etat.scene = i
+  etat.temps = temps
+  etat.fini = false
+  preparerScene(i, lancer ? temps : SCENES[i].temps.length)
+  afficherScene(i)
+  majProgression()
+  majControles()
+  if (lancer) jouer()
+  else afficherSousTitre('')
+}
+
+function pause() {
+  arreter()
+  figerSegment()
+  majControles()
+}
+
+function basculerLecture() {
+  if (etat.lecture) return pause()
+  if (etat.fini) return allerA(0, 0, true)
+  allerA(etat.scene, etat.temps, true) // reprend le temps en cours depuis son début
+}
+
+function precedent() {
+  const recommencerScene = etat.temps > 0 && !etat.fini
+  allerA(recommencerScene ? etat.scene : Math.max(0, etat.scene - 1), 0, etat.lecture)
+}
+
+function suivant() {
+  if (etat.scene < SCENES.length - 1) allerA(etat.scene + 1, 0, etat.lecture)
+}
+
+/* ───────── Barre de contrôle ───────── */
+const icone = (id) => `<svg class="ic"><use href="#i-${id}"/></svg>`
+
+function construireSegments() {
+  segments = SCENES.map((scene, i) => {
+    const b = document.createElement('button')
+    b.type = 'button'
+    b.className = 'seg'
+    b.style.setProperty('--n', scene.temps.length)
+    b.title = scene.titre
+    b.setAttribute('aria-label', `Aller à : ${scene.titre}`)
+    b.innerHTML = '<i></i>'
+    b.addEventListener('click', () => allerA(i, 0, etat.lecture))
+    $('#segments').append(b)
+    return b
+  })
+}
+
+function majProgression() {
+  segments.forEach((seg, j) => {
+    const n = SCENES[j].temps.length
+    const fraction = j < etat.scene ? 1 : j > etat.scene ? 0 : Math.min(1, etat.temps / n)
+    const barre = seg.firstElementChild
+    barre.style.transition = 'transform .4s ease'
+    barre.style.transform = `scaleX(${fraction})`
+    seg.toggleAttribute('aria-current', j === etat.scene)
+  })
+  $('#titre-courant').textContent = SCENES[etat.scene].titre
+  $('#compteur').textContent = `${etat.scene + 1} / ${SCENES.length}`
+}
+
+function animerSegment(dureeMs) {
+  const barre = segments[etat.scene].firstElementChild
+  barre.style.transition = `transform ${dureeMs}ms linear`
+  barre.style.transform = `scaleX(${(etat.temps + 1) / SCENES[etat.scene].temps.length})`
+}
+
+function figerSegment() {
+  const barre = segments[etat.scene]?.firstElementChild
+  if (!barre) return
+  const actuelle = getComputedStyle(barre).transform
+  barre.style.transition = 'none'
+  barre.style.transform = actuelle
+}
+
+function majControles() {
+  const lecture = $('#b-lecture')
+  const mode = etat.lecture ? 'pause' : etat.fini ? 'rejouer' : 'lecture'
+  lecture.innerHTML = icone(mode)
+  lecture.setAttribute('aria-label', { pause: 'Mettre en pause', rejouer: 'Revoir depuis le début', lecture: 'Lecture' }[mode])
+  const son = $('#b-son')
+  son.innerHTML = icone(Voix.coupee ? 'muet' : 'son')
+  son.setAttribute('aria-pressed', String(Voix.coupee))
+  son.setAttribute('aria-label', Voix.coupee ? 'Réactiver la voix off' : 'Couper la voix off')
+  $('#b-st').setAttribute('aria-pressed', String(etat.sousTitres))
+}
+
+function basculerSousTitres() {
+  etat.sousTitres = !etat.sousTitres
+  stage.classList.toggle('sans-st', !etat.sousTitres)
+  majControles()
+}
+
+function basculerVoix() {
+  Voix.coupee = !Voix.coupee
+  majControles()
+  if (etat.lecture) allerA(etat.scene, etat.temps, true) // rejoue le temps en cours avec le nouveau réglage
+}
+
+function basculerReglages(ouvrir = $('#reglages').hidden) {
+  $('#reglages').hidden = !ouvrir
+  $('#b-reglages').setAttribute('aria-expanded', String(ouvrir))
+}
+
+function pleinEcran() {
+  if (document.fullscreenElement) document.exitFullscreen?.()
+  else document.documentElement.requestFullscreen?.().catch(() => {})
+}
+
+function ajuster() {
+  const plein = Boolean(document.fullscreenElement)
+  document.body.classList.toggle('plein', plein)
+  const hauteur = innerHeight - (plein ? 0 : HAUTEUR_BARRE)
+  const k = Math.min(innerWidth / LARGEUR, hauteur / HAUTEUR) * (plein ? 1 : 0.97)
+  stage.style.setProperty('--k', String(Math.max(k, 0.1)))
+}
+
+let minuteurInactivite
+function signalerActivite() {
+  document.body.classList.remove('inactif')
+  clearTimeout(minuteurInactivite)
+  minuteurInactivite = setTimeout(() => {
+    if (etat.lecture && $('#reglages').hidden) document.body.classList.add('inactif')
+  }, 2500)
+}
+
+function demarrer() {
+  $('#demarrage').hidden = true
+  allerA(0, 0, true)
+  $('#b-lecture').focus({ preventScroll: true })
+}
+
+function brancherEvenements() {
+  $('#b-lancer').addEventListener('click', demarrer)
+  $('#b-lecture').addEventListener('click', basculerLecture)
+  $('#b-prec').addEventListener('click', precedent)
+  $('#b-suiv').addEventListener('click', suivant)
+  $('#b-st').addEventListener('click', basculerSousTitres)
+  $('#b-son').addEventListener('click', basculerVoix)
+  $('#b-plein').addEventListener('click', pleinEcran)
+  $('#b-reglages').addEventListener('click', () => basculerReglages())
+  stage.addEventListener('click', (e) => { if (e.target.closest('#b-revoir')) allerA(0, 0, true) })
+
+  $('#choix-voix').addEventListener('change', (e) => {
+    Voix.choisie = Voix.liste.find((v) => v.name === e.target.value) ?? Voix.choisie
+    Voix.prefere = Voix.choisie?.name ?? null
+    if (Voix.prefere) ecrireStockage(CLES_STOCKAGE.voix, Voix.prefere)
+    majNotesVoix()
+  })
+  const debit = $('#debit')
+  debit.value = String(Voix.debit)
+  const afficherDebit = () => { $('#debit-val').textContent = `${Voix.debit.toFixed(2).replace('.', ',')}×` }
+  afficherDebit()
+  debit.addEventListener('input', () => {
+    Voix.debit = Number(debit.value)
+    ecrireStockage(CLES_STOCKAGE.debit, debit.value)
+    afficherDebit()
+  })
+  $('#b-tester').addEventListener('click', () => {
+    if (etat.lecture) pause()
+    const coupee = Voix.coupee
+    Voix.coupee = false
+    Voix.dire('Bonjour ! Voici la voix off de la présentation.', etat.gen)
+    Voix.coupee = coupee
+  })
+
+  document.addEventListener('keydown', (e) => {
+    if (e.target.closest('select, input, textarea')) return
+    if (e.target.closest('button') && (e.key === ' ' || e.key === 'Enter')) return
+    if (!$('#demarrage').hidden) return
+    if (e.key === 'Escape' && !$('#reglages').hidden) return basculerReglages(false)
+    const actions = { ' ': basculerLecture, k: basculerLecture, ArrowRight: suivant, ArrowLeft: precedent, s: basculerSousTitres, m: basculerVoix, f: pleinEcran }
+    const action = actions[e.key.length === 1 ? e.key.toLowerCase() : e.key]
+    if (!action) return
+    e.preventDefault()
+    action()
+  })
+  document.addEventListener('click', (e) => {
+    if (!$('#reglages').hidden && !e.target.closest('.reglages-wrap')) basculerReglages(false)
+  })
+  document.addEventListener('visibilitychange', () => { if (document.hidden && etat.lecture) pause() })
+  document.addEventListener('fullscreenchange', ajuster)
+  document.addEventListener('mousemove', signalerActivite)
+  document.addEventListener('keydown', signalerActivite)
+  addEventListener('resize', ajuster)
+}
+
+function init() {
+  document.body.classList.toggle('en-ligne', EN_LIGNE) // montre « Se connecter maintenant » en fin de présentation
+  $('#lien-edge').href = `microsoft-edge:${location.href}`
+  preparerDecor()
+  construireSegments()
+  Voix.init()
+  brancherEvenements()
+  ajuster()
+  // Aperçu de la première scène derrière l'écran de démarrage
+  preparerScene(0, SCENES[0].temps.length)
+  afficherScene(0)
+  majProgression()
+  majControles()
+  $('#b-lancer').focus({ preventScroll: true })
+}
+
+init()
+</script>
+</body>
+</html>
