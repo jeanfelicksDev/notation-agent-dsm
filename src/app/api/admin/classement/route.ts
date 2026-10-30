@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { requireAdmin } from '@/lib/auth'
 import { attribuerRangs, calculerScores, enregistrerScores } from '@/lib/scores'
+import type { Role } from '@prisma/client'
 
 export const dynamic = 'force-dynamic'
 
@@ -210,8 +211,13 @@ const SELECT_UTILISATEUR = {
 } as const
 
 async function listeCampagnes() {
+  // Poids et prix chargés d'emblée : la campagne choisie n'a pas à être relue ensuite.
   const campagnes = await prisma.campagne.findMany({
-    select: { id: true, libelle: true, statut: true, dateDebut: true, dateFin: true },
+    select: {
+      id: true, libelle: true, statut: true, dateDebut: true, dateFin: true,
+      poidsCollegues: true, poidsManager: true, poidsClient: true,
+      prixGlobal: true, prixDirection: true, prixDepartement: true, prixService: true,
+    },
     orderBy: { dateDebut: 'desc' },
   })
   const annees = [...new Set(campagnes.map((c) => new Date(c.dateDebut).getFullYear()))].sort((a, b) => b - a)
@@ -222,7 +228,8 @@ async function listeCampagnes() {
     dateDebut: new Date(`${annee}-01-01`),
     dateFin: new Date(`${annee}-12-31`),
   }))
-  return { campagnes, toutesLesCampagnes: [...annuels, ...campagnes] }
+  const resume = campagnes.map(({ id, libelle, statut, dateDebut, dateFin }) => ({ id, libelle, statut, dateDebut, dateFin }))
+  return { campagnes, toutesLesCampagnes: [...annuels, ...resume] }
 }
 
 async function palmaresAnnuel(annee: number, toutesLesCampagnes: unknown[]) {
@@ -295,17 +302,24 @@ async function getFullClassementData(cible?: string) {
     }
   }
 
-  const campagne = await prisma.campagne.findUniqueOrThrow({ where: { id: choisie.id } })
+  const campagne = choisie
 
   // Campagne ouverte, ou close sans calcul enregistré : classement calculé à la volée, sans écriture.
-  const enregistres = await prisma.scoreFinal.findMany({ where: { campagneId: campagne.id } })
-  const provisoire = campagne.statut === 'OUVERTE' || enregistres.length === 0
-  const scores = provisoire ? await calculerScores(campagne.id) : enregistres
-
-  const utilisateurs = await prisma.utilisateur.findMany({
-    where: { id: { in: scores.map((s) => s.utilisateurId) } },
-    select: { id: true, ...SELECT_UTILISATEUR },
-  })
+  // Scores et agents classables sont chargés en parallèle.
+  const chargerScores = async () => {
+    if (campagne.statut !== 'OUVERTE') {
+      const enregistres = await prisma.scoreFinal.findMany({ where: { campagneId: campagne.id } })
+      if (enregistres.length > 0) return { provisoire: false, scores: enregistres }
+    }
+    return { provisoire: true, scores: await calculerScores(campagne.id, campagne) }
+  }
+  const [{ provisoire, scores }, utilisateurs] = await Promise.all([
+    chargerScores(),
+    prisma.utilisateur.findMany({
+      where: { role: { in: [...ROLES_CLASSES] as Role[] } },
+      select: { id: true, ...SELECT_UTILISATEUR },
+    }),
+  ])
   const parId = new Map(utilisateurs.map((u) => [u.id, u]))
 
   const rawList = scores

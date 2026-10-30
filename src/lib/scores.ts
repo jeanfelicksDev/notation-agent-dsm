@@ -67,11 +67,16 @@ export function attribuerRangs<T extends { scoreTotal: number; scoreManager: num
   return triee
 }
 
-export async function calculerScores(campagneId: string): Promise<ScoreCalcule[]> {
-  const campagne = await prisma.campagne.findUnique({
-    where: { id: campagneId },
-    select: { id: true, poidsCollegues: true, poidsManager: true, poidsClient: true },
-  })
+type PoidsCampagne = { id: string; poidsCollegues: number; poidsManager: number; poidsClient: number }
+
+/** `connue` évite de relire la campagne quand l'appelant l'a déjà chargée. */
+export async function calculerScores(campagneId: string, connue?: PoidsCampagne): Promise<ScoreCalcule[]> {
+  const campagne =
+    connue ??
+    (await prisma.campagne.findUnique({
+      where: { id: campagneId },
+      select: { id: true, poidsCollegues: true, poidsManager: true, poidsClient: true },
+    }))
   if (!campagne) return []
 
   const [terminees, invalidees, notes, notesClients] = await Promise.all([
