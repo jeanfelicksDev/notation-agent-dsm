@@ -9,7 +9,6 @@ import {
   verifyPassword,
 } from '@/lib/auth'
 import { trouverParIdentifiant } from '@/lib/identifiant'
-import { estHorsCampagne, MESSAGE_HORS_CAMPAGNE } from '@/lib/roles'
 
 const ERREUR_GENERIQUE = 'Identifiant ou PIN incorrect.'
 
@@ -32,10 +31,6 @@ export async function POST(request: NextRequest) {
     })
     if (!utilisateur) {
       return NextResponse.json({ error: ERREUR_GENERIQUE }, { status: 401 })
-    }
-
-    if (estHorsCampagne(utilisateur.role)) {
-      return NextResponse.json({ error: MESSAGE_HORS_CAMPAGNE }, { status: 403 })
     }
 
     if (compteVerrouille(utilisateur.verrouilleJusqua)) {

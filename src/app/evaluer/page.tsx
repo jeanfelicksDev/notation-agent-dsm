@@ -665,7 +665,7 @@ export default function EvaluerPage() {
                             }`}
                           >
                             <span
-                              className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold tabular-nums transition-colors ${
+                              className={`flex h-6 w-6 items-center justify-center rounded-full text-2xs font-semibold tabular-nums transition-colors ${
                                 actif
                                   ? v > 0
                                     ? 'bg-gold-400 text-navy-950'

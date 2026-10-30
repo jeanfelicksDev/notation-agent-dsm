@@ -1,11 +1,13 @@
 import type { Metadata, Viewport } from 'next'
-import { Public_Sans, Source_Serif_4 } from 'next/font/google'
+import { IBM_Plex_Sans, Source_Serif_4 } from 'next/font/google'
 import { Toaster } from '@/components/ui/feedback'
 import './globals.css'
 
-const publicSans = Public_Sans({
+/** Sans institutionnelle : lettres bien distinctes (Il1, 0O) et chiffres nets pour les scores. */
+const plexSans = IBM_Plex_Sans({
   subsets: ['latin'],
-  variable: '--font-public-sans',
+  style: ['normal', 'italic'],
+  variable: '--font-plex-sans',
   display: 'swap',
 })
 
@@ -36,7 +38,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="fr" className={`${publicSans.variable} ${sourceSerif.variable} h-full`}>
+    <html lang="fr" className={`${plexSans.variable} ${sourceSerif.variable} h-full`}>
       <body className="min-h-full bg-canvas text-slate-900 antialiased">
         {children}
         <Toaster />

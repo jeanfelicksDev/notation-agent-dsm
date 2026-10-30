@@ -11,9 +11,11 @@ import {
   ExternalLink, Building2, FolderGit2, Sparkles, Crown, ListOrdered, Eye, EyeOff, Filter
 } from 'lucide-react'
 import AdminHeader from '@/components/AdminHeader'
+import OutilsRepartition, { type PerspectiveRepartition } from '@/components/OutilsRepartition'
+import ReconductionAffectations from '@/components/ReconductionAffectations'
 import { confirmer, toast } from '@/components/ui/feedback'
 import { typesDuCritere } from '@/lib/criteres'
-import { estHorsCampagne } from '@/lib/roles'
+import { estCadre } from '@/lib/roles'
 import { getAppreciationInfo } from '@/lib/default-criteres'
 
 interface Critere {
@@ -75,6 +77,8 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
 
   const [allUsers, setAllUsers] = useState<User[]>([])
   const [affectations, setAffectations] = useState<any[]>([])
+  // Agent à ouvrir dans la répartition depuis le contrôle (n change à chaque clic, même sur le même agent)
+  const [focusRepartition, setFocusRepartition] = useState<FocusRepartition | null>(null)
   const [closing, setClosing] = useState(false)
   const [calculating, setCalculating] = useState(false)
 
@@ -114,8 +118,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
   const loadUsers = () => {
     fetch('/api/admin/utilisateurs')
       .then(res => res.json())
-      // Les cadres sont dans l'annuaire mais ne participent pas aux campagnes.
-      .then(data => setAllUsers(Array.isArray(data) ? data.filter((u: User) => !estHorsCampagne(u.role)) : []))
+      .then(data => setAllUsers(Array.isArray(data) ? data : []))
   }
 
   const loadAffectations = () => {
@@ -388,12 +391,12 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
           <div className="max-w-[1780px] w-full mx-auto space-y-6">
             {/* Header / Actions */}
             <div className="flex items-center justify-between">
-              <Link href="/admin/campagnes" className="group flex items-center gap-2 text-slate-500 hover:text-slate-800 font-bold transition-colors">
+              <Link href="/admin/campagnes" className="group flex items-center gap-2 text-slate-500 hover:text-slate-800 font-semibold transition-colors">
                 <ArrowLeft className="w-5 h-5 transition-transform group-hover:-translate-x-1" /> Retour
               </Link>
               <button
                 onClick={handleDelete}
-                className="flex items-center gap-2 text-red-500 hover:text-red-600 hover:bg-red-50 px-4 py-2 rounded-xl transition-all font-bold text-sm"
+                className="flex items-center gap-2 text-red-500 hover:text-red-600 hover:bg-red-50 px-4 py-2 rounded-xl transition-all font-semibold text-sm"
               >
                 <Trash2 className="w-5 h-5" /> Supprimer cette Campagne
               </button>
@@ -404,40 +407,40 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
               <div className="inline-flex items-center gap-1.5 bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm">
                 <button 
                   onClick={() => setActiveTab('config')}
-                  className={`flex items-center gap-2 py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition-all ${activeTab === 'config' ? 'bg-navy-700 text-white shadow-md shadow-navy-100' : 'text-slate-600 hover:bg-slate-50'}`}
+                  className={`flex items-center gap-2 py-2.5 px-4 rounded-xl font-semibold text-xs sm:text-sm whitespace-nowrap transition-all ${activeTab === 'config' ? 'bg-navy-700 text-white shadow-md shadow-navy-100' : 'text-slate-600 hover:bg-slate-50'}`}
                 >
                   <Settings2 className="w-4 h-4" /> Configuration
                 </button>
                 <button 
                   onClick={() => setActiveTab('criteres')}
-                  className={`flex items-center gap-2 py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition-all ${activeTab === 'criteres' ? 'bg-navy-700 text-white shadow-md shadow-navy-100' : 'text-slate-600 hover:bg-slate-50'}`}
+                  className={`flex items-center gap-2 py-2.5 px-4 rounded-xl font-semibold text-xs sm:text-sm whitespace-nowrap transition-all ${activeTab === 'criteres' ? 'bg-navy-700 text-white shadow-md shadow-navy-100' : 'text-slate-600 hover:bg-slate-50'}`}
                 >
                   <ClipboardList className="w-4 h-4" /> Critères ({criteres.length})
                 </button>
                 <button 
                   onClick={() => setActiveTab('affectations')}
-                  className={`flex items-center gap-2 py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition-all ${activeTab === 'affectations' ? 'bg-navy-700 text-white shadow-md shadow-navy-100' : 'text-slate-600 hover:bg-slate-50'}`}
+                  className={`flex items-center gap-2 py-2.5 px-4 rounded-xl font-semibold text-xs sm:text-sm whitespace-nowrap transition-all ${activeTab === 'affectations' ? 'bg-navy-700 text-white shadow-md shadow-navy-100' : 'text-slate-600 hover:bg-slate-50'}`}
                 >
                   <Users2 className="w-4 h-4" /> Affectations
                 </button>
                 <button 
                   onClick={() => setActiveTab('suivi')}
-                  className={`flex items-center gap-2 py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition-all ${activeTab === 'suivi' ? 'bg-navy-700 text-white shadow-md shadow-navy-100' : 'text-slate-600 hover:bg-slate-50'}`}
+                  className={`flex items-center gap-2 py-2.5 px-4 rounded-xl font-semibold text-xs sm:text-sm whitespace-nowrap transition-all ${activeTab === 'suivi' ? 'bg-navy-700 text-white shadow-md shadow-navy-100' : 'text-slate-600 hover:bg-slate-50'}`}
                 >
                   <Activity className="w-4 h-4" /> Suivi
                 </button>
                 <button 
                   onClick={() => setActiveTab('prix')}
-                  className={`flex items-center gap-2 py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition-all ${activeTab === 'prix' ? 'bg-navy-700 text-white shadow-md shadow-navy-100' : 'text-slate-600 hover:bg-slate-50'}`}
+                  className={`flex items-center gap-2 py-2.5 px-4 rounded-xl font-semibold text-xs sm:text-sm whitespace-nowrap transition-all ${activeTab === 'prix' ? 'bg-navy-700 text-white shadow-md shadow-navy-100' : 'text-slate-600 hover:bg-slate-50'}`}
                 >
                   <Gift className="w-4 h-4" /> Prix & Distinctions
                 </button>
                 <button 
                   onClick={() => setActiveTab('classement')}
-                  className={`flex items-center gap-2 py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition-all ${
+                  className={`flex items-center gap-2 py-2.5 px-4 rounded-xl font-semibold text-xs sm:text-sm whitespace-nowrap transition-all ${
                     activeTab === 'classement' 
                       ? 'bg-navy-900 text-gold-500 shadow-md border border-gold-500/30' 
-                      : 'text-navy-900 hover:bg-amber-50/50 font-black'
+                      : 'text-navy-900 hover:bg-amber-50/50 font-bold'
                   }`}
                 >
                   <Trophy className="w-4 h-4 text-gold-500" /> Classement & Palmarès
@@ -448,14 +451,14 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
             {saveSuccess && (
               <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3 text-emerald-800 shadow-sm">
                 <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
-                <p className="font-bold">Modifications enregistrées avec succès !</p>
+                <p className="font-semibold">Modifications enregistrées avec succès !</p>
               </div>
             )}
 
             {error && (
               <div className="p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 text-red-700">
                 <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                <p className="font-bold">{error}</p>
+                <p className="font-semibold">{error}</p>
               </div>
             )}
 
@@ -464,29 +467,29 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
               {activeTab === 'config' && (
                 <div className="bg-white shadow-card rounded-3xl p-8 border border-slate-200/50 shadow-sm space-y-8">
                   <div className="space-y-1">
-                    <h3 className="text-xl font-bold text-slate-900">Paramètres Généraux</h3>
+                    <h3 className="text-xl font-semibold text-slate-900">Paramètres Généraux</h3>
                     <p className="text-slate-500 text-sm font-medium">Définissez les bases de votre campagne d'évaluation.</p>
                   </div>
 
                   <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                     <div className="md:col-span-2 space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Libellé de la campagne</label>
+                      <label className="text-2xs font-bold text-slate-400 uppercase tracking-widest ml-1">Libellé de la campagne</label>
                       <input
                         type="text"
                         required
-                        className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 focus:bg-white transition-all outline-none font-bold text-slate-800"
+                        className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 focus:bg-white transition-all outline-none font-semibold text-slate-800"
                         value={formData.libelle}
                         onChange={e => setFormData({ ...formData, libelle: e.target.value })}
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Date de début</label>
+                      <label className="text-2xs font-bold text-slate-400 uppercase tracking-widest ml-1">Date de début</label>
                       <div className="relative">
                         <input
                           type="date"
                           required
-                          className="w-full px-5 py-3.5 pl-12 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 focus:bg-white transition-all outline-none font-bold text-slate-800"
+                          className="w-full px-5 py-3.5 pl-12 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 focus:bg-white transition-all outline-none font-semibold text-slate-800"
                           value={formData.dateDebut}
                           onChange={e => setFormData({ ...formData, dateDebut: e.target.value })}
                         />
@@ -495,12 +498,12 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Date de fin</label>
+                      <label className="text-2xs font-bold text-slate-400 uppercase tracking-widest ml-1">Date de fin</label>
                       <div className="relative">
                         <input
                           type="date"
                           required
-                          className="w-full px-5 py-3.5 pl-12 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 focus:bg-white transition-all outline-none font-bold text-slate-800"
+                          className="w-full px-5 py-3.5 pl-12 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 focus:bg-white transition-all outline-none font-semibold text-slate-800"
                           value={formData.dateFin}
                           onChange={e => setFormData({ ...formData, dateFin: e.target.value })}
                         />
@@ -509,9 +512,9 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Statut Actuel</label>
+                      <label className="text-2xs font-bold text-slate-400 uppercase tracking-widest ml-1">Statut Actuel</label>
                       <select
-                        className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 focus:bg-white transition-all outline-none font-bold text-slate-800 cursor-pointer"
+                        className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 focus:bg-white transition-all outline-none font-semibold text-slate-800 cursor-pointer"
                         value={formData.statut}
                         onChange={e => setFormData({ ...formData, statut: e.target.value })}
                       >
@@ -523,17 +526,17 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
 
                     <div className="space-y-4 md:col-span-2 pt-4">
                       <div className="flex items-center justify-between">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Répartition des poids</label>
-                        <span className="text-sm font-bold text-navy-800 bg-navy-50 px-3 py-1 rounded-full">Total 100%</span>
+                        <label className="text-2xs font-bold text-slate-400 uppercase tracking-widest ml-1">Répartition des poids</label>
+                        <span className="text-sm font-semibold text-navy-800 bg-navy-50 px-3 py-1 rounded-full">Total 100%</span>
                       </div>
                       <div className="grid grid-cols-2 gap-4 bg-slate-50 p-6 rounded-3xl border border-slate-100">
                         <div className="space-y-2">
-                          <span className="text-xs font-bold text-slate-600 block">Collègues (%)</span>
+                          <span className="text-xs font-semibold text-slate-600 block">Collègues (%)</span>
                           <input
                             type="number"
                             min="0"
                             max="100"
-                            className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-black text-navy-800 text-xl"
+                            className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold text-navy-800 text-xl"
                             value={formData.poidsCollegues}
                             onChange={e => {
                               const val = Math.min(100, Math.max(0, parseInt(e.target.value) || 0))
@@ -542,12 +545,12 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                           />
                         </div>
                         <div className="space-y-2">
-                          <span className="text-xs font-bold text-slate-600 block">Manager (%)</span>
+                          <span className="text-xs font-semibold text-slate-600 block">Manager (%)</span>
                           <input
                             type="number"
                             min="0"
                             max="100"
-                            className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-black text-amber-600 text-xl"
+                            className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold text-amber-600 text-xl"
                             value={formData.poidsManager}
                             onChange={e => {
                               const val = Math.min(100, Math.max(0, parseInt(e.target.value) || 0))
@@ -556,7 +559,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                           />
                         </div>
                         <div className="col-span-2 space-y-2 border-t border-slate-200 pt-4">
-                          <label htmlFor="poids-client" className="block text-xs font-bold text-slate-600">
+                          <label htmlFor="poids-client" className="block text-xs font-semibold text-slate-600">
                             Dont clients QR (points pris sur la part collègues)
                           </label>
                           <input
@@ -588,7 +591,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                               type="button"
                               onClick={handleCloture}
                               disabled={closing}
-                              className="bg-amber-600 hover:bg-amber-700 text-white px-7 py-3.5 rounded-2xl font-black transition-all active:scale-[0.98] shadow-lg shadow-amber-600/20 disabled:opacity-50 flex items-center gap-2.5 text-sm"
+                              className="bg-amber-600 hover:bg-amber-700 text-white px-7 py-3.5 rounded-2xl font-bold transition-all active:scale-[0.98] shadow-lg shadow-amber-600/20 disabled:opacity-50 flex items-center gap-2.5 text-sm"
                             >
                               {closing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
                               Clôturer la campagne
@@ -597,7 +600,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                               type="button"
                               onClick={() => handleCalculScores()}
                               disabled={calculating}
-                              className="bg-navy-700 hover:bg-navy-800 text-white px-7 py-3.5 rounded-2xl font-black transition-all active:scale-[0.98] shadow-lg shadow-navy-700/20 disabled:opacity-50 flex items-center gap-2.5 text-sm"
+                              className="bg-navy-700 hover:bg-navy-800 text-white px-7 py-3.5 rounded-2xl font-bold transition-all active:scale-[0.98] shadow-lg shadow-navy-700/20 disabled:opacity-50 flex items-center gap-2.5 text-sm"
                             >
                               {calculating ? <Loader2 className="w-4 h-4 animate-spin" /> : <BarChart3 className="w-4 h-4" />}
                               Calculer les scores
@@ -610,7 +613,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                               type="button"
                               onClick={() => handleCalculScores()}
                               disabled={calculating}
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white px-7 py-3.5 rounded-2xl font-black transition-all active:scale-[0.98] shadow-lg shadow-emerald-600/20 disabled:opacity-50 flex items-center gap-2.5 text-sm"
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white px-7 py-3.5 rounded-2xl font-bold transition-all active:scale-[0.98] shadow-lg shadow-emerald-600/20 disabled:opacity-50 flex items-center gap-2.5 text-sm"
                             >
                               {calculating ? <Loader2 className="w-4 h-4 animate-spin" /> : <BarChart3 className="w-4 h-4" />}
                               Calculer les scores
@@ -619,7 +622,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                               type="button"
                               onClick={handleRouvrir}
                               disabled={saving}
-                              className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-5 py-3.5 rounded-2xl font-bold transition-all text-sm flex items-center gap-2 shadow-sm"
+                              className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-5 py-3.5 rounded-2xl font-semibold transition-all text-sm flex items-center gap-2 shadow-sm"
                             >
                               <RefreshCw className="w-4 h-4 text-slate-500" />
                               Rouvrir la campagne
@@ -632,7 +635,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                               type="button"
                               onClick={handleCloture}
                               disabled={closing}
-                              className="bg-amber-600 hover:bg-amber-700 text-white px-6 py-3.5 rounded-2xl font-black transition-all active:scale-[0.98] shadow-lg shadow-amber-600/20 disabled:opacity-50 flex items-center gap-2 text-sm"
+                              className="bg-amber-600 hover:bg-amber-700 text-white px-6 py-3.5 rounded-2xl font-bold transition-all active:scale-[0.98] shadow-lg shadow-amber-600/20 disabled:opacity-50 flex items-center gap-2 text-sm"
                             >
                               {closing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
                               Clôturer / Figer
@@ -641,14 +644,14 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                               type="button"
                               onClick={() => handleCalculScores()}
                               disabled={calculating}
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3.5 rounded-2xl font-black transition-all active:scale-[0.98] shadow-lg shadow-emerald-600/20 disabled:opacity-50 flex items-center gap-2 text-sm"
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3.5 rounded-2xl font-bold transition-all active:scale-[0.98] shadow-lg shadow-emerald-600/20 disabled:opacity-50 flex items-center gap-2 text-sm"
                             >
                               {calculating ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                               Recalculer les scores
                             </button>
                             <Link
                               href={`/admin/classement?campagneId=${id}`}
-                              className="bg-navy-900 hover:bg-navy-950 text-gold-500 border border-gold-500/40 px-6 py-3.5 rounded-2xl font-black text-sm transition-all shadow-md flex items-center gap-2"
+                              className="bg-navy-900 hover:bg-navy-950 text-gold-500 border border-gold-500/40 px-6 py-3.5 rounded-2xl font-bold text-sm transition-all shadow-md flex items-center gap-2"
                             >
                               <Trophy className="w-4 h-4" />
                               Voir le classement
@@ -657,7 +660,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                               type="button"
                               onClick={handleRouvrir}
                               disabled={saving}
-                              className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-5 py-3.5 rounded-2xl font-bold transition-all text-sm flex items-center gap-2 shadow-sm"
+                              className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-5 py-3.5 rounded-2xl font-semibold transition-all text-sm flex items-center gap-2 shadow-sm"
                             >
                               Rouvrir la campagne
                             </button>
@@ -667,7 +670,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                       <button
                         type="submit"
                         disabled={saving}
-                        className="bg-slate-900 hover:bg-slate-800 text-white px-8 py-3.5 rounded-2xl font-black text-base transition-all active:scale-[0.98] shadow-xl disabled:opacity-50 flex items-center gap-2.5"
+                        className="bg-slate-900 hover:bg-slate-800 text-white px-8 py-3.5 rounded-2xl font-bold text-base transition-all active:scale-[0.98] shadow-xl disabled:opacity-50 flex items-center gap-2.5"
                       >
                         {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                         Enregistrer les modifications
@@ -682,8 +685,8 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                       <div className="flex items-center gap-2">
-                        <h3 className="text-2xl font-bold text-slate-900">Critères d'évaluation</h3>
-                        <span className="bg-navy-50 text-navy-900 text-xs font-black px-2.5 py-0.5 rounded-full border border-navy-100">
+                        <h3 className="text-2xl font-semibold text-slate-900">Critères d'évaluation</h3>
+                        <span className="bg-navy-50 text-navy-900 text-xs font-bold px-2.5 py-0.5 rounded-full border border-navy-100">
                           {criteres.length} critère{criteres.length > 1 ? 's' : ''}
                         </span>
                       </div>
@@ -694,7 +697,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                         type="button"
                         onClick={handleSeedOfficialCriteres}
                         disabled={seedingCriteres}
-                        className="text-xs font-bold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 px-4 py-2.5 rounded-xl transition-all border border-slate-200 shadow-sm flex items-center gap-2 disabled:opacity-50"
+                        className="text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 px-4 py-2.5 rounded-xl transition-all border border-slate-200 shadow-sm flex items-center gap-2 disabled:opacity-50"
                       >
                         {seedingCriteres ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4 text-navy-800" />}
                         <span>Rétablir la grille officielle</span>
@@ -702,7 +705,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                       {!showCritereForm && (
                         <button
                           onClick={() => { resetCritereForm(); setShowCritereForm(true) }}
-                          className="flex items-center gap-2 bg-navy-700 hover:bg-navy-800 text-white px-5 py-2.5 rounded-xl font-bold text-xs shadow-md shadow-navy-100 transition-all active:scale-95"
+                          className="flex items-center gap-2 bg-navy-700 hover:bg-navy-800 text-white px-5 py-2.5 rounded-xl font-semibold text-xs shadow-md shadow-navy-100 transition-all active:scale-95"
                         >
                           <Plus className="w-4 h-4" /> Ajouter un critère
                         </button>
@@ -715,7 +718,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                       <div className="absolute top-0 left-0 w-1.5 h-full bg-navy-700"></div>
                       <form onSubmit={handleCritereSubmit} className="space-y-6">
                         <div className="flex items-center justify-between mb-2">
-                          <h4 className="text-lg font-bold text-slate-900">{editingCritere ? 'Modifier le critère' : 'Nouveau critère'}</h4>
+                          <h4 className="text-lg font-semibold text-slate-900">{editingCritere ? 'Modifier le critère' : 'Nouveau critère'}</h4>
                           <button type="button" onClick={resetCritereForm} className="p-2 hover:bg-slate-100 rounded-full">
                             <X className="w-5 h-5 text-slate-400" />
                           </button>
@@ -723,11 +726,11 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                         
                         <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
                           <div className="md:col-span-9 xl:col-span-10 space-y-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Libellé du critère</label>
+                            <label className="text-2xs font-bold text-slate-400 uppercase tracking-widest ml-1">Libellé du critère</label>
                             <input
                               type="text"
                               required
-                              className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 outline-none font-bold"
+                              className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 outline-none font-semibold"
                               value={critereForm.libelle}
                               onChange={e => setCritereForm({ ...critereForm, libelle: e.target.value })}
                               placeholder="Ex: Ponctualité et assiduité"
@@ -735,19 +738,19 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                           </div>
                           
                           <div className="md:col-span-3 xl:col-span-2 space-y-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Note maximale</label>
+                            <label className="text-2xs font-bold text-slate-400 uppercase tracking-widest ml-1">Note maximale</label>
                             <input
                               type="number"
                               min="1"
                               max="20"
-                              className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 outline-none font-bold"
+                              className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 outline-none font-semibold"
                               value={critereForm.noteMaximale}
                               onChange={e => setCritereForm({ ...critereForm, noteMaximale: parseInt(e.target.value) || 5 })}
                             />
                           </div>
                           
                           <div className="md:col-span-12 space-y-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Description détaillée</label>
+                            <label className="text-2xs font-bold text-slate-400 uppercase tracking-widest ml-1">Description détaillée</label>
                             <textarea
                               rows={3}
                               className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 outline-none font-medium text-slate-600"
@@ -758,7 +761,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                           </div>
                           
                           <div className="md:col-span-12 space-y-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Évaluateurs autorisés</label>
+                            <label className="text-2xs font-bold text-slate-400 uppercase tracking-widest ml-1">Évaluateurs autorisés</label>
                             <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
                               {[
                                 { id: 'MANAGER', label: 'Managers' },
@@ -781,7 +784,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                                       });
                                     }}
                                   />
-                                  <span className="text-sm font-bold text-slate-700">{role.label}</span>
+                                  <span className="text-sm font-semibold text-slate-700">{role.label}</span>
                                 </label>
                               ))}
                             </div>
@@ -792,13 +795,13 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                           <button
                             type="button"
                             onClick={resetCritereForm}
-                            className="px-6 py-3 border border-slate-200 rounded-2xl text-slate-600 font-bold hover:bg-slate-50 transition-all"
+                            className="px-6 py-3 border border-slate-200 rounded-2xl text-slate-600 font-semibold hover:bg-slate-50 transition-all"
                           >
                             Annuler
                           </button>
                           <button
                             type="submit"
-                            className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-black shadow-lg transition-all active:scale-95 flex items-center gap-2"
+                            className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-bold shadow-lg transition-all active:scale-95 flex items-center gap-2"
                           >
                             {editingCritere ? <><Check className="w-5 h-5" /> Mettre à jour</> : <><Plus className="w-5 h-5" /> Ajouter au référentiel</>}
                           </button>
@@ -823,7 +826,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                     <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-1 md:pb-0">
                       <button
                         onClick={() => setCritereFilter('ALL')}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
                           critereFilter === 'ALL'
                             ? 'bg-slate-900 text-white shadow-sm'
                             : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -834,7 +837,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                       <button
                         onClick={() => setCritereFilter('TOUS')}
                         title="Critères notés à la fois par le manager, les collègues et les clients internes (hors clients externes)"
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
                           critereFilter === 'TOUS'
                             ? 'bg-navy-800 text-white shadow-sm'
                             : 'bg-navy-50 text-navy-900 hover:bg-navy-100'
@@ -844,7 +847,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                       </button>
                       <button
                         onClick={() => setCritereFilter('COLLEGUE')}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
                           critereFilter === 'COLLEGUE'
                             ? 'bg-navy-700 text-white shadow-sm'
                             : 'bg-navy-50 text-navy-800 hover:bg-navy-100'
@@ -854,7 +857,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                       </button>
                       <button
                         onClick={() => setCritereFilter('MANAGER')}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
                           critereFilter === 'MANAGER'
                             ? 'bg-teal-600 text-white shadow-sm'
                             : 'bg-teal-50 text-teal-700 hover:bg-teal-100'
@@ -864,7 +867,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                       </button>
                       <button
                         onClick={() => setCritereFilter('CLIENT')}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
                           critereFilter === 'CLIENT'
                             ? 'bg-amber-600 text-white shadow-sm'
                             : 'bg-amber-50 text-amber-800 hover:bg-amber-100'
@@ -874,7 +877,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                       </button>
                       <button
                         onClick={() => setCritereFilter('CLIENT_INTERNE')}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
                           critereFilter === 'CLIENT_INTERNE'
                             ? 'bg-pink-600 text-white shadow-sm'
                             : 'bg-pink-50 text-pink-700 hover:bg-pink-100'
@@ -907,8 +910,8 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                         >
                           <div className="flex-1 pr-4">
                             <div className="flex flex-wrap items-center gap-2.5">
-                              <h4 className="text-base font-bold text-slate-900">{critere.libelle}</h4>
-                              <span className="px-2.5 py-0.5 rounded-full bg-navy-50 text-navy-800 text-xs font-black border border-navy-100">
+                              <h4 className="text-base font-semibold text-slate-900">{critere.libelle}</h4>
+                              <span className="px-2.5 py-0.5 rounded-full bg-navy-50 text-navy-800 text-xs font-bold border border-navy-100">
                                 Noté de 1 à {critere.noteMaximale}
                               </span>
                               {typesDuCritere(critere).map(t => (
@@ -949,7 +952,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                         <div className="flex flex-col items-center gap-3 opacity-40">
                           <ClipboardList className="w-12 h-12" />
                           <div className="space-y-1">
-                            <p className="text-lg font-bold">Aucun critère</p>
+                            <p className="text-lg font-semibold">Aucun critère</p>
                             <p className="text-xs text-slate-500">Ajoutez un critère ou cliquez sur « Rétablir grille DSM ».</p>
                           </div>
                         </div>
@@ -960,12 +963,23 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
               )}
 
               {activeTab === 'affectations' && (
-                <AffectationsManager 
-                  campagneId={id} 
-                  users={allUsers} 
-                  initialAffectations={affectations}
-                  onUpdate={loadAffectations}
-                />
+                <div className="space-y-5">
+                  <OutilsRepartition
+                    campagneId={id}
+                    agents={allUsers}
+                    affectations={affectations}
+                    onUpdate={loadAffectations}
+                    onSelectionner={(agentId, perspective) => setFocusRepartition(f => ({ agentId, perspective, n: (f?.n ?? 0) + 1 }))}
+                  />
+                  <ReconductionAffectations campagneId={id} nbActuelles={affectations.length} onUpdate={loadAffectations} />
+                  <AffectationsManager
+                    campagneId={id}
+                    users={allUsers}
+                    initialAffectations={affectations}
+                    onUpdate={loadAffectations}
+                    focus={focusRepartition}
+                  />
+                </div>
               )}
 
               {activeTab === 'suivi' && (
@@ -979,7 +993,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                       <div className="flex items-center gap-2 text-amber-500 font-extrabold text-xs uppercase tracking-widest">
                         <Trophy className="w-4 h-4" /> Récompenses & Palmarès Officiels
                       </div>
-                      <h3 className="text-2xl font-bold text-slate-900">Grille des Prix & Distinctions</h3>
+                      <h3 className="text-2xl font-semibold text-slate-900">Grille des Prix & Distinctions</h3>
                       <p className="text-slate-500 text-sm font-medium">Définissez les 3 paliers officiels de distinctions : Direction (Super Lauréat), Département et Service.</p>
                     </div>
 
@@ -990,40 +1004,40 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                     {/* 1. Super Lauréat Direction */}
                     <div className="bg-gold-50 border border-gold-200 rounded-2xl p-5 flex flex-col justify-between shadow-sm relative overflow-hidden">
                       <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-amber-700 font-black text-xs uppercase tracking-wider">
+                        <div className="flex items-center gap-2 text-amber-700 font-bold text-xs uppercase tracking-wider">
                           <Trophy className="w-4 h-4 text-amber-600 flex-shrink-0" /> Super Lauréat Direction DSM
                         </div>
-                        <p className="text-sm font-black text-amber-950 mt-2 line-clamp-2">
+                        <p className="text-sm font-bold text-amber-950 mt-2 line-clamp-2">
                           {formData.prixDirection || formData.prixGlobal || "Non configuré"}
                         </p>
                       </div>
-                      <span className="text-[10px] text-amber-800 font-black mt-3 bg-amber-200/80 px-2.5 py-1 rounded-md w-fit">1er Prix • Niveau Direction</span>
+                      <span className="text-2xs text-amber-800 font-bold mt-3 bg-amber-200/80 px-2.5 py-1 rounded-md w-fit">1er Prix • Niveau Direction</span>
                     </div>
 
                     {/* 2. Prix Département */}
                     <div className="bg-teal-50 border border-teal-200 rounded-2xl p-5 flex flex-col justify-between shadow-sm">
                       <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-teal-700 font-black text-xs uppercase tracking-wider">
+                        <div className="flex items-center gap-2 text-teal-700 font-bold text-xs uppercase tracking-wider">
                           <Medal className="w-4 h-4 text-teal-600 flex-shrink-0" /> Meilleur Agent par Département
                         </div>
-                        <p className="text-sm font-bold text-teal-950 mt-2 line-clamp-2">
+                        <p className="text-sm font-semibold text-teal-950 mt-2 line-clamp-2">
                           {formData.prixDepartement || "Non configuré"}
                         </p>
                       </div>
-                      <span className="text-[10px] text-teal-700 font-black mt-3 bg-teal-100 px-2.5 py-1 rounded-md w-fit">2ème Prix • Niveau Département</span>
+                      <span className="text-2xs text-teal-700 font-bold mt-3 bg-teal-100 px-2.5 py-1 rounded-md w-fit">2ème Prix • Niveau Département</span>
                     </div>
 
                     {/* 3. Prix Service / Cellule */}
                     <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 flex flex-col justify-between shadow-sm">
                       <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-emerald-700 font-black text-xs uppercase tracking-wider">
+                        <div className="flex items-center gap-2 text-emerald-700 font-bold text-xs uppercase tracking-wider">
                           <Gift className="w-4 h-4 text-emerald-600 flex-shrink-0" /> Meilleur Agent de Service
                         </div>
-                        <p className="text-sm font-bold text-emerald-950 mt-2 line-clamp-2">
+                        <p className="text-sm font-semibold text-emerald-950 mt-2 line-clamp-2">
                           {formData.prixService || "Non configuré"}
                         </p>
                       </div>
-                      <span className="text-[10px] text-emerald-700 font-black mt-3 bg-emerald-100 px-2.5 py-1 rounded-md w-fit">3ème Prix • Niveau Service / Cellule</span>
+                      <span className="text-2xs text-emerald-700 font-bold mt-3 bg-emerald-100 px-2.5 py-1 rounded-md w-fit">3ème Prix • Niveau Service / Cellule</span>
                     </div>
                   </div>
 
@@ -1033,22 +1047,22 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                       {/* 1. Super Lauréat Direction */}
                       <div className="p-6 bg-white rounded-2xl border border-amber-200/80 shadow-sm space-y-3 relative overflow-hidden">
                         <div className="flex items-center gap-3">
-                          <div className="w-11 h-11 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold flex-shrink-0 shadow-sm">
+                          <div className="w-11 h-11 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-semibold flex-shrink-0 shadow-sm">
                             <Trophy className="w-6 h-6" />
                           </div>
                           <div>
                             <div className="flex items-center gap-2">
-                              <h4 className="font-black text-slate-900 text-base">Super Lauréat de la Direction (Meilleur Agent Direction DSM)</h4>
-                              <span className="text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full border border-amber-200">Palier 1</span>
+                              <h4 className="font-bold text-slate-900 text-base">Super Lauréat de la Direction (Meilleur Agent Direction DSM)</h4>
+                              <span className="text-2xs font-bold uppercase tracking-wider bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full border border-amber-200">Palier 1</span>
                             </div>
                             <p className="text-xs text-slate-500">Premier de la direction</p>
                           </div>
                         </div>
                         <div className="space-y-1.5 pt-2">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Description du Prix & Dotation Direction</label>
+                          <label className="text-2xs font-bold text-slate-400 uppercase tracking-widest">Description du Prix & Dotation Direction</label>
                           <input
                             type="text"
-                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-amber-100 focus:border-amber-500 focus:bg-white transition-all outline-none font-bold text-slate-800"
+                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-amber-100 focus:border-amber-500 focus:bg-white transition-all outline-none font-semibold text-slate-800"
                             placeholder="Ex. : Trophée d’excellence + prime"
                             value={formData.prixDirection || formData.prixGlobal}
                             onChange={e => {
@@ -1063,22 +1077,22 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                         {/* 2. Prix Département */}
                         <div className="p-6 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-3 relative overflow-hidden">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center font-bold flex-shrink-0">
+                            <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center font-semibold flex-shrink-0">
                               <Medal className="w-5 h-5" />
                             </div>
                             <div>
                               <div className="flex items-center gap-2">
-                                <h4 className="font-bold text-slate-900 text-base">Meilleur Agent par Département</h4>
-                                <span className="text-[10px] font-black uppercase tracking-wider bg-teal-100 text-teal-800 px-2 py-0.5 rounded-full">Palier 2</span>
+                                <h4 className="font-semibold text-slate-900 text-base">Meilleur Agent par Département</h4>
+                                <span className="text-2xs font-bold uppercase tracking-wider bg-teal-100 text-teal-800 px-2 py-0.5 rounded-full">Palier 2</span>
                               </div>
                               <p className="text-xs text-slate-500">Premier de chaque département</p>
                             </div>
                           </div>
                           <div className="space-y-1.5 pt-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Description du Prix & Dotation Département</label>
+                            <label className="text-2xs font-bold text-slate-400 uppercase tracking-widest">Description du Prix & Dotation Département</label>
                             <input
                               type="text"
-                              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-teal-100 focus:border-teal-500 focus:bg-white transition-all outline-none font-bold text-slate-800"
+                              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-teal-100 focus:border-teal-500 focus:bg-white transition-all outline-none font-semibold text-slate-800"
                               placeholder="Ex. : Certificat de mérite + prime"
                               value={formData.prixDepartement}
                               onChange={e => setFormData({ ...formData, prixDepartement: e.target.value })}
@@ -1089,22 +1103,22 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                         {/* 3. Prix Service / Cellule */}
                         <div className="p-6 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-3 relative overflow-hidden">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold flex-shrink-0">
+                            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-semibold flex-shrink-0">
                               <Gift className="w-5 h-5" />
                             </div>
                             <div>
                               <div className="flex items-center gap-2">
-                                <h4 className="font-bold text-slate-900 text-base">Meilleur Agent de Service / Cellule</h4>
-                                <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">Palier 3</span>
+                                <h4 className="font-semibold text-slate-900 text-base">Meilleur Agent de Service / Cellule</h4>
+                                <span className="text-2xs font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">Palier 3</span>
                               </div>
                               <p className="text-xs text-slate-500">Major de chaque cellule de travail</p>
                             </div>
                           </div>
                           <div className="space-y-1.5 pt-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Description du Prix & Dotation Service</label>
+                            <label className="text-2xs font-bold text-slate-400 uppercase tracking-widest">Description du Prix & Dotation Service</label>
                             <input
                               type="text"
-                              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 focus:bg-white transition-all outline-none font-bold text-slate-800"
+                              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-emerald-100 focus:border-emerald-500 focus:bg-white transition-all outline-none font-semibold text-slate-800"
                               placeholder="Ex: Tableau d'honneur"
                               value={formData.prixService}
                               onChange={e => setFormData({ ...formData, prixService: e.target.value })}
@@ -1118,7 +1132,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                       <button
                         type="submit"
                         disabled={saving}
-                        className="bg-slate-900 hover:bg-slate-800 text-white px-10 py-4 rounded-2xl font-black text-lg transition-all active:scale-[0.98] shadow-xl disabled:opacity-50 flex items-center gap-3"
+                        className="bg-slate-900 hover:bg-slate-800 text-white px-10 py-4 rounded-2xl font-bold text-lg transition-all active:scale-[0.98] shadow-xl disabled:opacity-50 flex items-center gap-3"
                       >
                         {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
                         Enregistrer la grille des 3 prix
@@ -1143,7 +1157,9 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
   )
 }
 
-function AffectationsManager({ campagneId, users, initialAffectations, onUpdate }: { campagneId: string, users: User[], initialAffectations: any[], onUpdate: () => void }) {
+type FocusRepartition = { agentId: string; perspective: PerspectiveRepartition; n: number }
+
+function AffectationsManager({ campagneId, users, initialAffectations, onUpdate, focus }: { campagneId: string, users: User[], initialAffectations: any[], onUpdate: () => void, focus?: FocusRepartition | null }) {
   const [perspective, setPerspective] = useState<'BY_EVALUE' | 'BY_EVALUATEUR'>('BY_EVALUE')
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<'ALL' | 'PAIR' | 'MANAGER' | 'EXTERNE'>('ALL')
@@ -1158,6 +1174,22 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
   const [targetSort, setTargetSort] = useState<'name_asc' | 'role'>('name_asc')
   const [showSelectedOnly, setShowSelectedOnly] = useState(false)
   const [saving, setSaving] = useState(false)
+
+  // Demande venue du contrôle de la répartition : ouvrir cet agent dans la bonne disposition.
+  // Appliquée pendant le rendu, une seule fois par demande (focus.n), puis défilement jusqu'à l'éditeur.
+  const [focusApplique, setFocusApplique] = useState(0)
+  if (focus && focus.n !== focusApplique) {
+    setFocusApplique(focus.n)
+    const agent = users.find(u => u.id === focus.agentId)
+    if (agent) {
+      setPerspective(focus.perspective)
+      setSelectedUser(agent)
+      setSearch('')
+    }
+  }
+  useEffect(() => {
+    if (focus) document.getElementById('repartition-editeur')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [focus])
 
   // Calcule les cibles courantes selon la perspective
   useEffect(() => {
@@ -1194,12 +1226,14 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
         return { label: 'Client Ext.', badge: 'bg-amber-100 text-amber-800 border-amber-200' }
       case 'ADMIN':
         return { label: 'Admin', badge: 'bg-red-100 text-red-800 border-red-200' }
+      case 'CADRE':
+        return { label: 'Cadre · facultatif', badge: 'bg-slate-100 text-slate-700 border-slate-300' }
       default:
         return { label: 'Pair', badge: 'bg-navy-100 text-navy-900 border-navy-200' }
     }
   }
 
-  // Règle métier DSM : seuls les collaborateurs pairs sont notés (ni managers, ni clients externes, ni admins)
+  // Règle métier DSM : seuls les collaborateurs pairs sont notés (ni managers, ni cadres, ni clients externes, ni admins)
   const isNoteEligible = (u: User) => u.role === 'UTILISATEUR'
 
   // Liste de gauche (selon perspective)
@@ -1226,7 +1260,7 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
         return a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom)
       }
       if (sortOrder === 'role') {
-        const order: Record<string, number> = { MANAGER: 1, UTILISATEUR: 2, EXTERNE: 3, ADMIN: 4 }
+        const order: Record<string, number> = { MANAGER: 1, UTILISATEUR: 2, CADRE: 3, EXTERNE: 4, ADMIN: 5 }
         return (order[a.role] || 99) - (order[b.role] || 99) || a.nom.localeCompare(b.nom)
       }
       if (sortOrder === 'count_desc') {
@@ -1270,7 +1304,7 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
     })
     .sort((a, b) => {
       if (targetSort === 'role') {
-        const order: Record<string, number> = { MANAGER: 1, UTILISATEUR: 2, EXTERNE: 3, ADMIN: 4 }
+        const order: Record<string, number> = { MANAGER: 1, UTILISATEUR: 2, CADRE: 3, EXTERNE: 4, ADMIN: 5 }
         return (order[a.role] || 99) - (order[b.role] || 99) || a.nom.localeCompare(b.nom)
       }
       return a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom)
@@ -1288,9 +1322,13 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
     }
   }
 
-  /** Le notant de la paire est un pair : il peut être désigné « client interne ». */
-  const peutEtreClientInterne = (cible: User) =>
-    perspective === 'BY_EVALUE' ? cible.role === 'UTILISATEUR' : selectedUser?.role === 'UTILISATEUR'
+  /**
+   * Le notant de la paire est un pair, un cadre ou un manager : il peut être désigné « client interne ».
+   * Un manager client interne note alors les critères Clients internes et compte dans ce bloc.
+   */
+  const peutNoterEnClientInterne = (role?: string) => role === 'UTILISATEUR' || role === 'MANAGER' || estCadre(role)
+  const notantDeLaPaire = (cible: User) => (perspective === 'BY_EVALUE' ? cible : selectedUser)
+  const peutEtreClientInterne = (cible: User) => peutNoterEnClientInterne(notantDeLaPaire(cible)?.role)
 
   const basculerInterne = (id: string) =>
     setInternes(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]))
@@ -1350,23 +1388,23 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
   }
 
   return (
-    <div className="space-y-5 text-slate-800">
+    <div id="repartition-editeur" className="scroll-mt-6 space-y-5 text-slate-800">
       {/* ⇄ Barre de Permutation des Colonnes (Notants ↔ Notés) & Agrandissement x1.2 */}
       <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-3.5 w-full md:w-auto">
-          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-white shadow-md transition-all ${
+          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-semibold text-white shadow-md transition-all ${
             perspective === 'BY_EVALUE' ? 'bg-navy-800 shadow-navy-200' : 'bg-slate-900 shadow-slate-300'
           }`}>
             <ArrowLeftRight className="w-6 h-6" />
           </div>
           <div>
             <div className="flex items-center gap-2 mb-0.5">
-              <span className="text-[11px] font-black uppercase tracking-wider text-slate-400">Disposition des colonnes</span>
-              <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+              <span className="text-2xs font-bold uppercase tracking-wider text-slate-400">Disposition des colonnes</span>
+              <span className="text-2xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
                 <Check className="w-3 h-3" /> Auto-évaluation interdite
               </span>
             </div>
-            <h3 className="text-base sm:text-lg font-black text-slate-900 leading-tight">
+            <h3 className="text-base sm:text-lg font-bold text-slate-900 leading-tight">
               {perspective === 'BY_EVALUE' ? (
                 <>Colonne gauche : <span className="text-navy-800">COLLABORATEURS NOTÉS</span> ➔ Colonne droite : <span className="text-slate-600">LEURS NOTANTS</span></>
               ) : (
@@ -1378,7 +1416,7 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
 
         <div className="flex items-center gap-2.5 w-full md:w-auto justify-end flex-wrap">
           {/* Sélecteur direct à deux modes */}
-          <div className="inline-flex p-1 bg-slate-100 rounded-2xl border border-slate-200 text-xs sm:text-sm font-bold">
+          <div className="inline-flex p-1 bg-slate-100 rounded-2xl border border-slate-200 text-xs sm:text-sm font-semibold">
             <button
               type="button"
               onClick={() => {
@@ -1423,7 +1461,7 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
               setPerspective(prev => prev === 'BY_EVALUE' ? 'BY_EVALUATEUR' : 'BY_EVALUE')
               setSelectedUser(null)
             }}
-            className="flex items-center gap-2.5 px-5 py-2.5 bg-navy-900 hover:bg-navy-800 text-white rounded-2xl text-xs sm:text-sm font-black shadow-md shadow-amber-500/20 active:scale-95 transition-all cursor-pointer"
+            className="flex items-center gap-2.5 px-5 py-2.5 bg-navy-900 hover:bg-navy-800 text-white rounded-2xl text-xs sm:text-sm font-bold shadow-md shadow-amber-500/20 active:scale-95 transition-all cursor-pointer"
             title="Permuter les colonnes (Notants ↔ Notés)"
           >
             <ArrowLeftRight className="w-4 h-4" />
@@ -1443,11 +1481,11 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
                 ) : (
                   <UserCheck className="w-5 h-5 text-slate-700" />
                 )}
-                <h3 className="text-base font-black text-slate-900 uppercase tracking-wide">
+                <h3 className="text-base font-bold text-slate-900 uppercase tracking-wide">
                   {perspective === 'BY_EVALUE' ? 'LES NOTÉS (COLLABORATEURS)' : 'LES NOTANTS (ÉVALUATEURS)'}
                 </h3>
               </div>
-              <span className="text-xs sm:text-sm font-black text-slate-600 bg-slate-100 px-3 py-1 rounded-full">
+              <span className="text-xs sm:text-sm font-bold text-slate-600 bg-slate-100 px-3 py-1 rounded-full">
                 {filteredLeftUsers.length} / {baseLeftUsers.length}
               </span>
             </div>
@@ -1457,7 +1495,7 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
               <div className="flex items-center gap-2 overflow-x-auto pb-1">
                 <button
                   onClick={() => setCategoryFilter('ALL')}
-                  className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all ${
+                  className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold whitespace-nowrap transition-all ${
                     categoryFilter === 'ALL'
                       ? 'bg-slate-900 text-white shadow-sm'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -1467,7 +1505,7 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
                 </button>
                 <button
                   onClick={() => setCategoryFilter('PAIR')}
-                  className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all ${
+                  className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold whitespace-nowrap transition-all ${
                     categoryFilter === 'PAIR'
                       ? 'bg-navy-700 text-white shadow-sm'
                       : 'bg-navy-50 text-navy-800 hover:bg-navy-100'
@@ -1477,7 +1515,7 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
                 </button>
                 <button
                   onClick={() => setCategoryFilter('MANAGER')}
-                  className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all ${
+                  className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold whitespace-nowrap transition-all ${
                     categoryFilter === 'MANAGER'
                       ? 'bg-teal-600 text-white shadow-sm'
                       : 'bg-teal-50 text-teal-700 hover:bg-teal-100'
@@ -1488,7 +1526,7 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
                 {countExternes > 0 && (
                   <button
                     onClick={() => setCategoryFilter('EXTERNE')}
-                    className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all ${
+                    className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold whitespace-nowrap transition-all ${
                       categoryFilter === 'EXTERNE'
                         ? 'bg-amber-600 text-white shadow-sm'
                         : 'bg-amber-50 text-amber-800 hover:bg-amber-100'
@@ -1500,7 +1538,7 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
               </div>
             ) : (
               <div className="flex items-center gap-2 py-0.5">
-                <span className="text-xs sm:text-sm font-bold text-slate-600 bg-slate-50 border border-slate-200/80 px-3.5 py-1.5 rounded-xl">
+                <span className="text-xs sm:text-sm font-semibold text-slate-600 bg-slate-50 border border-slate-200/80 px-3.5 py-1.5 rounded-xl">
                   {baseLeftUsers.length} agents opérationnels évalués (hors managers & clients)
                 </span>
               </div>
@@ -1521,7 +1559,7 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
               <select
                 value={sortOrder}
                 onChange={e => setSortOrder(e.target.value as any)}
-                className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-bold text-slate-700 outline-none"
+                className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-700 outline-none"
                 title="Trier la liste"
               >
                 <option value="name_asc">Nom A-Z</option>
@@ -1555,7 +1593,7 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
                     }`}
                   >
                     <div className="flex items-center gap-3.5 min-w-0">
-                      <div className={`w-11 h-11 rounded-2xl flex items-center justify-center font-bold text-sm flex-shrink-0 shadow-sm ${
+                      <div className={`w-11 h-11 rounded-2xl flex items-center justify-center font-semibold text-sm flex-shrink-0 shadow-sm ${
                         user.role === 'MANAGER'
                           ? 'bg-teal-100 text-teal-800'
                           : user.role === 'EXTERNE'
@@ -1565,12 +1603,12 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
                         {user.nom[0]}{user.prenom[0]}
                       </div>
                       <div className="min-w-0">
-                        <p className={`font-black text-sm sm:text-base truncate ${isSelected ? 'text-navy-950' : 'text-slate-900'}`}>
+                        <p className={`font-bold text-sm sm:text-base truncate ${isSelected ? 'text-navy-950' : 'text-slate-900'}`}>
                           {user.nom} {user.prenom}
                         </p>
                         <div className="flex items-center gap-2 mt-1 flex-wrap">
-                          <span className="text-xs font-mono text-slate-500 font-bold">#{user.matricule}</span>
-                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${catInfo.badge}`}>
+                          <span className="text-xs font-mono text-slate-500 font-semibold">#{user.matricule}</span>
+                          <span className={`text-2xs font-bold px-2 py-0.5 rounded-md ${catInfo.badge}`}>
                             {catInfo.label}
                           </span>
                           {user.service && (
@@ -1583,11 +1621,11 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
                     </div>
                     <div className="flex items-center gap-2.5 flex-shrink-0 ml-2">
                       {count > 0 ? (
-                        <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-black">
+                        <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold">
                           {count} {perspective === 'BY_EVALUE' ? `notant${count > 1 ? 's' : ''}` : `cible${count > 1 ? 's' : ''}`}
                         </span>
                       ) : (
-                        <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-400 text-xs font-bold">
+                        <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-400 text-xs font-semibold">
                           0
                         </span>
                       )}
@@ -1608,10 +1646,10 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
               <div className="p-5 sm:p-6 border-b border-slate-100 bg-slate-50/50 sticky top-0 z-10 flex flex-wrap items-center justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-2.5">
-                    <span className={`text-xs font-black px-2.5 py-1 rounded-lg ${getCategoryLabel(selectedUser.role).badge}`}>
+                    <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${getCategoryLabel(selectedUser.role).badge}`}>
                       {getCategoryLabel(selectedUser.role).label}
                     </span>
-                    <h4 className="text-lg sm:text-xl font-black text-slate-900">
+                    <h4 className="text-lg sm:text-xl font-bold text-slate-900">
                       {perspective === 'BY_EVALUE' ? (
                         <>Ceux qui notent <span className="text-navy-800">{selectedUser.prenom} {selectedUser.nom}</span></>
                       ) : (
@@ -1628,7 +1666,7 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
                 <button
                   onClick={saveAffectations}
                   disabled={saving}
-                  className="bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-2xl font-black text-xs sm:text-sm transition-all flex items-center gap-2 shadow-md disabled:opacity-50 active:scale-95 cursor-pointer"
+                  className="bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-2xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 shadow-md disabled:opacity-50 active:scale-95 cursor-pointer"
                 >
                   {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                   <span>Enregistrer ({targets.length})</span>
@@ -1640,12 +1678,12 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
                 <div className="flex items-center justify-between flex-wrap gap-2.5">
                   {perspective === 'BY_EVALUE' ? (
                     <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                      <span className="text-xs font-black text-slate-400 uppercase mr-1">
+                      <span className="text-xs font-bold text-slate-400 uppercase mr-1">
                         Notant :
                       </span>
                       <button
                         onClick={() => setTargetCategory('ALL')}
-                        className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+                        className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
                           targetCategory === 'ALL'
                             ? 'bg-slate-900 text-white shadow-sm'
                             : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -1655,7 +1693,7 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
                       </button>
                       <button
                         onClick={() => setTargetCategory('PAIR')}
-                        className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+                        className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
                           targetCategory === 'PAIR'
                             ? 'bg-navy-700 text-white shadow-sm'
                             : 'bg-navy-50 text-navy-800 hover:bg-navy-100'
@@ -1665,7 +1703,7 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
                       </button>
                       <button
                         onClick={() => setTargetCategory('MANAGER')}
-                        className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+                        className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
                           targetCategory === 'MANAGER'
                             ? 'bg-teal-600 text-white shadow-sm'
                             : 'bg-teal-50 text-teal-700 hover:bg-teal-100'
@@ -1675,7 +1713,7 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
                       </button>
                       <button
                         onClick={() => setTargetCategory('EXTERNE')}
-                        className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+                        className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
                           targetCategory === 'EXTERNE'
                             ? 'bg-amber-600 text-white shadow-sm'
                             : 'bg-amber-50 text-amber-800 hover:bg-amber-100'
@@ -1686,7 +1724,7 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
                     </div>
                   ) : (
                     <div className="flex items-center gap-2">
-                      <span className="text-xs sm:text-sm font-black text-slate-600 bg-slate-100 px-3.5 py-1.5 rounded-xl">
+                      <span className="text-xs sm:text-sm font-bold text-slate-600 bg-slate-100 px-3.5 py-1.5 rounded-xl">
                         {baseRightUsers.length} collaborateurs évaluables disponibles
                       </span>
                     </div>
@@ -1695,14 +1733,14 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
                   <div className="flex items-center gap-3">
                     <button
                       onClick={handleSelectAllFiltered}
-                      className="text-xs font-bold text-navy-800 hover:underline"
+                      className="text-xs font-semibold text-navy-800 hover:underline"
                     >
                       Tout cocher ({filteredRightUsers.length})
                     </button>
                     <span className="text-slate-300">•</span>
                     <button
                       onClick={handleDeselectAllFiltered}
-                      className="text-xs font-bold text-slate-500 hover:underline"
+                      className="text-xs font-semibold text-slate-500 hover:underline"
                     >
                       Tout décocher
                     </button>
@@ -1725,7 +1763,7 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
                     <select
                       value={targetSort}
                       onChange={e => setTargetSort(e.target.value as any)}
-                      className="px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm font-bold text-slate-700 outline-none"
+                      className="px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-700 outline-none"
                       title="Trier la liste"
                     >
                       <option value="name_asc">Trier Nom A-Z</option>
@@ -1739,7 +1777,7 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
                       >
                         {showSelectedOnly && <Check className="w-3.5 h-3.5 stroke-[3]" />}
                       </div>
-                      <span className="text-xs sm:text-sm font-bold text-slate-700 whitespace-nowrap">
+                      <span className="text-xs sm:text-sm font-semibold text-slate-700 whitespace-nowrap">
                         Sélectionnés ({targets.length})
                       </span>
                     </label>
@@ -1778,7 +1816,7 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
                           className="w-full flex items-center justify-between p-3.5 sm:p-4 rounded-2xl cursor-pointer"
                         >
                           <div className="flex items-center gap-3 min-w-0">
-                            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-xs sm:text-sm flex-shrink-0 shadow-sm ${
+                            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-semibold text-xs sm:text-sm flex-shrink-0 shadow-sm ${
                               user.role === 'MANAGER'
                                 ? 'bg-teal-100 text-teal-800'
                                 : user.role === 'EXTERNE'
@@ -1788,16 +1826,16 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
                               {user.nom[0]}{user.prenom[0]}
                             </div>
                             <div className="text-left min-w-0">
-                              <p className={`text-xs sm:text-sm font-bold truncate ${isSelected ? 'text-emerald-950 font-black' : 'text-slate-900'}`}>
+                              <p className={`text-xs sm:text-sm font-semibold truncate ${isSelected ? 'text-emerald-950 font-bold' : 'text-slate-900'}`}>
                                 {user.nom} {user.prenom}
                               </p>
                               <div className="flex items-center gap-2 mt-1">
-                                <span className="text-xs font-mono text-slate-500 font-bold">#{user.matricule}</span>
-                                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${catInfo.badge}`}>
+                                <span className="text-xs font-mono text-slate-500 font-semibold">#{user.matricule}</span>
+                                <span className={`text-2xs font-bold px-1.5 py-0.5 rounded ${catInfo.badge}`}>
                                   {catInfo.label}
                                 </span>
                                 {user.service && (
-                                  <span className="text-[11px] text-slate-400 truncate max-w-[110px]">
+                                  <span className="text-2xs text-slate-400 truncate max-w-[110px]">
                                     • {user.service}
                                   </span>
                                 )}
@@ -1815,7 +1853,11 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
                         </button>
                         {optionInterne && (
                           <label
-                            title="Ce pair notera ce collaborateur sur les critères « Clients internes »"
+                            title={
+                              notantDeLaPaire(user)?.role === 'MANAGER'
+                                ? 'Ce manager notera ce collaborateur sur les critères « Clients internes » ; ses notes compteront dans ce bloc, pas dans celui du manager'
+                                : 'Ce notant notera ce collaborateur sur les critères « Clients internes »'
+                            }
                             className="flex cursor-pointer items-center gap-2 border-t border-emerald-200/70 px-4 py-2 text-xs font-medium text-emerald-950"
                           >
                             <input
@@ -1837,7 +1879,7 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate 
           ) : (
             <div className="h-full min-h-[380px] flex flex-col items-center justify-center p-12 bg-white rounded-3xl border border-dashed border-slate-300 opacity-70 space-y-4">
               <Users2 className="w-16 h-16 text-slate-400" />
-              <p className="text-lg sm:text-xl font-bold text-slate-800">
+              <p className="text-lg sm:text-xl font-semibold text-slate-800">
                 {perspective === 'BY_EVALUE' ? "Sélectionnez un collaborateur noté" : "Sélectionnez un notant"}
               </p>
               <p className="text-slate-500 text-xs sm:text-sm text-center max-w-sm font-medium">
@@ -1936,10 +1978,12 @@ function SuiviDashboard({ campagneId, affectations, users, onUpdate }: { campagn
     return matchesSearch && matchesCat
   })
 
-  const countTerminee = filteredTracking.filter(d => d.statut === 'TERMINEE').length
-  const countBrouillon = filteredTracking.filter(d => d.statut === 'BROUILLON').length
-  const countAttente = filteredTracking.filter(d => d.statut === 'EN_ATTENTE').length
-  const total = filteredTracking.length
+  // Le vote des cadres est facultatif : un cadre ne compte dans l'avancement que s'il a soumis
+  const comptes = filteredTracking.filter(d => !estCadre(d.user.role) || d.statut === 'TERMINEE')
+  const countTerminee = comptes.filter(d => d.statut === 'TERMINEE').length
+  const countBrouillon = comptes.filter(d => d.statut === 'BROUILLON').length
+  const countAttente = comptes.filter(d => d.statut === 'EN_ATTENTE').length
+  const total = comptes.length
   const countInvalidee = trackingData.filter(d => d.statut === 'INVALIDEE').length
 
   return (
@@ -1956,26 +2000,26 @@ function SuiviDashboard({ campagneId, affectations, users, onUpdate }: { campagn
       {/* Stat Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center">
-          <span className="text-slate-500 font-bold text-sm">Évaluateurs Filtrés</span>
-          <span className="text-3xl font-black text-slate-900 mt-2">{total}</span>
+          <span className="text-slate-500 font-semibold text-sm">Évaluateurs Filtrés</span>
+          <span className="text-3xl font-bold text-slate-900 mt-2">{total}</span>
         </div>
         <div className="bg-emerald-50 p-6 rounded-2xl border border-emerald-100 shadow-sm flex flex-col justify-center">
-          <div className="flex items-center gap-2 text-emerald-600 font-bold text-sm">
+          <div className="flex items-center gap-2 text-emerald-600 font-semibold text-sm">
             <CheckCircle2 className="w-5 h-5" /> Terminées
           </div>
-          <span className="text-3xl font-black text-emerald-700 mt-2">{countTerminee}</span>
+          <span className="text-3xl font-bold text-emerald-700 mt-2">{countTerminee}</span>
         </div>
         <div className="bg-amber-50 p-6 rounded-2xl border border-amber-100 shadow-sm flex flex-col justify-center">
-          <div className="flex items-center gap-2 text-amber-600 font-bold text-sm">
+          <div className="flex items-center gap-2 text-amber-600 font-semibold text-sm">
             <Activity className="w-5 h-5" /> En cours (Brouillon)
           </div>
-          <span className="text-3xl font-black text-amber-700 mt-2">{countBrouillon}</span>
+          <span className="text-3xl font-bold text-amber-700 mt-2">{countBrouillon}</span>
         </div>
         <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center">
-          <div className="flex items-center gap-2 text-slate-500 font-bold text-sm">
+          <div className="flex items-center gap-2 text-slate-500 font-semibold text-sm">
             <Clock className="w-5 h-5" /> Non commencées
           </div>
-          <span className="text-3xl font-black text-slate-700 mt-2">{countAttente}</span>
+          <span className="text-3xl font-bold text-slate-700 mt-2">{countAttente}</span>
         </div>
       </div>
 
@@ -1983,7 +2027,7 @@ function SuiviDashboard({ campagneId, affectations, users, onUpdate }: { campagn
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-4 sm:p-6 border-b border-slate-100 bg-slate-50/50 flex flex-col md:flex-row items-center justify-between gap-4">
           <div>
-            <h3 className="text-lg font-bold text-slate-900">Détail par évaluateur</h3>
+            <h3 className="text-lg font-semibold text-slate-900">Détail par évaluateur</h3>
             <p className="text-xs text-slate-500 font-medium">Suivi de la participation par profil</p>
           </div>
 
@@ -1992,7 +2036,7 @@ function SuiviDashboard({ campagneId, affectations, users, onUpdate }: { campagn
             <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200">
               <button
                 onClick={() => setSuiviCategory('ALL')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
                   suiviCategory === 'ALL' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'
                 }`}
               >
@@ -2000,7 +2044,7 @@ function SuiviDashboard({ campagneId, affectations, users, onUpdate }: { campagn
               </button>
               <button
                 onClick={() => setSuiviCategory('PAIR')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
                   suiviCategory === 'PAIR' ? 'bg-navy-700 text-white' : 'text-navy-800 hover:bg-navy-50'
                 }`}
               >
@@ -2008,7 +2052,7 @@ function SuiviDashboard({ campagneId, affectations, users, onUpdate }: { campagn
               </button>
               <button
                 onClick={() => setSuiviCategory('MANAGER')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
                   suiviCategory === 'MANAGER' ? 'bg-teal-600 text-white' : 'text-teal-700 hover:bg-teal-50'
                 }`}
               >
@@ -2016,7 +2060,7 @@ function SuiviDashboard({ campagneId, affectations, users, onUpdate }: { campagn
               </button>
               <button
                 onClick={() => setSuiviCategory('EXTERNE')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
                   suiviCategory === 'EXTERNE' ? 'bg-amber-600 text-white' : 'text-amber-800 hover:bg-amber-50'
                 }`}
               >
@@ -2031,7 +2075,7 @@ function SuiviDashboard({ campagneId, affectations, users, onUpdate }: { campagn
                 placeholder="Filtrer..."
                 value={suiviSearch}
                 onChange={e => setSuiviSearch(e.target.value)}
-                className="pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none"
+                className="pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold outline-none"
               />
             </div>
           </div>
@@ -2047,7 +2091,7 @@ function SuiviDashboard({ campagneId, affectations, users, onUpdate }: { campagn
             <div key={idx} className="p-4 md:p-6 hover:bg-slate-50 transition-colors">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="flex items-center gap-4">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs ${
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold text-xs ${
                   data.user.role === 'MANAGER'
                     ? 'bg-teal-100 text-teal-800'
                     : data.user.role === 'EXTERNE'
@@ -2058,15 +2102,15 @@ function SuiviDashboard({ campagneId, affectations, users, onUpdate }: { campagn
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <p className="font-bold text-slate-900">{data.user.prenom} {data.user.nom}</p>
-                    <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${
+                    <p className="font-semibold text-slate-900">{data.user.prenom} {data.user.nom}</p>
+                    <span className={`text-2xs font-bold px-2 py-0.5 rounded-full ${
                       data.user.role === 'MANAGER'
                         ? 'bg-teal-100 text-teal-800'
                         : data.user.role === 'EXTERNE'
                         ? 'bg-amber-100 text-amber-800'
                         : 'bg-navy-100 text-navy-900'
                     }`}>
-                      {data.user.role === 'MANAGER' ? 'Manager' : data.user.role === 'EXTERNE' ? 'Client Ext.' : 'Pair'}
+                      {data.user.role === 'MANAGER' ? 'Manager' : data.user.role === 'EXTERNE' ? 'Client Ext.' : estCadre(data.user.role) ? 'Cadre · facultatif' : 'Pair'}
                     </span>
                   </div>
                   <p className="text-sm text-slate-500 font-medium">Matricule: {data.user.matricule} • Doit évaluer {data.totalToEvaluate} agents</p>
@@ -2080,22 +2124,22 @@ function SuiviDashboard({ campagneId, affectations, users, onUpdate }: { campagn
               </div>
               <div className="flex items-center gap-3">
                 {data.statut === 'INVALIDEE' && (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-100 text-rose-700 text-xs font-black">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-100 text-rose-700 text-xs font-bold">
                     <X className="w-4 h-4" /> Notes invalidées
                   </span>
                 )}
                 {data.statut === 'TERMINEE' && (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-black">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">
                     <CheckCircle2 className="w-4 h-4" /> Finalisé
                   </span>
                 )}
                 {data.statut === 'BROUILLON' && (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-black">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-bold">
                     <Activity className="w-4 h-4" /> En cours
                   </span>
                 )}
                 {data.statut === 'EN_ATTENTE' && (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-black">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-bold">
                     <Clock className="w-4 h-4" /> Non commencé
                   </span>
                 )}
@@ -2107,7 +2151,7 @@ function SuiviDashboard({ campagneId, affectations, users, onUpdate }: { campagn
                       }
                     }}
                     disabled={envoi}
-                    className="text-xs font-bold text-slate-500 hover:text-slate-900 underline disabled:opacity-50"
+                    className="text-xs font-semibold text-slate-500 hover:text-slate-900 underline disabled:opacity-50"
                   >
                     Rétablir
                   </button>
@@ -2118,7 +2162,7 @@ function SuiviDashboard({ campagneId, affectations, users, onUpdate }: { campagn
                       setMotif('FORCE_MAJEURE')
                       setCommentaire('')
                     }}
-                    className="text-xs font-bold text-rose-600 hover:text-rose-800 underline"
+                    className="text-xs font-semibold text-rose-600 hover:text-rose-800 underline"
                   >
                     Invalider
                   </button>
@@ -2128,14 +2172,14 @@ function SuiviDashboard({ campagneId, affectations, users, onUpdate }: { campagn
             {invalidation === data.user.id && (
               <div className="mt-4 p-4 rounded-2xl bg-rose-50/60 border border-rose-100 space-y-3">
                 <p className="text-sm text-slate-700 font-medium">
-                  Les notes de <span className="font-bold">{data.user.prenom} {data.user.nom}</span> seront ignorées au calcul.
+                  Les notes de <span className="font-semibold">{data.user.prenom} {data.user.nom}</span> seront ignorées au calcul.
                   Les {data.totalToEvaluate} collaborateur(s) concerné(s) resteront classés sur leurs autres évaluations.
                 </p>
                 <div className="flex flex-col md:flex-row gap-3">
                   <select
                     value={motif}
                     onChange={e => setMotif(e.target.value)}
-                    className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold outline-none"
+                    className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-semibold outline-none"
                   >
                     {Object.entries(MOTIFS_INVALIDATION).map(([valeur, libelle]) => (
                       <option key={valeur} value={valeur}>{libelle}</option>
@@ -2151,13 +2195,13 @@ function SuiviDashboard({ campagneId, affectations, users, onUpdate }: { campagn
                   <button
                     onClick={() => changerInvalidation(data.user.id, true)}
                     disabled={envoi}
-                    className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-xl text-sm font-bold disabled:opacity-50"
+                    className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-xl text-sm font-semibold disabled:opacity-50"
                   >
                     Confirmer l&apos;invalidation
                   </button>
                   <button
                     onClick={() => setInvalidation(null)}
-                    className="px-4 py-2 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-100"
+                    className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-500 hover:bg-slate-100"
                   >
                     Annuler
                   </button>
@@ -2322,7 +2366,7 @@ function ClassementCampagneView({
     return (
       <div className="bg-white rounded-3xl p-16 border border-slate-200 shadow-sm flex flex-col items-center justify-center space-y-4">
         <div className="w-12 h-12 rounded-full border-4 border-amber-100 border-t-gold-500 animate-spin"></div>
-        <p className="text-slate-600 font-bold text-sm">Chargement des résultats et palmarès de la campagne...</p>
+        <p className="text-slate-600 font-semibold text-sm">Chargement des résultats et palmarès de la campagne...</p>
       </div>
     )
   }
@@ -2359,29 +2403,29 @@ function ClassementCampagneView({
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 relative z-10">
           <div>
             <div className="flex items-center gap-2 mb-2 flex-wrap">
-              <span className="text-gold-500 font-black text-xs uppercase tracking-widest flex items-center gap-1.5">
+              <span className="text-gold-500 font-bold text-xs uppercase tracking-widest flex items-center gap-1.5">
                 <Trophy className="w-4 h-4 text-gold-500" /> Session DSM TAMIS
               </span>
               {formData.statut === 'OUVERTE' && (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-2xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                   Notation active
                 </span>
               )}
               {formData.statut === 'CLOTUREE' && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-400/30">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-2xs font-bold bg-amber-500/20 text-amber-300 border border-amber-400/30">
                   <Lock className="w-3 h-3" />
                   Session clôturée
                 </span>
               )}
               {formData.statut === 'CALCULEE' && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-navy-600/20 text-navy-300 border border-navy-400/30">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-2xs font-bold bg-navy-600/20 text-navy-300 border border-navy-400/30">
                   <CheckCircle2 className="w-3 h-3" />
                   Scores définitifs
                 </span>
               )}
             </div>
-            <h2 className="text-2xl sm:text-3xl font-black text-white">{formData.libelle || 'Classement de la Campagne'}</h2>
+            <h2 className="text-2xl sm:text-3xl font-bold text-white">{formData.libelle || 'Classement de la Campagne'}</h2>
             <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-xl">
               Pondération appliquée : Collègues {formData.poidsCollegues}% • Manager {formData.poidsManager}% • Total agents évalués : {allScores.length}
             </p>
@@ -2392,7 +2436,7 @@ function ClassementCampagneView({
               type="button"
               onClick={handleTriggerRecalculate}
               disabled={calculating}
-              className="flex items-center gap-2 px-4 py-2.5 bg-gold-500 hover:bg-gold-600 text-navy-900 rounded-xl text-xs font-black transition-all shadow-md active:scale-95 disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2.5 bg-gold-500 hover:bg-gold-600 text-navy-900 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 disabled:opacity-50"
             >
               <RefreshCw className={`w-4 h-4 ${calculating ? 'animate-spin' : ''}`} />
               <span>{calculating ? 'Calcul en cours...' : 'Recalculer'}</span>
@@ -2402,7 +2446,7 @@ function ClassementCampagneView({
               type="button"
               onClick={exportToExcel}
               disabled={allScores.length === 0}
-              className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold transition-all shadow-md active:scale-95 disabled:opacity-50"
             >
               <FileSpreadsheet className="w-4 h-4" />
               <span>Exporter Excel</span>
@@ -2410,7 +2454,7 @@ function ClassementCampagneView({
 
             <Link
               href={`/admin/classement?campagneId=${campagneId}`}
-              className="flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-xl text-xs font-bold transition-all shadow-md"
+              className="flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-xl text-xs font-semibold transition-all shadow-md"
             >
               <ExternalLink className="w-4 h-4" />
               <span>Plein écran</span>
@@ -2425,7 +2469,7 @@ function ClassementCampagneView({
             <Trophy className="w-8 h-8" />
           </div>
           <div className="space-y-1">
-            <h3 className="text-lg font-bold text-slate-900">Aucun résultat pour le moment</h3>
+            <h3 className="text-lg font-semibold text-slate-900">Aucun résultat pour le moment</h3>
             <p className="text-slate-500 text-xs max-w-md mx-auto">
               Les scores de cette campagne n'ont pas encore été calculés ou aucune note n'a été soumise.
             </p>
@@ -2434,7 +2478,7 @@ function ClassementCampagneView({
             type="button"
             onClick={handleTriggerRecalculate}
             disabled={calculating}
-            className="px-6 py-3 bg-navy-900 text-gold-500 border border-gold-500/40 rounded-xl text-xs font-black transition-all hover:bg-navy-950 shadow-md"
+            className="px-6 py-3 bg-navy-900 text-gold-500 border border-gold-500/40 rounded-xl text-xs font-bold transition-all hover:bg-navy-950 shadow-md"
           >
             {calculating ? 'Calcul en cours...' : 'Calculer les scores maintenant'}
           </button>
@@ -2446,7 +2490,7 @@ function ClassementCampagneView({
             <div className="inline-flex items-center gap-1.5 bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm">
               <button
                 onClick={() => setSubTab('palmares')}
-                className={`flex items-center gap-2 py-2 px-3.5 rounded-xl font-bold text-xs whitespace-nowrap transition-all ${
+                className={`flex items-center gap-2 py-2 px-3.5 rounded-xl font-semibold text-xs whitespace-nowrap transition-all ${
                   subTab === 'palmares'
                     ? 'bg-navy-900 text-gold-500 shadow-sm'
                     : 'text-slate-600 hover:bg-slate-50'
@@ -2456,7 +2500,7 @@ function ClassementCampagneView({
               </button>
               <button
                 onClick={() => setSubTab('global')}
-                className={`flex items-center gap-2 py-2 px-3.5 rounded-xl font-bold text-xs whitespace-nowrap transition-all ${
+                className={`flex items-center gap-2 py-2 px-3.5 rounded-xl font-semibold text-xs whitespace-nowrap transition-all ${
                   subTab === 'global'
                     ? 'bg-navy-700 text-white shadow-sm'
                     : 'text-slate-600 hover:bg-slate-50'
@@ -2466,7 +2510,7 @@ function ClassementCampagneView({
               </button>
               <button
                 onClick={() => setSubTab('direction')}
-                className={`flex items-center gap-2 py-2 px-3.5 rounded-xl font-bold text-xs whitespace-nowrap transition-all ${
+                className={`flex items-center gap-2 py-2 px-3.5 rounded-xl font-semibold text-xs whitespace-nowrap transition-all ${
                   subTab === 'direction'
                     ? 'bg-amber-600 text-white shadow-sm'
                     : 'text-slate-600 hover:bg-slate-50'
@@ -2476,7 +2520,7 @@ function ClassementCampagneView({
               </button>
               <button
                 onClick={() => setSubTab('departement')}
-                className={`flex items-center gap-2 py-2 px-3.5 rounded-xl font-bold text-xs whitespace-nowrap transition-all ${
+                className={`flex items-center gap-2 py-2 px-3.5 rounded-xl font-semibold text-xs whitespace-nowrap transition-all ${
                   subTab === 'departement'
                     ? 'bg-teal-600 text-white shadow-sm'
                     : 'text-slate-600 hover:bg-slate-50'
@@ -2486,7 +2530,7 @@ function ClassementCampagneView({
               </button>
               <button
                 onClick={() => setSubTab('service')}
-                className={`flex items-center gap-2 py-2 px-3.5 rounded-xl font-bold text-xs whitespace-nowrap transition-all ${
+                className={`flex items-center gap-2 py-2 px-3.5 rounded-xl font-semibold text-xs whitespace-nowrap transition-all ${
                   subTab === 'service'
                     ? 'bg-emerald-600 text-white shadow-sm'
                     : 'text-slate-600 hover:bg-slate-50'
@@ -2499,7 +2543,7 @@ function ClassementCampagneView({
             {subTab === 'global' && (
               <button
                 onClick={() => setAnonymized(!anonymized)}
-                className="flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold shadow-sm transition-all"
+                className="flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold shadow-sm transition-all"
               >
                 {anonymized ? <Eye className="w-4 h-4 text-navy-800" /> : <EyeOff className="w-4 h-4 text-slate-400" />}
                 <span>{anonymized ? 'Noms visibles' : 'Anonymiser'}</span>
@@ -2515,34 +2559,34 @@ function ClassementCampagneView({
                 <div className="bg-gold-50 ring-1 ring-gold-300 rounded-3xl p-6 sm:p-8 shadow-xl relative overflow-hidden">
                   <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10">
                     <div className="flex items-center gap-5">
-                      <div className="w-20 h-20 rounded-2xl bg-gold-500 text-navy-900 font-black text-2xl flex items-center justify-center shadow-lg border-2 border-white">
+                      <div className="w-20 h-20 rounded-2xl bg-gold-500 text-navy-900 font-bold text-2xl flex items-center justify-center shadow-lg border-2 border-white">
                         <Crown className="w-10 h-10 text-white drop-shadow" />
                       </div>
                       <div className="space-y-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-[10px] font-black uppercase tracking-widest bg-navy-900 text-gold-500 px-3 py-0.5 rounded-full border border-gold-500/30 flex items-center gap-1">
+                          <span className="text-2xs font-bold uppercase tracking-widest bg-navy-900 text-gold-500 px-3 py-0.5 rounded-full border border-gold-500/30 flex items-center gap-1">
                             <Trophy className="w-3 h-3" /> Super Lauréat Direction DSM
                           </span>
-                          <span className="text-xs font-bold text-amber-900">Palier 1</span>
+                          <span className="text-xs font-semibold text-amber-900">Palier 1</span>
                         </div>
-                        <h3 className="text-2xl font-black text-slate-900">
+                        <h3 className="text-2xl font-bold text-slate-900">
                           {anonymized ? `Agent ${majorGlobal.matricule}` : `${majorGlobal.prenom} ${majorGlobal.nom}`}
                         </h3>
                         <p className="text-xs text-slate-600 font-medium">
-                          Matricule: <span className="font-bold text-slate-800">{majorGlobal.matricule}</span> • {majorGlobal.service} ({majorGlobal.departement}) • {majorGlobal.direction}
+                          Matricule: <span className="font-semibold text-slate-800">{majorGlobal.matricule}</span> • {majorGlobal.service} ({majorGlobal.departement}) • {majorGlobal.direction}
                         </p>
                       </div>
                     </div>
 
                     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 bg-white/80 p-4 rounded-2xl border border-amber-200">
                       <div className="text-left sm:text-right">
-                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Score TAMIS Final</span>
-                        <span className="text-3xl font-black text-emerald-600">{majorGlobal.scoreTotal}%</span>
+                        <span className="text-2xs font-bold uppercase tracking-wider text-slate-400 block">Score TAMIS Final</span>
+                        <span className="text-3xl font-bold text-emerald-600">{majorGlobal.scoreTotal}%</span>
                       </div>
                       <div className="h-10 w-px bg-slate-200 hidden sm:block"></div>
                       <div className="text-left">
-                        <span className="text-[10px] font-black uppercase tracking-wider text-navy-900 block">Dotation Officielle</span>
-                        <span className="text-xs font-black text-amber-900">
+                        <span className="text-2xs font-bold uppercase tracking-wider text-navy-900 block">Dotation Officielle</span>
+                        <span className="text-xs font-bold text-amber-900">
                           {formData.prixDirection || formData.prixGlobal || '—'}
                         </span>
                       </div>
@@ -2556,32 +2600,32 @@ function ClassementCampagneView({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Medal className="w-5 h-5 text-teal-600" />
-                    <h4 className="font-black text-slate-900 text-base">Meilleurs Agents par Département</h4>
-                    <span className="text-[10px] font-black bg-teal-100 text-teal-800 px-2.5 py-0.5 rounded-full">
+                    <h4 className="font-bold text-slate-900 text-base">Meilleurs Agents par Département</h4>
+                    <span className="text-2xs font-bold bg-teal-100 text-teal-800 px-2.5 py-0.5 rounded-full">
                       Palier 2 • {formData.prixDepartement || '—'}
                     </span>
                   </div>
-                  <span className="text-xs font-bold text-slate-400">{majorsDepartement.length} lauréats</span>
+                  <span className="text-xs font-semibold text-slate-400">{majorsDepartement.length} lauréats</span>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {majorsDepartement.map((md: any, idx: number) => (
                     <div key={idx} className="bg-white rounded-2xl p-5 border border-teal-100 shadow-sm hover:shadow-md transition-all space-y-3">
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-black text-teal-700 bg-teal-50 px-2.5 py-1 rounded-lg uppercase">
+                        <span className="text-2xs font-bold text-teal-700 bg-teal-50 px-2.5 py-1 rounded-lg uppercase">
                           {md.departementNom}
                         </span>
-                        <span className="text-sm font-black text-emerald-600">{md.major.scoreTotal}%</span>
+                        <span className="text-sm font-bold text-emerald-600">{md.major.scoreTotal}%</span>
                       </div>
                       <div>
-                        <p className="font-black text-slate-900 text-sm">
+                        <p className="font-bold text-slate-900 text-sm">
                           {anonymized ? `Agent ${md.major.matricule}` : `${md.major.prenom} ${md.major.nom}`}
                         </p>
-                        <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                        <p className="text-2xs text-slate-500 font-medium mt-0.5">
                           {md.major.service} • Mat: {md.major.matricule}
                         </p>
                       </div>
-                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] font-bold text-slate-400">
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-2xs font-semibold text-slate-400">
                         <span>Sur {md.totalAgents} agents</span>
                         <span className="text-teal-700">{formData.prixDepartement || '—'}</span>
                       </div>
@@ -2595,34 +2639,34 @@ function ClassementCampagneView({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Gift className="w-5 h-5 text-emerald-600" />
-                    <h4 className="font-black text-slate-900 text-base">Meilleurs Agents par Service / Cellule</h4>
-                    <span className="text-[10px] font-black bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full">
+                    <h4 className="font-bold text-slate-900 text-base">Meilleurs Agents par Service / Cellule</h4>
+                    <span className="text-2xs font-bold bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full">
                       Palier 3 • {formData.prixService || '—'}
                     </span>
                   </div>
-                  <span className="text-xs font-bold text-slate-400">{majorsService.length} lauréats</span>
+                  <span className="text-xs font-semibold text-slate-400">{majorsService.length} lauréats</span>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {majorsService.map((ms: any, idx: number) => (
                     <div key={idx} className="bg-white rounded-2xl p-5 border border-emerald-100 shadow-sm hover:shadow-md transition-all space-y-3">
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg uppercase truncate max-w-[180px]">
+                        <span className="text-2xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg uppercase truncate max-w-[180px]">
                           {ms.serviceNom}
                         </span>
-                        <span className="text-sm font-black text-emerald-600">{ms.major.scoreTotal}%</span>
+                        <span className="text-sm font-bold text-emerald-600">{ms.major.scoreTotal}%</span>
                       </div>
                       <div>
-                        <p className="font-black text-slate-900 text-sm">
+                        <p className="font-bold text-slate-900 text-sm">
                           {anonymized ? `Agent ${ms.major.matricule}` : `${ms.major.prenom} ${ms.major.nom}`}
                         </p>
-                        <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                        <p className="text-2xs text-slate-500 font-medium mt-0.5">
                           {ms.departementNom} • Mat: {ms.major.matricule}
                         </p>
                       </div>
-                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] font-bold text-slate-400">
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-2xs font-semibold text-slate-400">
                         <span>Sur {ms.totalAgents} agents</span>
-                        <span className="text-emerald-700 font-bold truncate max-w-[120px]" title={formData.prixService || "Tableau d'honneur"}>{formData.prixService || "Tableau d'honneur"}</span>
+                        <span className="text-emerald-700 font-semibold truncate max-w-[120px]" title={formData.prixService || "Tableau d'honneur"}>{formData.prixService || "Tableau d'honneur"}</span>
                       </div>
                     </div>
                   ))}
@@ -2643,7 +2687,7 @@ function ClassementCampagneView({
                     placeholder="Rechercher par nom, matricule ou service..."
                     value={search}
                     onChange={e => setSearch(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-navy-700"
+                    className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:ring-2 focus:ring-navy-700"
                   />
                 </div>
 
@@ -2651,7 +2695,7 @@ function ClassementCampagneView({
                   <select
                     value={filterDepartement}
                     onChange={e => setFilterDepartement(e.target.value)}
-                    className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none cursor-pointer"
+                    className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none cursor-pointer"
                   >
                     <option value="ALL">Tous les départements</option>
                     {departements.map(d => <option key={d} value={d}>{d}</option>)}
@@ -2662,7 +2706,7 @@ function ClassementCampagneView({
                   <select
                     value={filterService}
                     onChange={e => setFilterService(e.target.value)}
-                    className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none cursor-pointer"
+                    className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none cursor-pointer"
                   >
                     <option value="ALL">Tous les services</option>
                     {services.map(s => <option key={s} value={s}>{s}</option>)}
@@ -2674,7 +2718,7 @@ function ClassementCampagneView({
               <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-black text-[10px]">
+                    <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold text-2xs">
                       <tr>
                         <th className="py-3.5 px-4 text-center w-16">Rang</th>
                         <th className="py-3.5 px-4">Collaborateur</th>
@@ -2682,7 +2726,7 @@ function ClassementCampagneView({
                         <th className="py-3.5 px-3 text-center">Collègues & Pairs</th>
                         <th className="py-3.5 px-3 text-center">Manager (55 pts)</th>
                         <th className="py-3.5 px-3 text-center">Client QR</th>
-                        <th className="py-3.5 px-4 text-center font-black text-slate-800">Score Total (/100)</th>
+                        <th className="py-3.5 px-4 text-center font-bold text-slate-800">Score Total (/100)</th>
                         <th className="py-3.5 px-4 text-center">Mention</th>
                       </tr>
                     </thead>
@@ -2707,39 +2751,39 @@ function ClassementCampagneView({
 
                           return (
                             <tr key={score.utilisateurId || idx} className="hover:bg-slate-50/80 transition-colors">
-                              <td className="py-3.5 px-4 text-center font-black">
+                              <td className="py-3.5 px-4 text-center font-bold">
                                 {rang === 1 ? (
-                                  <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-100 text-amber-800 font-black text-xs border border-amber-300">
+                                  <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-100 text-amber-800 font-bold text-xs border border-amber-300">
                                     1
                                   </span>
                                 ) : rang === 2 ? (
-                                  <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-200 text-slate-800 font-black text-xs">
+                                  <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-200 text-slate-800 font-bold text-xs">
                                     2
                                   </span>
                                 ) : rang === 3 ? (
-                                  <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-700/20 text-amber-900 font-black text-xs">
+                                  <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-700/20 text-amber-900 font-bold text-xs">
                                     3
                                   </span>
                                 ) : (
-                                  <span className="text-slate-500 font-bold">#{rang}</span>
+                                  <span className="text-slate-500 font-semibold">#{rang}</span>
                                 )}
                               </td>
                               <td className="py-3.5 px-4">
-                                <p className="font-bold text-slate-900">
+                                <p className="font-semibold text-slate-900">
                                   {anonymized ? `Agent ${score.matricule}` : `${score.prenom} ${score.nom}`}
                                 </p>
-                                <p className="text-[10px] text-slate-400 font-medium">Matricule: {score.matricule}</p>
+                                <p className="text-2xs text-slate-400 font-medium">Matricule: {score.matricule}</p>
                               </td>
                               <td className="py-3.5 px-4">
-                                <p className="font-bold text-slate-700">{score.service}</p>
-                                <p className="text-[10px] text-slate-400">{score.departement}</p>
+                                <p className="font-semibold text-slate-700">{score.service}</p>
+                                <p className="text-2xs text-slate-400">{score.departement}</p>
                               </td>
                               <td className="py-3.5 px-3 text-center">
                                 {hasColl ? (
                                   <div>
-                                    <span className="font-bold text-slate-800">{partCollegues}</span>
-                                    <span className="text-[10px] text-slate-400">/{maxCollegues} pts</span>
-                                    <span className="text-[10px] text-navy-700 block font-normal">({score.scoreCollegues.toFixed(0)}%)</span>
+                                    <span className="font-semibold text-slate-800">{partCollegues}</span>
+                                    <span className="text-2xs text-slate-400">/{maxCollegues} pts</span>
+                                    <span className="text-2xs text-navy-700 block font-normal">({score.scoreCollegues.toFixed(0)}%)</span>
                                   </div>
                                 ) : (
                                   <span className="text-slate-400 text-xs">Non noté</span>
@@ -2748,9 +2792,9 @@ function ClassementCampagneView({
                               <td className="py-3.5 px-3 text-center">
                                 {score.hasManager || score.scoreManager > 0 ? (
                                   <div>
-                                    <span className="font-bold text-slate-800">{partManager}</span>
-                                    <span className="text-[10px] text-slate-400">/55 pts</span>
-                                    <span className="text-[10px] text-navy-700 block font-normal">({score.scoreManager.toFixed(0)}%)</span>
+                                    <span className="font-semibold text-slate-800">{partManager}</span>
+                                    <span className="text-2xs text-slate-400">/55 pts</span>
+                                    <span className="text-2xs text-navy-700 block font-normal">({score.scoreManager.toFixed(0)}%)</span>
                                   </div>
                                 ) : (
                                   <span className="text-slate-400 text-xs">Non noté</span>
@@ -2759,19 +2803,19 @@ function ClassementCampagneView({
                               <td className="py-3.5 px-3 text-center">
                                 {hasCli ? (
                                   <div>
-                                    <span className="font-bold text-slate-800">{partClients}</span>
-                                    <span className="text-[10px] text-slate-400">/{maxClients} pts</span>
-                                    <span className="text-[10px] text-amber-600 block font-normal">({score.scoreClient.toFixed(0)}%)</span>
+                                    <span className="font-semibold text-slate-800">{partClients}</span>
+                                    <span className="text-2xs text-slate-400">/{maxClients} pts</span>
+                                    <span className="text-2xs text-amber-600 block font-normal">({score.scoreClient.toFixed(0)}%)</span>
                                   </div>
                                 ) : (
                                   <span className="text-slate-400 text-xs font-medium">Non concerné</span>
                                 )}
                               </td>
                               <td className="py-3.5 px-4 text-center">
-                                <span className="text-sm font-black text-slate-900">{score.scoreTotal.toFixed(1)} / 100</span>
+                                <span className="text-sm font-bold text-slate-900">{score.scoreTotal.toFixed(1)} / 100</span>
                               </td>
                               <td className="py-3.5 px-4 text-center">
-                                <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black border ${appInfo.colorBadge}`}>
+                                <span className={`inline-block px-2.5 py-0.5 rounded-full text-2xs font-bold border ${appInfo.colorBadge}`}>
                                   {appInfo.appreciation}
                                 </span>
                               </td>
@@ -2794,20 +2838,20 @@ function ClassementCampagneView({
                   <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                     <div className="flex items-center gap-2.5">
                       <Building2 className="w-5 h-5 text-amber-600" />
-                      <h4 className="font-black text-slate-900 text-base">{g.directionNom}</h4>
+                      <h4 className="font-bold text-slate-900 text-base">{g.directionNom}</h4>
                     </div>
-                    <span className="text-xs font-bold text-slate-400">{g.scores.length} collaborateurs</span>
+                    <span className="text-xs font-semibold text-slate-400">{g.scores.length} collaborateurs</span>
                   </div>
                   {g.major && (
                     <div className="bg-amber-50/60 border border-amber-200 rounded-2xl p-4 flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <Crown className="w-6 h-6 text-amber-600" />
                         <div>
-                          <span className="text-[10px] font-black text-amber-800 uppercase">Major Direction</span>
-                          <p className="font-black text-slate-900 text-sm">{g.major.prenom} {g.major.nom} ({g.major.service})</p>
+                          <span className="text-2xs font-bold text-amber-800 uppercase">Major Direction</span>
+                          <p className="font-bold text-slate-900 text-sm">{g.major.prenom} {g.major.nom} ({g.major.service})</p>
                         </div>
                       </div>
-                      <span className="text-lg font-black text-emerald-600">{g.major.scoreTotal}%</span>
+                      <span className="text-lg font-bold text-emerald-600">{g.major.scoreTotal}%</span>
                     </div>
                   )}
                 </div>
@@ -2824,22 +2868,22 @@ function ClassementCampagneView({
                     <div className="flex items-center gap-2.5">
                       <FolderGit2 className="w-5 h-5 text-teal-600" />
                       <div>
-                        <h4 className="font-black text-slate-900 text-base">{g.departementNom}</h4>
-                        <p className="text-[10px] text-slate-400 font-bold">{g.directionNom}</p>
+                        <h4 className="font-bold text-slate-900 text-base">{g.departementNom}</h4>
+                        <p className="text-2xs text-slate-400 font-semibold">{g.directionNom}</p>
                       </div>
                     </div>
-                    <span className="text-xs font-bold text-slate-400">{g.scores.length} collaborateurs</span>
+                    <span className="text-xs font-semibold text-slate-400">{g.scores.length} collaborateurs</span>
                   </div>
                   {g.major && (
                     <div className="bg-teal-50/60 border border-teal-200 rounded-2xl p-4 flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <Medal className="w-6 h-6 text-teal-600" />
                         <div>
-                          <span className="text-[10px] font-black text-teal-800 uppercase">Major Département</span>
-                          <p className="font-black text-slate-900 text-sm">{g.major.prenom} {g.major.nom} ({g.major.service})</p>
+                          <span className="text-2xs font-bold text-teal-800 uppercase">Major Département</span>
+                          <p className="font-bold text-slate-900 text-sm">{g.major.prenom} {g.major.nom} ({g.major.service})</p>
                         </div>
                       </div>
-                      <span className="text-lg font-black text-emerald-600">{g.major.scoreTotal}%</span>
+                      <span className="text-lg font-bold text-emerald-600">{g.major.scoreTotal}%</span>
                     </div>
                   )}
                 </div>
@@ -2856,22 +2900,22 @@ function ClassementCampagneView({
                     <div className="flex items-center gap-2.5">
                       <Users2 className="w-5 h-5 text-emerald-600" />
                       <div>
-                        <h4 className="font-black text-slate-900 text-base">{g.serviceNom}</h4>
-                        <p className="text-[10px] text-slate-400 font-bold">{g.departementNom}</p>
+                        <h4 className="font-bold text-slate-900 text-base">{g.serviceNom}</h4>
+                        <p className="text-2xs text-slate-400 font-semibold">{g.departementNom}</p>
                       </div>
                     </div>
-                    <span className="text-xs font-bold text-slate-400">{g.scores.length} collaborateurs</span>
+                    <span className="text-xs font-semibold text-slate-400">{g.scores.length} collaborateurs</span>
                   </div>
                   {g.major && (
                     <div className="bg-emerald-50/60 border border-emerald-200 rounded-2xl p-4 flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <Gift className="w-6 h-6 text-emerald-600" />
                         <div>
-                          <span className="text-[10px] font-black text-emerald-800 uppercase">Major Service</span>
-                          <p className="font-black text-slate-900 text-sm">{g.major.prenom} {g.major.nom}</p>
+                          <span className="text-2xs font-bold text-emerald-800 uppercase">Major Service</span>
+                          <p className="font-bold text-slate-900 text-sm">{g.major.prenom} {g.major.nom}</p>
                         </div>
                       </div>
-                      <span className="text-lg font-black text-emerald-600">{g.major.scoreTotal}%</span>
+                      <span className="text-lg font-bold text-emerald-600">{g.major.scoreTotal}%</span>
                     </div>
                   )}
                 </div>

@@ -1,5 +1,5 @@
 import prisma from '@/lib/prisma'
-import { estEvaluateurManager } from '@/lib/criteres'
+import { compteCommeManager } from '@/lib/criteres'
 
 /**
  * Calcul des scores d'une campagne.
@@ -8,6 +8,7 @@ import { estEvaluateurManager } from '@/lib/criteres'
  * - seules les évaluations SOUMISES (affectation TERMINEE) comptent ; les brouillons sont ignorés ;
  * - chaque évaluateur pèse autant que les autres : on moyenne des ratios note/barème par évaluateur ;
  * - score = part manager (poidsManager) + part collègues/clients (poidsCollegues), sur 100 ;
+ * - un manager désigné « client interne » de l'agent compte dans la part collègues/clients, pas manager ;
  * - dans la part collègues/clients, les clients QR comptent pour poidsClient points quand
  *   collègues ET clients existent ; sinon la source présente prend toute la part ;
  * - une source absente compte pour 0 : un agent sans note manager plafonne à poidsCollegues ;
@@ -77,11 +78,11 @@ export async function calculerScores(campagneId: string): Promise<ScoreCalcule[]
   const [terminees, invalidees, notes, notesClients] = await Promise.all([
     prisma.affectation.findMany({
       where: { campagneId, statut: 'TERMINEE', invalidee: false },
-      select: { evaluateurId: true, evalueId: true },
+      select: { evaluateurId: true, evalueId: true, clientInterne: true },
     }),
     prisma.affectation.findMany({
       where: { campagneId, invalidee: true },
-      select: { evalueId: true, evaluateur: { select: { role: true } } },
+      select: { evalueId: true, clientInterne: true, evaluateur: { select: { role: true } } },
     }),
     prisma.note.findMany({
       where: { campagneId },
@@ -97,14 +98,16 @@ export async function calculerScores(campagneId: string): Promise<ScoreCalcule[]
     }),
   ])
 
-  const soumises = new Set(terminees.map((a) => `${a.evaluateurId}:${a.evalueId}`))
+  // Paires soumises, avec leur qualité « client interne » (qui décide du bloc où comptent les notes)
+  const soumises = new Map(terminees.map((a) => [`${a.evaluateurId}:${a.evalueId}`, a.clientInterne]))
   const manager = new Map<string, Map<string, { val: number; max: number }>>()
   const collegues = new Map<string, Map<string, { val: number; max: number }>>()
   const clients = new Map<string, Map<string, { val: number; max: number }>>()
 
   for (const n of notes) {
-    if (!soumises.has(`${n.evaluateurId}:${n.evalueId}`)) continue
-    const cible = estEvaluateurManager(n.evaluateur.role) ? manager : collegues
+    const clientInterne = soumises.get(`${n.evaluateurId}:${n.evalueId}`)
+    if (clientInterne === undefined) continue
+    const cible = compteCommeManager(n.evaluateur.role, clientInterne) ? manager : collegues
     cumuler(cible, n.evalueId, n.evaluateurId, n.valeur, n.critere.noteMaximale || 5)
   }
   for (const nc of notesClients) {
@@ -115,7 +118,7 @@ export async function calculerScores(campagneId: string): Promise<ScoreCalcule[]
   const managerInvalide = new Set<string>()
   const collegueInvalide = new Set<string>()
   for (const a of invalidees) {
-    ;(estEvaluateurManager(a.evaluateur.role) ? managerInvalide : collegueInvalide).add(a.evalueId)
+    ;(compteCommeManager(a.evaluateur.role, a.clientInterne) ? managerInvalide : collegueInvalide).add(a.evalueId)
   }
 
   const agents = new Set([...manager.keys(), ...collegues.keys(), ...clients.keys()])

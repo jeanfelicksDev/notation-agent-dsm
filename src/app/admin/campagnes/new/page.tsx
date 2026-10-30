@@ -4,18 +4,23 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Save, AlertCircle, Calendar } from 'lucide-react'
+import { useCampagnesSources } from '@/components/ReconductionAffectations'
+import { toast } from '@/components/ui/feedback'
 
 export default function NewCampagnePage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const sources = useCampagnesSources()
 
   const [formData, setFormData] = useState({
     libelle: '',
     dateDebut: '',
     dateFin: '',
     poidsCollegues: 45,
-    poidsManager: 55
+    poidsManager: 55,
+    // Campagne dont on reprend les affectations ('' = aucune)
+    reconduireDepuis: ''
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -33,6 +38,7 @@ export default function NewCampagnePage() {
       const data = await res.json()
 
       if (res.ok) {
+        if (data.reconduction) toast.info(data.reconduction)
         router.push('/admin/campagnes')
         router.refresh()
       } else {
@@ -52,7 +58,7 @@ export default function NewCampagnePage() {
           <Link href="/admin/campagnes" className="text-gray-600 hover:text-gray-800">
             <ArrowLeft className="w-5 h-5" />
           </Link>
-          <h1 className="text-2xl font-bold text-gray-800">Nouvelle Campagne</h1>
+          <h1 className="text-2xl font-semibold text-gray-800">Nouvelle Campagne</h1>
         </div>
       </header>
 
@@ -138,6 +144,30 @@ export default function NewCampagnePage() {
               </div>
             </div>
 
+            {sources.length > 0 && (
+              <div>
+                <label htmlFor="reconduireDepuis" className="block text-sm font-medium text-gray-700 mb-1">
+                  Reprendre les affectations de
+                </label>
+                <select
+                  id="reconduireDepuis"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 outline-none bg-white"
+                  value={formData.reconduireDepuis}
+                  onChange={e => setFormData({ ...formData, reconduireDepuis: e.target.value })}
+                >
+                  <option value="">Aucune : répartition à faire</option>
+                  {sources.map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.libelle} ({s.nbAffectations} affectation{s.nbAffectations > 1 ? 's' : ''})
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1.5 text-xs text-gray-500">
+                  Les paires notant → noté et les désignations « client interne » sont recopiées. Possible aussi plus tard, depuis l’onglet Répartition.
+                </p>
+              </div>
+            )}
+
             <div className="flex justify-end gap-4 pt-4">
               <Link
                 href="/admin/campagnes"
@@ -148,7 +178,7 @@ export default function NewCampagnePage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="flex items-center gap-2 bg-navy-700 hover:bg-navy-800 text-white px-8 py-2 rounded-lg font-bold disabled:opacity-50 transition-colors"
+                className="flex items-center gap-2 bg-navy-700 hover:bg-navy-800 text-white px-8 py-2 rounded-lg font-semibold disabled:opacity-50 transition-colors"
               >
                 {loading ? 'Création...' : <><Save className="w-4 h-4" /> Créer la campagne</>}
               </button>

@@ -4,6 +4,7 @@ import { requireAdmin } from '@/lib/auth'
 import { CRITERES_OFFICIELS_DSM } from '@/lib/default-criteres'
 import { normaliserTypes } from '@/lib/criteres'
 import { validerPoids } from '@/lib/campagne'
+import { messageReconduction, reconduireAffectations } from '@/lib/reconduction'
 
 export async function GET() {
   const admin = await requireAdmin()
@@ -72,8 +73,22 @@ export async function POST(request: NextRequest) {
       include: { criteres: true },
     })
 
+    // Reprise facultative des affectations d'une campagne précédente
+    const reconduireDepuis = typeof body.reconduireDepuis === 'string' ? body.reconduireDepuis : ''
+    let reconduction: string | null = null
+    if (reconduireDepuis) {
+      try {
+        reconduction = messageReconduction(await reconduireAffectations(campagne.id, reconduireDepuis))
+      } catch (error) {
+        // La campagne est créée : l'administrateur pourra reconduire depuis l'onglet Répartition.
+        console.error('Reconduction à la création:', error)
+        reconduction = "Les affectations n'ont pas pu être reconduites : relancez la reconduction depuis l'onglet Répartition."
+      }
+    }
+
     return NextResponse.json({
       ...campagne,
+      reconduction,
       avertissement: dejaOuverte
         ? `La campagne « ${dejaOuverte.libelle} » est encore ouverte : la nouvelle campagne a été créée fermée. Ouvrez-la après avoir clôturé l'autre.`
         : null,

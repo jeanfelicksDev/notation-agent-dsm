@@ -22,7 +22,7 @@ export default function ListesPage() {
         subtitle="Valeurs proposées dans les fiches agents. Renommer une valeur met à jour toutes les fiches qui la portent."
         back={{ href: '/admin/utilisateurs', label: 'Agents' }}
       />
-      <main className="mx-auto grid w-full max-w-7xl gap-5 px-5 py-6 sm:px-8 lg:grid-cols-2">
+      <main className="mx-auto grid w-full max-w-[104rem] gap-5 px-5 py-6 sm:px-8 lg:grid-cols-2">
         {ORDRE.map(({ liste, aide }) => (
           <section key={liste} className="rounded-2xl bg-white p-5 shadow-card ring-1 ring-slate-200/70">
             <div className="mb-3 flex items-baseline justify-between gap-3">

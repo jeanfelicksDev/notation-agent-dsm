@@ -46,9 +46,9 @@ export async function POST(
       const managerUsers = allUsers.filter(u => u.role === 'MANAGER')
 
       for (const user of evalueUsers) {
-        // A. Assigner les collègues (pairs) du même service
+        // A. Assigner les collègues (pairs) du même service, ainsi que les cadres du service (vote facultatif)
         if (user.service) {
-          const sameServicePeers = allUsers.filter(u => u.service === user.service && u.id !== user.id && u.role === 'UTILISATEUR')
+          const sameServicePeers = allUsers.filter(u => u.service === user.service && u.id !== user.id && (u.role === 'UTILISATEUR' || u.role === 'CADRE'))
           for (const peer of sameServicePeers) {
             const key = `${peer.id}_${user.id}`
             if (!existingKeys.has(key)) {
@@ -84,6 +84,12 @@ export async function POST(
       return NextResponse.json({ success: true, count: newAffectationsData.length })
     }
 
+    // 1 bis. Les Pairs d'un même service se notent tous entre eux (paires manquantes seulement)
+    if (mode === 'pairs_service') {
+      const ajoutees = await affecterPairsDuService(id)
+      return NextResponse.json({ success: true, ajoutees })
+    }
+
     // 2. Mode PAR COLLABORATEUR (Évalué) : la liste `evaluateurIds` devient celle des évaluateurs de `evalueId`.
     if (mode === 'by_evalue' || (evalueId && Array.isArray(evaluateurIds))) {
       if (!evalueId || !Array.isArray(evaluateurIds)) {
@@ -100,16 +106,75 @@ export async function POST(
     const resultat = await synchroniser(id, { evaluateurId }, 'evalueId', evalueIds, evaluateurId, internes)
     return NextResponse.json({ success: true, ...resultat })
   } catch (error) {
+    if (error instanceof ErreurAffectation) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
     console.error('Affectation error:', error)
     return NextResponse.json({ error: 'Erreur lors de la mise à jour des affectations' }, { status: 500 })
   }
 }
 
 /**
+ * Chaque Pair est noté par tous les autres Pairs de son service. N'ajoute que les paires manquantes :
+ * les affectations existantes (managers, clients internes, statuts, notes) restent intactes.
+ */
+async function affecterPairsDuService(campagneId: string): Promise<number> {
+  const pairs = await prisma.utilisateur.findMany({
+    where: { role: 'UTILISATEUR', service: { not: null } },
+    select: { id: true, service: true },
+  })
+  const parService = new Map<string, string[]>()
+  for (const p of pairs) {
+    const service = p.service!.trim()
+    if (!service) continue
+    parService.set(service, [...(parService.get(service) ?? []), p.id])
+  }
+
+  const data = [...parService.values()].flatMap((ids) =>
+    ids.flatMap((evaluateurId) =>
+      ids.filter((evalueId) => evalueId !== evaluateurId).map((evalueId) => ({ campagneId, evaluateurId, evalueId }))
+    )
+  )
+  if (data.length === 0) return 0
+  const { count } = await prisma.affectation.createMany({ data, skipDuplicates: true })
+  return count
+}
+
+/**
+ * DELETE — remet à zéro la répartition de la campagne : toutes ses affectations et les notes internes
+ * qui en dépendent (brouillons comme évaluations soumises), ainsi que les scores enregistrés.
+ * Les avis clients (QR) sont conservés.
+ */
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const admin = await requireAdmin()
+  if (!admin) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
+
+  const { id } = await params
+  try {
+    // Les scores enregistrés reposaient sur ces notes : ils partent aussi
+    const [notes, affectations] = await prisma.$transaction([
+      prisma.note.deleteMany({ where: { campagneId: id } }),
+      prisma.affectation.deleteMany({ where: { campagneId: id } }),
+      prisma.scoreFinal.deleteMany({ where: { campagneId: id } }),
+    ])
+    return NextResponse.json({ success: true, affectations: affectations.count, notes: notes.count })
+  } catch (error) {
+    console.error('Réinitialisation error:', error)
+    return NextResponse.json({ error: 'Erreur lors de la réinitialisation des affectations' }, { status: 500 })
+  }
+}
+
+/** Demande de répartition contraire aux règles métier (renvoyée en 400). */
+class ErreurAffectation extends Error {}
+
+/**
  * Aligne les affectations sur la liste voulue SANS toucher à celles qui restent :
  * leur statut (brouillon, soumise) et leurs notes sont conservés. Seules les paires
  * retirées sont supprimées et les nouvelles créées ; la qualité « client interne » est
- * mise à jour sur toutes. L'auto-évaluation est toujours exclue.
+ * mise à jour sur toutes. L'auto-évaluation est toujours exclue, et un cadre n'est jamais noté.
  */
 async function synchroniser(
   campagneId: string,
@@ -119,7 +184,16 @@ async function synchroniser(
   soiMeme: string,
   internes: Set<string>
 ) {
-  const cibles = new Set(voulus.filter((v): v is string => typeof v === 'string' && v !== '' && v !== soiMeme))
+  const demandes = voulus.filter((v): v is string => typeof v === 'string' && v !== '' && v !== soiMeme)
+  // Un cadre peut noter mais ne peut jamais être noté
+  const evaluesDemandes = cote === 'evalueId' ? demandes : 'evalueId' in fixe ? [fixe.evalueId] : []
+  const cadres = new Set(
+    (await prisma.utilisateur.findMany({ where: { id: { in: evaluesDemandes }, role: 'CADRE' }, select: { id: true } })).map((u) => u.id)
+  )
+  if ('evalueId' in fixe && cadres.has(fixe.evalueId)) {
+    throw new ErreurAffectation('Un cadre ne peut pas être noté.')
+  }
+  const cibles = new Set(demandes.filter((c) => !cadres.has(c)))
   const existantes = await prisma.affectation.findMany({
     where: { campagneId, ...fixe },
     select: { id: true, evaluateurId: true, evalueId: true, clientInterne: true },
