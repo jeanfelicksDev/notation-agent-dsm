@@ -4,14 +4,24 @@ import { Suspense, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
-import { AlertCircle, ArrowLeft, ArrowRight, ArrowUpRight, CircleCheck, Eye, EyeOff, Info, Loader2, Lock, Phone, User } from 'lucide-react'
+import { AlertCircle, ArrowLeft, ArrowRight, ArrowUpRight, CircleCheck, Eye, EyeOff, Info, Loader2, Lock, Phone, Play, User } from 'lucide-react'
 import { destinationPourRole } from '@/lib/roles'
 import { BrandMark } from '@/components/BrandMark'
 import { libelleCampagne } from '@/lib/libelle'
 
 const QRCode = dynamic(() => import('qrcode.react').then((m) => m.QRCodeSVG), { ssr: false })
 
-type Etape = 'identifiant' | 'connexion' | 'definir' | 'contact_admin'
+type Etape = 'identifiant' | 'choix' | 'connexion' | 'definir' | 'contact_admin'
+
+/** Guide animé de la connexion (page statique de /public), proposé sur téléphone après le matricule. */
+const PRESENTATION_CONNEXION = '/presentation-connexion.html'
+
+/** Téléphone ou tablette : c'est avec eux qu'on scanne le QR code de l'accueil. */
+function estAppareilMobile() {
+  const ua = navigator.userAgent
+  // iPadOS se présente comme un Mac : on le reconnaît à son écran tactile
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)
+}
 
 type CampagnePublique = { libelle: string; dateFin: string; completionRate: number } | null
 
@@ -67,6 +77,8 @@ export default function Accueil() {
 function AccueilContenu() {
   const reason = useSearchParams().get('reason')
   const [etape, setEtape] = useState<Etape>('identifiant')
+  // Étape du code PIN qui suit l'écran « choix » (présentation ou connexion immédiate)
+  const [etapePin, setEtapePin] = useState<'connexion' | 'definir'>('connexion')
   // Collaborateur : matricule ; client externe : téléphone, puis portail d'avis
   const [profil, setProfil] = useState<'collaborateur' | 'client'>('collaborateur')
   const [identifiant, setIdentifiant] = useState('')
@@ -135,7 +147,14 @@ function AccueilContenu() {
         const { res, data } = await post('/api/auth/identifier', { identifiant })
         if (!res.ok) return setError(data.error || 'Identifiant inconnu.')
         setEstAdmin(Boolean(data.admin))
-        setEtape(data.etat === 'pin_a_definir' ? 'definir' : data.etat === 'contact_admin' ? 'contact_admin' : 'connexion')
+        const suivante = data.etat === 'pin_a_definir' ? 'definir' : data.etat === 'contact_admin' ? 'contact_admin' : 'connexion'
+        // Sur téléphone (QR code de l'accueil), l'agent reconnu choisit : voir la présentation ou se connecter
+        if (suivante !== 'contact_admin' && !data.admin && estAppareilMobile()) {
+          setEtapePin(suivante)
+          setEtape('choix')
+          return
+        }
+        setEtape(suivante)
         return
       }
 
@@ -170,6 +189,7 @@ function AccueilContenu() {
   const estClient = profil === 'client'
   const titre = {
     identifiant: 'Connexion',
+    choix: 'Bienvenue',
     connexion: estAdmin ? 'Votre mot de passe' : 'Votre PIN',
     definir: 'Choisissez votre PIN',
     contact_admin: 'Compte à activer',
@@ -312,6 +332,11 @@ function AccueilContenu() {
                     (estClient
                       ? 'Le numéro de téléphone enregistré par la DSM est requis pour donner votre avis sur nos agents.'
                       : 'Votre matricule de collaborateur DSM est requis pour poursuivre.')}
+                  {etape === 'choix' && (
+                    <>
+                      Compte <strong className="font-semibold text-slate-900">{identifiant}</strong> reconnu. Que souhaitez-vous faire ?
+                    </>
+                  )}
                   {etape === 'connexion' && (
                     <>
                       Compte <strong className="font-semibold text-slate-900">{identifiant}</strong>
@@ -327,8 +352,37 @@ function AccueilContenu() {
                   {etape === 'contact_admin' &&
                     'Ce compte administrateur n’a pas encore de mot de passe. Il doit être initialisé par la commande d’installation.'}
                 </p>
-  
-                {etape !== 'contact_admin' && (
+
+                {etape === 'choix' && (
+                  <div className="mt-9 space-y-4">
+                    {/* Nouvel onglet : la page de connexion reste prête pour revenir au code PIN */}
+                    <a
+                      href={PRESENTATION_CONNEXION}
+                      target="_blank"
+                      rel="noopener"
+                      className="flex items-center gap-4 rounded-2xl bg-white px-5 py-4 text-navy-950 ring-1 ring-slate-200 shadow-[0_10px_24px_-16px_rgb(0_43_73/0.45)] transition-[box-shadow,transform] duration-200 hover:-translate-y-px hover:ring-gold-400 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-gold-400"
+                    >
+                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-b from-gold-300 to-gold-500 text-navy-950">
+                        <Play className="ml-0.5 h-5 w-5 fill-current" aria-hidden />
+                      </span>
+                      <span>
+                        <span className="block text-[1.05rem] font-semibold">Voir la présentation</span>
+                        <span className="mt-0.5 block text-sm leading-snug text-navy-500">Comment se connecter, pas à pas · environ 3 minutes, avec voix off</span>
+                      </span>
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => setEtape(etapePin)}
+                      className="group relative flex h-[60px] w-full items-center justify-center gap-2.5 rounded-2xl bg-[#050d1a] px-5 text-[1.05rem] font-semibold text-white shadow-[0_18px_30px_-14px_rgb(5_13_26/0.8)] transition-[box-shadow,transform] duration-200 hover:-translate-y-px hover:shadow-[0_22px_36px_-14px_rgb(5_13_26/0.85)] active:translate-y-0"
+                    >
+                      <span aria-hidden className="absolute inset-x-12 -bottom-px h-[2px] rounded-full bg-gradient-to-r from-transparent via-gold-400 to-transparent blur-[1px]" />
+                      Se connecter maintenant
+                      <ArrowRight className="h-5 w-5 text-gold-300 transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden />
+                    </button>
+                  </div>
+                )}
+
+                {etape !== 'contact_admin' && etape !== 'choix' && (
                   <form onSubmit={handleSubmit} className="mt-9 space-y-6" noValidate>
                     {etape === 'identifiant' && (
                       <div>
