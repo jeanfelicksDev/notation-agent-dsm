@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma'
 import { getSessionUser } from '@/lib/auth'
 import { getCampagneOuverte } from '@/lib/campagne'
 import { ErreurNotation, preparerNotation, type NoteEntrante } from '@/lib/notation'
+import { commentaireObligatoire } from '@/lib/commentaires'
 
 /**
  * POST /api/evaluation/submit — soumission définitive.
@@ -63,16 +64,22 @@ export async function POST(request: NextRequest) {
         // Contrôle de complétude sur l'état final en base (brouillons antérieurs inclus).
         const enBase = await tx.note.findMany({
           where: { evaluateurId: sessionUser.id, campagneId: campagne.id, evalueId: { in: evalueIds } },
-          select: { evalueId: true, critereId: true },
+          select: { evalueId: true, critereId: true, valeur: true, commentaire: true },
         })
-        const notees = new Set(enBase.map((n) => `${n.evalueId}:${n.critereId}`))
+        const notees = new Map(enBase.map((n) => [`${n.evalueId}:${n.critereId}`, n]))
         for (const a of affectations) {
-          const manquant = attendus.get(a.evalueId)?.find((c) => !notees.has(`${a.evalueId}:${c.id}`))
-          if (manquant) {
-            throw new ErreurNotation(
-              `Le critère « ${manquant.libelle} » n'est pas noté pour ${a.evalue.prenom} ${a.evalue.nom}.`,
-              400
-            )
+          for (const c of attendus.get(a.evalueId) ?? []) {
+            const n = notees.get(`${a.evalueId}:${c.id}`)
+            if (!n) {
+              throw new ErreurNotation(`Le critère « ${c.libelle} » n'est pas noté pour ${a.evalue.prenom} ${a.evalue.nom}.`, 400)
+            }
+            // Une note basse doit être expliquée pour être exploitable en entretien
+            if (commentaireObligatoire(n.valeur, c.noteMaximale) && !n.commentaire?.trim()) {
+              throw new ErreurNotation(
+                `« ${c.libelle} » : un commentaire est requis pour expliquer la note de ${a.evalue.prenom} ${a.evalue.nom}.`,
+                400
+              )
+            }
           }
         }
 

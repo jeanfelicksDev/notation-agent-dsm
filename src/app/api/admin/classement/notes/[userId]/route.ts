@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { requireAdmin } from '@/lib/auth'
+import { estEvaluateurManager } from '@/lib/criteres'
+import { empreinte } from '@/lib/commentaires'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,18 +37,18 @@ export async function GET(
       return NextResponse.json({ error: 'Aucune campagne trouvée' }, { status: 404 })
     }
 
-    // Récupérer les notes internes (collègues + manager)
+    // Notes internes (collègues + manager). L'identité des évaluateurs ne quitte pas le serveur.
     const notesInternes = await prisma.note.findMany({
       where: { evalueId: userId, campagneId: campagne.id },
-      include: {
-        evaluateur: {
-          select: { id: true, nom: true, prenom: true, matricule: true, role: true, service: true },
-        },
+      select: {
+        evaluateurId: true,
+        critereId: true,
+        valeur: true,
+        evaluateur: { select: { role: true } },
         critere: {
           select: { id: true, libelle: true, noteMaximale: true, typeEvaluateur: true, typeEvaluateurs: true },
         },
       },
-      orderBy: [{ critere: { typeEvaluateur: 'asc' } }, { evaluateur: { nom: 'asc' } }],
     })
 
     // Récupérer les notes clients
@@ -66,29 +68,27 @@ export async function GET(
       orderBy: { createdAt: 'asc' },
     })
 
-    // Grouper les notes internes par évaluateur
+    // Grouper les notes internes par évaluateur, sans son identité ni ses commentaires
+    // (les commentaires se lisent, anonymisés, dans la fiche de retours).
     const evaluateurMap = new Map<
       string,
       {
-        evaluateur: { id: string; nom: string; prenom: string; matricule: string; role: string; service: string | null }
-        notes: Array<{ critereId: string; critereLibelle: string; noteMaximale: number; valeur: number; commentaire: string | null; typeEvaluateur: string; typeEvaluateurs?: string[] }>
+        estManager: boolean
+        notes: Array<{ critereId: string; critereLibelle: string; noteMaximale: number; valeur: number; typeEvaluateur: string; typeEvaluateurs?: string[] }>
       }
     >()
 
     for (const note of notesInternes) {
-      const key = note.evaluateurId
-      if (!evaluateurMap.has(key)) {
-        evaluateurMap.set(key, { evaluateur: note.evaluateur, notes: [] })
-      }
-      evaluateurMap.get(key)!.notes.push({
+      const entree = evaluateurMap.get(note.evaluateurId) ?? { estManager: estEvaluateurManager(note.evaluateur.role), notes: [] }
+      entree.notes.push({
         critereId: note.critereId,
         critereLibelle: note.critere.libelle,
         noteMaximale: note.critere.noteMaximale,
         valeur: note.valeur,
-        commentaire: note.commentaire,
         typeEvaluateur: note.critere.typeEvaluateur,
         typeEvaluateurs: note.critere.typeEvaluateurs,
       })
+      evaluateurMap.set(note.evaluateurId, entree)
     }
 
     // Statut de chaque évaluation : seules les évaluations soumises comptent dans le score.
@@ -97,15 +97,24 @@ export async function GET(
       select: { evaluateurId: true, statut: true },
     })
     const statutPar = new Map(affectations.map((a) => [a.evaluateurId, a.statut]))
-    const evaluateursNotes = Array.from(evaluateurMap.values()).map((e) => ({
-      ...e,
-      soumis: statutPar.get(e.evaluateur.id) === 'TERMINEE',
-    }))
+
+    // Ordre mélangé (stable) puis numérotation : l'ordre alphabétique ne trahit personne.
+    let numero = 0
+    let numeroManager = 0
+    const plusieursManagers = [...evaluateurMap.values()].filter((e) => e.estManager).length > 1
+    const evaluateursNotes = [...evaluateurMap.entries()]
+      .sort(([a], [b]) => empreinte(`${campagne.id}:${userId}:${a}`) - empreinte(`${campagne.id}:${userId}:${b}`))
+      .map(([evaluateurId, e]) => ({
+        libelle: e.estManager ? (plusieursManagers ? `Manager ${++numeroManager}` : 'Manager') : `Évaluateur ${++numero}`,
+        estManager: e.estManager,
+        soumis: statutPar.get(evaluateurId) === 'TERMINEE',
+        notes: e.notes,
+      }))
 
     // Grouper les notes clients par client (ipHash ou clientId)
     const clientMap = new Map<
       string,
-      { notes: Array<{ critereId: string; critereLibelle: string; noteMaximale: number; valeur: number; commentaire: string | null }> }
+      { notes: Array<{ critereId: string; critereLibelle: string; noteMaximale: number; valeur: number }> }
     >()
 
     for (const nc of notesClients) {
@@ -118,7 +127,6 @@ export async function GET(
         critereLibelle: nc.critere.libelle,
         noteMaximale: nc.critere.noteMaximale,
         valeur: nc.valeur,
-        commentaire: nc.commentaire,
       })
     }
 

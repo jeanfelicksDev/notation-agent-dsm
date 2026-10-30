@@ -52,7 +52,7 @@ export default function NewCampagnePage() {
           <Link href="/admin/campagnes" className="text-gray-600 hover:text-gray-800">
             <ArrowLeft className="w-5 h-5" />
           </Link>
-          <h1 className="text-2xl font-bold text-gray-800">Nouvelle Campagne</h1>
+          <h1 className="text-2xl font-semibold text-gray-800">Nouvelle Campagne</h1>
         </div>
       </header>
 
@@ -148,7 +148,7 @@ export default function NewCampagnePage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="flex items-center gap-2 bg-navy-700 hover:bg-navy-800 text-white px-8 py-2 rounded-lg font-bold disabled:opacity-50 transition-colors"
+                className="flex items-center gap-2 bg-navy-700 hover:bg-navy-800 text-white px-8 py-2 rounded-lg font-semibold disabled:opacity-50 transition-colors"
               >
                 {loading ? 'Création...' : <><Save className="w-4 h-4" /> Créer la campagne</>}
               </button>

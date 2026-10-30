@@ -7,8 +7,14 @@
    ═══════════════════════════════════════════════════════════════ */
 
 @theme {
-  --font-sans: var(--font-public-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-display: var(--font-serif-titres), Georgia, "Times New Roman", serif;
+
+  /* Échelle basse relevée : rien sous 12 px. 2xs = libellés en capitales, xs = texte secondaire. */
+  --text-2xs: 0.75rem;
+  --text-2xs--line-height: 1rem;
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.25rem;
 
   /* Navy — ancré sur #002B49 (900) */
   --color-navy-50:  #f3f6f9;
@@ -53,6 +59,14 @@
   --animate-fondu: fondu 2s cubic-bezier(0.25, 0.1, 0.25, 1) both;
   --animate-pouls: pouls 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
 
+  /* Passage d'un collaborateur noté au suivant : toutes ces animations partagent la même
+     durée pour rester synchronisées. --sens vaut 1 (suivant) ou -1 (précédent). */
+  --animate-rideau: rideau 3200ms cubic-bezier(0.65, 0, 0.35, 1) both;
+  --animate-rideau-sortie: rideau-sortie 3200ms var(--ease-out-expo) both;
+  --animate-rideau-arrivee: rideau-arrivee 3200ms var(--ease-out-expo) both;
+  --animate-rideau-medaillon: rideau-medaillon 3200ms var(--ease-out-expo) both;
+  --animate-rideau-trait: rideau-trait 3200ms var(--ease-out-expo) both;
+
   @keyframes fade-in {
     from { opacity: 0; }
     to { opacity: 1; }
@@ -77,6 +91,29 @@
   @keyframes pouls {
     from { transform: scale(1); opacity: 0.7; }
     to { transform: scale(2.6); opacity: 0; }
+  }
+  /* Le rideau entre par un côté, marque une pause, puis sort par l'autre */
+  @keyframes rideau {
+    0% { transform: translateX(calc(var(--sens, 1) * 100%)); }
+    22%, 80% { transform: none; }
+    100% { transform: translateX(calc(var(--sens, 1) * -100%)); }
+  }
+  /* Le collaborateur quitté s'efface dans le sens du parcours */
+  @keyframes rideau-sortie {
+    0%, 26% { opacity: 1; transform: none; }
+    46%, 100% { opacity: 0; transform: translateX(calc(var(--sens, 1) * -1.5rem)); }
+  }
+  @keyframes rideau-arrivee {
+    0%, 30% { opacity: 0; transform: translateX(calc(var(--sens, 1) * 1.5rem)); filter: blur(4px); }
+    54%, 100% { opacity: 1; transform: none; filter: none; }
+  }
+  @keyframes rideau-medaillon {
+    0%, 26% { opacity: 0; transform: scale(0.6); }
+    50%, 100% { opacity: 1; transform: none; }
+  }
+  @keyframes rideau-trait {
+    0%, 40% { transform: scaleX(0); }
+    70%, 100% { transform: none; }
   }
   @keyframes rise-in {
     from { transform: translateY(6px); }
@@ -162,6 +199,9 @@ button:not(:disabled), [role="button"]:not([aria-disabled="true"]) {
   margin-left: var(--sidebar-width);
 }
 @media (max-width: 1023px) {
+  .dsm-page-with-sidebar { margin-left: 0; }
+}
+@media print {
   .dsm-page-with-sidebar { margin-left: 0; }
 }
 

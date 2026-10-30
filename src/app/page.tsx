@@ -186,9 +186,9 @@ function AccueilContenu() {
             <BrandMark size={50} />
           </span>
           <div className="leading-tight">
-            <p className="flex items-center gap-2.5 text-lg font-bold tracking-[0.02em] sm:text-xl">
+            <p className="flex items-center gap-2.5 text-lg font-semibold tracking-[0.02em] sm:text-xl">
               DSM TAMIS
-              <span className="rounded-full px-2.5 py-0.5 text-[10.5px] font-semibold tracking-[0.12em] text-gold-300 ring-1 ring-gold-400/50">
+              <span className="rounded-full px-2.5 py-0.5 text-2xs font-semibold tracking-[0.12em] text-gold-300 ring-1 ring-gold-400/50">
                 OFFICIEL
               </span>
             </p>
@@ -207,14 +207,14 @@ function AccueilContenu() {
         <main className="grid flex-1 items-center gap-12 py-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,35rem)] lg:gap-16 xl:gap-24 lg:py-14">
           {/* ─── Présentation et campagne ─── */}
           <section aria-labelledby="titre-page" className="min-w-0">
-            <span className="inline-flex animate-entree items-center gap-2.5 rounded-full bg-navy-900/70 px-4 py-2 text-xs font-semibold tracking-[0.08em] text-navy-100 ring-1 ring-white/15 sm:text-[13px]">
+            <span className="inline-flex animate-entree items-center gap-2.5 rounded-full bg-navy-900/70 px-4 py-2 text-xs font-semibold tracking-[0.08em] text-navy-100 ring-1 ring-white/15 sm:text-xs">
               <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgb(52_211_153/0.7)]" aria-hidden />
               PORTAIL RH INTERNE SÉCURISÉ
             </span>
 
             <h1
               id="titre-page"
-              className="mt-8 animate-entree text-[2.9rem] leading-[1.02] font-bold tracking-[-0.035em] text-white [animation-delay:60ms] sm:text-[3.9rem] xl:text-[4.5rem]"
+              className="mt-8 animate-entree text-[2.9rem] leading-[1.02] font-semibold tracking-[-0.035em] text-white [animation-delay:60ms] sm:text-[3.9rem] xl:text-[4.5rem]"
             >
               Évaluation de la performance
               <em className="mt-1 block font-display text-[0.95em] font-normal tracking-[-0.01em] text-gold-300 italic">des agents</em>
@@ -239,7 +239,7 @@ function AccueilContenu() {
                   <span className="text-sm text-navy-200">Session annuelle {annee}</span>
                 </div>
 
-                <p className="mt-6 text-[1.7rem] leading-tight font-bold tracking-[-0.02em] text-white sm:text-[2rem]">
+                <p className="mt-6 text-[1.7rem] leading-tight font-semibold tracking-[-0.02em] text-white sm:text-[2rem]">
                   <TitreCampagne libelle={campagne.libelle} />
                 </p>
 
@@ -369,7 +369,7 @@ function AccueilContenu() {
                           />
                         </div>
                       </Champ>
-                      <p className="mt-3 flex items-start gap-2 text-[13px] text-navy-400">
+                      <p className="mt-3 flex items-start gap-2 text-xs text-navy-400">
                         <Info className="mt-px h-4 w-4 shrink-0 text-gold-600" aria-hidden />
                         {estClient ? 'Le numéro communiqué à la DSM lors de votre enregistrement.' : 'Format d’identifiant habituel délivré par les Ressources Humaines.'}
                       </p>
@@ -521,7 +521,7 @@ function Statistique({ libelle, className, children }: { libelle: string; classN
   return (
     <div className={className}>
       <dt className="text-xs font-medium tracking-[0.1em] text-navy-200 uppercase">{libelle}</dt>
-      <dd className="mt-3 text-xl font-bold whitespace-nowrap tabular-nums sm:text-2xl">{children}</dd>
+      <dd className="mt-3 text-xl font-semibold whitespace-nowrap tabular-nums sm:text-2xl">{children}</dd>
     </div>
   )
 }
