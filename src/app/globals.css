@@ -7,8 +7,14 @@
    ═══════════════════════════════════════════════════════════════ */
 
 @theme {
-  --font-sans: var(--font-public-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-display: var(--font-serif-titres), Georgia, "Times New Roman", serif;
+
+  /* Échelle basse relevée : rien sous 12 px. 2xs = libellés en capitales, xs = texte secondaire. */
+  --text-2xs: 0.75rem;
+  --text-2xs--line-height: 1rem;
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.25rem;
 
   /* Navy — ancré sur #002B49 (900) */
   --color-navy-50:  #f3f6f9;
