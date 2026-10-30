@@ -177,7 +177,7 @@ export function GestionListe({
                 <span className="min-w-0 flex-1 truncate text-sm text-slate-800">
                   {v.libelle}
                   {v.parDefaut && (
-                    <span className="ml-2 rounded-full bg-gold-50 px-2 py-0.5 text-[11px] font-medium text-gold-800 ring-1 ring-gold-200">
+                    <span className="ml-2 rounded-full bg-gold-50 px-2 py-0.5 text-2xs font-medium text-gold-800 ring-1 ring-gold-200">
                       par défaut
                     </span>
                   )}

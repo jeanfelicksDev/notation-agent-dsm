@@ -71,7 +71,7 @@ export default function NewUtilisateurPage() {
         
         <main className="flex-1 overflow-y-auto p-6">
           <div className="max-w-3xl mx-auto space-y-6">
-            <Link href="/admin/utilisateurs" className="group flex items-center gap-2 text-slate-500 hover:text-slate-800 font-bold transition-colors">
+            <Link href="/admin/utilisateurs" className="group flex items-center gap-2 text-slate-500 hover:text-slate-800 font-semibold transition-colors">
               <ArrowLeft className="w-5 h-5 transition-transform group-hover:-translate-x-1" /> Retour à la liste
             </Link>
 
@@ -81,7 +81,7 @@ export default function NewUtilisateurPage() {
                   <User className="w-6 h-6" />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-bold text-slate-900">Profil Collaborateur</h2>
+                  <h2 className="text-2xl font-semibold text-slate-900">Profil Collaborateur</h2>
                   <p className="text-slate-500 text-sm font-medium">Informations d'identification et accès système.</p>
                 </div>
               </div>
@@ -89,19 +89,19 @@ export default function NewUtilisateurPage() {
               {error && (
                 <div className="mb-8 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 text-red-700">
                   <AlertCircle className="w-5 h-5" />
-                  <p className="font-bold">{error}</p>
+                  <p className="font-semibold">{error}</p>
                 </div>
               )}
 
               <form onSubmit={handleSubmit} className="space-y-8">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Matricule *</label>
+                    <label className="text-2xs font-bold text-slate-400 uppercase tracking-widest ml-1">Matricule *</label>
                     <div className="relative">
                       <input
                         type="text"
                         required
-                        className="w-full px-5 py-3.5 pl-12 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold uppercase"
+                        className="w-full px-5 py-3.5 pl-12 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-semibold uppercase"
                         value={formData.matricule}
                         onChange={e => setFormData({ ...formData, matricule: e.target.value.toUpperCase() })}
                         placeholder="Ex: MAT-001"
@@ -111,12 +111,12 @@ export default function NewUtilisateurPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email *</label>
+                    <label className="text-2xs font-bold text-slate-400 uppercase tracking-widest ml-1">Email *</label>
                     <div className="relative">
                       <input
                         type="email"
                         required
-                        className="w-full px-5 py-3.5 pl-12 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
+                        className="w-full px-5 py-3.5 pl-12 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-semibold"
                         value={formData.email}
                         onChange={e => setFormData({ ...formData, email: e.target.value })}
                         placeholder="email@dsm.com"
@@ -126,22 +126,22 @@ export default function NewUtilisateurPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nom *</label>
+                    <label className="text-2xs font-bold text-slate-400 uppercase tracking-widest ml-1">Nom *</label>
                     <input
                       type="text"
                       required
-                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
+                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-semibold"
                       value={formData.nom}
                       onChange={e => setFormData({ ...formData, nom: e.target.value })}
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Prénom *</label>
+                    <label className="text-2xs font-bold text-slate-400 uppercase tracking-widest ml-1">Prénom *</label>
                     <input
                       type="text"
                       required
-                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
+                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-semibold"
                       value={formData.prenom}
                       onChange={e => setFormData({ ...formData, prenom: e.target.value })}
                     />
@@ -151,7 +151,7 @@ export default function NewUtilisateurPage() {
                     <label htmlFor="sexe" className="ml-1 block text-sm font-medium text-slate-700">Sexe</label>
                     <select
                       id="sexe"
-                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
+                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-semibold"
                       value={formData.sexe}
                       onChange={e => setFormData({ ...formData, sexe: e.target.value })}
                     >
@@ -171,7 +171,7 @@ export default function NewUtilisateurPage() {
                     listes={listes}
                     onListes={setListes}
                     labelClassName="ml-1 block text-sm font-medium text-slate-700"
-                    selectClassName="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
+                    selectClassName="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-semibold"
                   />
 
                   <div className="space-y-2">
@@ -179,7 +179,7 @@ export default function NewUtilisateurPage() {
                     <input
                       id="emploi"
                       type="text"
-                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
+                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-semibold"
                       value={formData.emploi}
                       onChange={e => setFormData({ ...formData, emploi: e.target.value })}
                       placeholder="Ex : Agent de transit"
@@ -195,7 +195,7 @@ export default function NewUtilisateurPage() {
                     listes={listes}
                     onListes={setListes}
                     labelClassName="ml-1 block text-sm font-medium text-slate-700"
-                    selectClassName="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
+                    selectClassName="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-semibold"
                   />
 
                   <ChampListe
@@ -207,7 +207,7 @@ export default function NewUtilisateurPage() {
                     listes={listes}
                     onListes={setListes}
                     labelClassName="ml-1 block text-sm font-medium text-slate-700"
-                    selectClassName="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
+                    selectClassName="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-semibold"
                   />
 
                   <ChampListe
@@ -219,7 +219,7 @@ export default function NewUtilisateurPage() {
                     listes={listes}
                     onListes={setListes}
                     labelClassName="ml-1 block text-sm font-medium text-slate-700"
-                    selectClassName="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
+                    selectClassName="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-semibold"
                   />
 
                   <ChampListe
@@ -231,7 +231,7 @@ export default function NewUtilisateurPage() {
                     listes={listes}
                     onListes={setListes}
                     labelClassName="ml-1 block text-sm font-medium text-slate-700"
-                    selectClassName="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
+                    selectClassName="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-semibold"
                   />
 
 
@@ -246,7 +246,7 @@ export default function NewUtilisateurPage() {
                         required
                         minLength={8}
                         autoComplete="new-password"
-                        className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
+                        className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-semibold"
                         value={formData.motDePasse}
                         onChange={e => setFormData({ ...formData, motDePasse: e.target.value })}
                       />
@@ -293,7 +293,7 @@ export default function NewUtilisateurPage() {
                           <QrCode className={`w-5 h-5 ${formData.qrcodeActif ? 'text-white' : 'text-slate-500'}`} />
                         </div>
                         <div>
-                          <p className={`font-bold text-sm ${
+                          <p className={`font-semibold text-sm ${
                             formData.qrcodeActif ? 'text-amber-800' : 'text-slate-700'
                           }`}>Inclure dans la notation par QR Code unique</p>
                           <p className="text-xs text-slate-400 font-medium mt-0.5">
@@ -308,14 +308,14 @@ export default function NewUtilisateurPage() {
                 <div className="pt-6 border-t border-slate-100 flex justify-end gap-4">
                   <Link
                     href="/admin/utilisateurs"
-                    className="px-8 py-3.5 border border-slate-200 rounded-2xl text-slate-600 font-bold hover:bg-slate-50 transition-all active:scale-[0.98]"
+                    className="px-8 py-3.5 border border-slate-200 rounded-2xl text-slate-600 font-semibold hover:bg-slate-50 transition-all active:scale-[0.98]"
                   >
                     Annuler
                   </Link>
                   <button
                     type="submit"
                     disabled={loading}
-                    className="bg-slate-900 hover:bg-slate-800 text-white px-10 py-3.5 rounded-2xl font-black shadow-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center gap-2"
+                    className="bg-slate-900 hover:bg-slate-800 text-white px-10 py-3.5 rounded-2xl font-bold shadow-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center gap-2"
                   >
                     {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
                     Créer le profil

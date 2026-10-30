@@ -22,6 +22,7 @@ import {
 import { getAppreciationInfo, getAppreciationOptions } from '@/lib/default-criteres'
 import { BrandMark } from '@/components/BrandMark'
 import { confirmer, toast } from '@/components/ui/feedback'
+import { TransitionCollaborateur, type TransitionCollaborateurProps } from '@/components/evaluer/TransitionCollaborateur'
 import { libelleCampagne } from '@/lib/libelle'
 
 /* ─── Types ─────────────────────────────────────────────────────── */
@@ -66,6 +67,8 @@ interface Campagne {
 type NoteState = { valeur: number; commentaire: string }
 type NotesMap = Record<string, Record<string, NoteState>>
 type Sauvegarde = { etat: 'idle' | 'pending' | 'saving' | 'saved' | 'error'; at?: Date }
+/** Passage en cours d'un collaborateur à l'autre ; `cle` relance l'animation à chaque changement. */
+type Passage = Pick<TransitionCollaborateurProps, 'de' | 'vers' | 'sens'> & { cle: number }
 
 const AUTOSAVE_MS = 1200
 const MAX_COMMENTAIRE = 500
@@ -98,6 +101,11 @@ export default function EvaluerPage() {
   const [recherche, setRecherche] = useState('')
   const [filtre, setFiltre] = useState<'tous' | 'a_faire' | 'termines'>('tous')
   const [tiroir, setTiroir] = useState(false)
+
+  // Rideau affiché pendant le passage d'un collaborateur à l'autre
+  const [passage, setPassage] = useState<Passage | null>(null)
+  const finPassage = useCallback(() => setPassage(null), [])
+  const zoneNotation = useRef<HTMLElement>(null)
 
   // Collaborateurs modifiés depuis la dernière sauvegarde réussie
   const sales = useRef(new Set<string>())
@@ -249,7 +257,6 @@ export default function EvaluerPage() {
 
   const choisirNote = (aff: Affectation, critere: Critere, note: number) => {
     if (aff.statut === 'TERMINEE' || lectureSeule) return
-    const premiereFois = valeur(aff.evalueId, critere.id) === 0
     setNotes((prev) => ({
       ...prev,
       [aff.evalueId]: {
@@ -258,13 +265,6 @@ export default function EvaluerPage() {
       },
     }))
     marquerModifie(aff.evalueId)
-
-    // Auto-avance au critère suivant, seulement lors d'une première notation en mode focus
-    const cs = criteresDe(aff)
-    const idx = cs.findIndex((c) => c.id === critere.id)
-    if (vue === 'focus' && premiereFois && idx < cs.length - 1) {
-      setTimeout(() => setCritereIndex(idx + 1), 220)
-    }
   }
 
   const changerCommentaire = (aff: Affectation, critereId: string, texte: string) => {
@@ -291,6 +291,31 @@ export default function EvaluerPage() {
     const cible = affectations[idx]
     setCritereIndex(Math.max(0, cible.critereIds.findIndex((id) => valeur(cible.evalueId, id) === 0)))
     setTiroir(false)
+    // Le nouveau collaborateur s'affiche depuis le haut, sous le rideau
+    zoneNotation.current?.scrollTo({ top: 0 })
+    setPassage({
+      cle: Date.now(),
+      sens: idx > currentIndex ? 1 : -1,
+      de: quitte ? { nom: nomComplet(quitte), complet: quitte.statut === 'TERMINEE' || estComplet(quitte) } : null,
+      vers: { nom: nomComplet(cible), initiales: initiales(cible), service: cible.evalue.service },
+    })
+  }
+
+  // Bouton « Aucun commentaire à faire » : critère suivant, ou rideau vers le prochain collaborateur à noter
+  const continuer = (aff: Affectation, critereIdx: number) => {
+    const cs = criteresDe(aff)
+    if (critereIdx < cs.length - 1) {
+      setCritereIndex(critereIdx + 1)
+      return
+    }
+    const manquant = cs.findIndex((c) => valeur(aff.evalueId, c.id) === 0)
+    if (manquant !== -1) {
+      setCritereIndex(manquant)
+      return
+    }
+    const prochain = affectations.findIndex((a, i) => i > currentIndex && a.statut !== 'TERMINEE' && !estComplet(a))
+    if (prochain !== -1) allerA(prochain)
+    else toast.success('Tous vos collaborateurs sont notés : vous pouvez soumettre vos évaluations.')
   }
 
   /* ─── Soumission ─── */
@@ -618,7 +643,21 @@ export default function EvaluerPage() {
         </aside>
 
         {/* ─── Zone de notation ─── */}
-        <main className="min-w-0 flex-1 overflow-y-auto bg-[linear-gradient(180deg,#e9eef4_0%,var(--color-canvas)_340px)]">
+        <main
+          ref={zoneNotation}
+          className={`relative min-w-0 flex-1 bg-[linear-gradient(180deg,#e9eef4_0%,var(--color-canvas)_340px)] ${passage ? 'overflow-hidden' : 'overflow-y-auto'}`}
+        >
+          {passage && (
+            <TransitionCollaborateur
+              key={passage.cle}
+              de={passage.de}
+              vers={passage.vers}
+              sens={passage.sens}
+              position={currentIndex + 1}
+              termines={affectations.map((a) => a.statut === 'TERMINEE' || estComplet(a))}
+              onFin={finPassage}
+            />
+          )}
           {courant && (
             <div className="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-8 sm:py-9">
               <EnteteCollaborateur
@@ -665,7 +704,7 @@ export default function EvaluerPage() {
                             }`}
                           >
                             <span
-                              className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold tabular-nums transition-colors ${
+                              className={`flex h-6 w-6 items-center justify-center rounded-full text-2xs font-semibold tabular-nums transition-colors ${
                                 actif
                                   ? v > 0
                                     ? 'bg-gold-400 text-navy-950'
@@ -707,6 +746,7 @@ export default function EvaluerPage() {
                   verrouille={verrouille}
                   onNote={(n) => choisirNote(courant, criteresCourants[critereIndex], n)}
                   onCommentaire={(t) => changerCommentaire(courant, criteresCourants[critereIndex].id, t)}
+                  onContinuer={() => continuer(courant, critereIndex)}
                   autoFocus
                 />
               ) : (
@@ -845,6 +885,7 @@ function CarteCritere({
   verrouille,
   onNote,
   onCommentaire,
+  onContinuer,
   compact = false,
   autoFocus = false,
 }: {
@@ -856,6 +897,8 @@ function CarteCritere({
   verrouille: boolean
   onNote: (n: number) => void
   onCommentaire: (t: string) => void
+  /** Passage au critère (ou au collaborateur) suivant ; absent en vue « Tout afficher ». */
+  onContinuer?: () => void
   compact?: boolean
   autoFocus?: boolean
 }) {
@@ -953,6 +996,14 @@ function CarteCritere({
         </div>
 
         <div className={compact ? 'mt-4' : 'mt-7'}>
+          {onContinuer && (
+            <div className="mb-5 flex justify-end">
+              <button type="button" onClick={onContinuer} disabled={v === 0} className={BTN_PRIMAIRE}>
+                {commentaire.trim() ? 'Valider et continuer' : 'Aucun commentaire à faire'}
+                <ChevronRight className="h-4 w-4 text-gold-400 transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden />
+              </button>
+            </div>
+          )}
           <label htmlFor={`com-${nom}`} className="flex items-baseline justify-between text-sm font-medium text-slate-800">
             Commentaire <span className="text-xs font-normal text-slate-400">facultatif</span>
           </label>
