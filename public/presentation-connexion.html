@@ -536,7 +536,7 @@ body.plein.inactif{cursor:none}
     <div class="carte-connexion" data-b="0" data-fx="zoom" style="--d:150ms">
       <svg class="ic cadenas"><use href="#i-cadenas"/></svg>
       <div class="onglets"><span class="onglet actif">Collaborateur</span><span class="onglet">Client externe</span></div>
-      <span class="bulle bulle-sous" data-b="0" data-h="1" style="--d:4200ms">Réservé aux clients de la DSM</span>
+      <span class="bulle bulle-sous" data-b="0" data-h="1" style="--d:4200ms">Clients : téléphone ou e-mail</span>
       <h3>Connexion</h3>
       <p class="desc">Votre matricule de collaborateur DSM est requis pour poursuivre.</p>
       <span class="etiquette">Matricule collaborateur</span>
@@ -769,7 +769,7 @@ const SCENES = [
   ] },
   { id: 'identification', titre: 'Étape 01 · Identification', etape: 1, temps: [
     {
-      texte: 'Sur la page d’accueil, vérifiez que l’onglet « Collaborateur » est bien sélectionné. L’onglet « Client externe » est réservé aux clients de la DSM.',
+      texte: 'Sur la page d’accueil, vérifiez que l’onglet « Collaborateur » est bien sélectionné. L’onglet « Client externe » est réservé aux clients de la DSM : ils s’y identifient avec leur numéro de téléphone ou leur adresse e-mail. S’ils ont communiqué les deux, c’est le numéro qui compte.',
       min: 5000,
       faire(o) {
         o.plusTard(700, () => o.viser('.onglet.actif'))
