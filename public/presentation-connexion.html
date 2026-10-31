@@ -329,16 +329,30 @@ body.en-ligne #lien-plateforme{display:inline-flex}
 .demarrage-carte h1{margin-top:24px;font-family:var(--serif);font-size:clamp(28px,4vw,40px);font-weight:500;line-height:1.12;letter-spacing:-.01em}
 .demarrage-carte h1 em{color:var(--gold-300)}
 .demarrage-carte > p{margin-top:14px;font-size:17px;line-height:1.55;color:var(--navy-200)}
-#b-lancer{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;height:62px;margin-top:28px;border:0;border-radius:16px;font-size:19px;font-weight:600;color:var(--navy-950);background:linear-gradient(var(--gold-300),var(--gold-500));cursor:pointer;box-shadow:inset 0 1px 0 rgb(255 255 255/.45),0 14px 30px -12px rgb(212 175 55/.7);transition:transform .2s}
-#b-lancer:hover{transform:translateY(-1px)}
-#b-lancer:focus-visible{outline:3px solid #fff;outline-offset:3px}
+.choix{display:grid;gap:12px;margin-top:26px}
+.choix-option{display:flex;align-items:center;gap:16px;width:100%;padding:16px 22px;border:0;border-radius:16px;font:inherit;text-align:left;text-decoration:none;cursor:pointer;transition:transform .2s,background .2s}
+.choix-option:hover{transform:translateY(-1px)}
+.choix-option:focus-visible{outline:3px solid #fff;outline-offset:3px}
+.choix-option .ic{font-size:22px}
+.choix-option b{display:block;font-size:19px;font-weight:600}
+.choix-option small{display:block;margin-top:3px;font-size:14px;line-height:1.4}
+.choix-option.principal{color:var(--navy-950);background:linear-gradient(var(--gold-300),var(--gold-500));box-shadow:inset 0 1px 0 rgb(255 255 255/.45),0 14px 30px -12px rgb(212 175 55/.7)}
+.choix-option.principal small{color:var(--navy-800)}
+.choix-option.secondaire{color:#fff;background:rgb(255 255 255/.06);box-shadow:inset 0 0 0 1px rgb(255 255 255/.16)}
+.choix-option.secondaire:hover{background:rgb(255 255 255/.12)}
+.choix-option.secondaire .ic{color:var(--gold-300)}
+.choix-option.secondaire small{color:var(--navy-200)}
+/* Hors ligne (simple fichier), l'adresse de la plateforme est inconnue : seule la présentation est proposée */
+#b-connexion{display:none}
+body.en-ligne #b-connexion{display:flex}
 .note-son{display:flex;align-items:flex-start;gap:10px;margin-top:18px;font-size:14px;line-height:1.5;color:var(--navy-300)}
 .note-son .ic{margin-top:2px;font-size:17px;color:var(--gold-300)}
-.lien-edge{display:flex;align-items:center;justify-content:center;gap:10px;height:52px;margin-top:16px;border-radius:14px;font-size:16px;font-weight:500;color:#fff;text-decoration:none;background:rgb(255 255 255/.06);box-shadow:inset 0 0 0 1px rgb(255 255 255/.16);transition:background .2s}
-.lien-edge:hover{background:rgb(255 255 255/.12)}
-.lien-edge:focus-visible{outline:3px solid var(--gold-400);outline-offset:3px}
-.lien-edge[hidden]{display:none}
-.lien-edge .ic{font-size:18px;color:var(--gold-300)}
+.attente-edge{margin-top:18px;padding:16px 18px;border-radius:14px;background:rgb(255 255 255/.06);box-shadow:inset 0 0 0 1px rgb(255 255 255/.16)}
+.attente-edge[hidden]{display:none}
+.attente-edge p{display:flex;align-items:flex-start;gap:10px;font-size:15px;line-height:1.5;color:#fff}
+.attente-edge p .ic{margin-top:3px;font-size:17px;color:var(--gold-300)}
+#b-ici{margin-top:10px;padding:0;border:0;background:none;font:inherit;font-size:15px;font-weight:600;color:var(--gold-300);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+#b-ici:focus-visible{outline:3px solid var(--gold-400);outline-offset:3px}
 
 /* ───────── Barre de contrôle ───────── */
 #barre{position:fixed;left:0;right:0;bottom:0;z-index:40;display:flex;align-items:center;gap:6px;height:var(--barre);padding:0 18px;background:linear-gradient(#071a33f0,#04101f);border-top:1px solid rgb(255 255 255/.07);transition:opacity .4s,transform .4s}
@@ -681,10 +695,22 @@ body.plein.inactif{cursor:none}
   <div class="demarrage-carte" role="dialog" aria-modal="true" aria-labelledby="titre-demarrage">
     <span class="marque"><span><svg class="ic"><use href="#i-ancre"/></svg></span></span>
     <h1 id="titre-demarrage">Se connecter pour <em>participer à la campagne</em></h1>
-    <p>Présentation animée avec voix off et sous-titres · environ 3 minutes.</p>
-    <button type="button" id="b-lancer"><svg class="ic"><use href="#i-lecture"/></svg>Lancer la présentation</button>
+    <p>Que souhaitez-vous faire ?</p>
+    <div class="choix">
+      <button type="button" class="choix-option principal" id="b-lancer">
+        <svg class="ic"><use href="#i-lecture"/></svg>
+        <span><b>Voir la présentation</b><small>Comment se connecter, pas à pas · environ 3 minutes, avec voix off</small></span>
+      </button>
+      <a class="choix-option secondaire" id="b-connexion" href="/">
+        <svg class="ic"><use href="#i-sortie"/></svg>
+        <span><b>Se connecter maintenant</b><small>Vous avez déjà votre matricule et votre code PIN</small></span>
+      </a>
+    </div>
     <p class="note-son"><svg class="ic"><use href="#i-son"/></svg><span id="note-voix-demarrage">Activez le son de votre appareil.</span></p>
-    <a id="lien-edge" class="lien-edge" hidden><svg class="ic"><use href="#i-globe"/></svg>Ouvrir dans Microsoft Edge (voix naturelle)</a>
+    <div class="attente-edge" id="attente-edge" role="status" hidden>
+      <p><svg class="ic"><use href="#i-globe"/></svg><span>Ouverture dans Microsoft Edge… Si votre navigateur vous le demande, acceptez l’ouverture.</span></p>
+      <button type="button" id="b-ici">Edge ne s’ouvre pas ? Continuer dans ce navigateur</button>
+    </div>
   </div>
 </div>
 
@@ -903,10 +929,9 @@ function decouperPhrases(texte) {
  * puis Google (Chrome), puis voix installées dans Windows. Eloise, voix d'enfant, passe après les autres.
  */
 const PREFERENCES_VOIX = [/vivienne/i, /denise/i, /r[ée]my/i, /henri/i, /google/i, /julie/i, /paul/i, /hortense/i]
-const EST_EDGE = /Edg\//.test(navigator.userAgent)
-// Le lien « microsoft-edge: » n'ouvre que des pages web : Edge l'ignore pour un fichier local.
+// Edge sous Windows et macOS (« Edg/ »), Android (« EdgA/ ») ou iPhone (« EdgiOS/ »)
+const EST_EDGE = /Edg(A|iOS)?\//.test(navigator.userAgent)
 const EST_FICHIER = location.protocol === 'file:'
-const PEUT_OUVRIR_EDGE = /Windows/.test(navigator.userAgent) && EN_LIGNE
 
 function estNaturelle(v) {
   return /natural|neural|premium|enhanced/i.test(v.name)
@@ -1048,9 +1073,9 @@ function majNotesVoix() {
   else note = `Voix off : ${nomCourt(choisie)} (voix de synthèse).` + (EST_EDGE ? '' : EST_FICHIER
     ? ' Pour une voix plus humaine, ouvrez ce fichier avec Microsoft Edge (clic droit › Ouvrir avec › Microsoft Edge).'
     : ' Pour une voix plus humaine, ouvrez cette page dans Microsoft Edge.')
-  $('#note-voix-demarrage').textContent = note
-  // Edge propose des voix neuronales ; sous Windows, un lien rouvre cette page web dans Edge.
-  $('#lien-edge').hidden = !(Voix.chargee && PEUT_OUVRIR_EDGE && !EST_EDGE && !naturelle)
+  $('#note-voix-demarrage').textContent = PASSER_PAR_EDGE
+    ? 'Votre choix s’ouvre dans Microsoft Edge, dont la voix off est la plus naturelle. Activez le son de votre appareil.'
+    : note
   $('#note-voix-reglages').textContent = Voix.liste.some(estNaturelle)
     ? 'Les voix naturelles sont les plus humaines ; elles demandent une connexion Internet.'
     : note
@@ -1371,8 +1396,55 @@ function demarrer() {
   $('#b-lecture').focus({ preventScroll: true })
 }
 
+/* ───────── Choix de départ, ouverts dans Microsoft Edge ───────── */
+/*
+ * La voix off n'est vraiment naturelle que dans Edge. En ligne, sous Windows et Android, les deux
+ * choix de départ s'ouvrent donc dans Edge : lien « microsoft-edge: » sous Windows ; sous Android,
+ * lien « intent: » qui retombe sur le navigateur courant si Edge n'est pas installé.
+ * Sur iPhone, tous les navigateurs partagent le moteur et les voix de Safari : on reste sur place.
+ * « ?via=edge » marque une page déjà rouverte, pour ne jamais relancer Edge en boucle.
+ */
+const EST_ANDROID = /Android/i.test(navigator.userAgent)
+const DEJA_RELANCEE = new URLSearchParams(location.search).get('via') === 'edge'
+const PASSER_PAR_EDGE = EN_LIGNE && !EST_EDGE && !DEJA_RELANCEE && (EST_ANDROID || /Windows/.test(navigator.userAgent))
+
+function lienEdge(adresse) {
+  if (!EST_ANDROID) return `microsoft-edge:${adresse}`
+  const u = new URL(adresse)
+  return `intent://${u.host}${u.pathname}${u.search}#Intent;scheme=${u.protocol.slice(0, -1)};`
+    + `package=com.microsoft.emmx;S.browser_fallback_url=${encodeURIComponent(adresse)};end`
+}
+
+function adresseRelancee() {
+  const u = new URL(location.href)
+  u.searchParams.set('via', 'edge')
+  u.hash = ''
+  return u.href
+}
+
+const CHOIX = {
+  presentation: { adresse: adresseRelancee, ici: demarrer },
+  connexion: { adresse: () => new URL('/', location.href).href, ici: () => location.assign('/') },
+}
+let choixEnAttente = null
+
+function choisir(nom) {
+  const choix = CHOIX[nom]
+  if (!PASSER_PAR_EDGE) return choix.ici()
+  // Si Edge ne s'ouvre pas (refus, navigateur intégré à une appli…), le choix reste faisable ici
+  choixEnAttente = choix
+  $('#attente-edge').hidden = false
+  location.href = lienEdge(choix.adresse())
+}
+
 function brancherEvenements() {
-  $('#b-lancer').addEventListener('click', demarrer)
+  $('#b-lancer').addEventListener('click', () => choisir('presentation'))
+  $('#b-connexion').addEventListener('click', (e) => {
+    if (!PASSER_PAR_EDGE) return // simple lien vers la plateforme
+    e.preventDefault()
+    choisir('connexion')
+  })
+  $('#b-ici').addEventListener('click', () => choixEnAttente?.ici())
   $('#b-lecture').addEventListener('click', basculerLecture)
   $('#b-prec').addEventListener('click', precedent)
   $('#b-suiv').addEventListener('click', suivant)
@@ -1427,8 +1499,8 @@ function brancherEvenements() {
 }
 
 function init() {
-  document.body.classList.toggle('en-ligne', EN_LIGNE) // montre « Se connecter maintenant » en fin de présentation
-  $('#lien-edge').href = `microsoft-edge:${location.href}`
+  document.body.classList.toggle('en-ligne', EN_LIGNE) // montre « Se connecter maintenant » au départ et en fin de présentation
+  if (DEJA_RELANCEE) history.replaceState(null, '', location.pathname) // adresse propre dans Edge
   preparerDecor()
   construireSegments()
   Voix.init()
