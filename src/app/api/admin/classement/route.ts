@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { requireAdmin } from '@/lib/auth'
 import { attribuerRangs, calculerScores, enregistrerScores } from '@/lib/scores'
+import { compterSituations, estClasse, type SituationScore } from '@/lib/eligibilite'
 
 export const dynamic = 'force-dynamic'
 
@@ -54,12 +55,17 @@ export interface RawAgentScore {
   /** Part neutralisée car tous ses notants ont été invalidés (force majeure) */
   managerNeutralise: boolean
   colleguesNeutralise: boolean
+  /** Situation face aux notants défaillants (null : règle historique ou palmarès annuel) */
+  situation: SituationScore | null
+  nbNotants: number
+  nbNotantsAttendus: number
 }
 
 type Poids = { poidsManager: number; poidsCollegues: number; poidsClient: number }
 const POIDS_PAR_DEFAUT: Poids = { poidsManager: 55, poidsCollegues: 45, poidsClient: 25 }
 
 type Neutralisation = { managerNeutralise?: boolean; colleguesNeutralise?: boolean }
+type Situation = { situation?: SituationScore | null; nbNotants?: number; nbNotantsAttendus?: number }
 
 /** Même répartition que le calcul du score (src/lib/scores.ts), exprimée en points. */
 function parts(s: { scoreCollegues: number; scoreManager: number; scoreClient: number } & Neutralisation, p: Poids) {
@@ -98,7 +104,7 @@ type UtilisateurClasse = {
 function versAgent(
   utilisateurId: string,
   u: UtilisateurClasse,
-  s: { scoreTotal: number; scoreCollegues: number; scoreManager: number; scoreClient: number } & Neutralisation,
+  s: { scoreTotal: number; scoreCollegues: number; scoreManager: number; scoreClient: number } & Neutralisation & Situation,
   poids: Poids,
   arrondi = (n: number) => Math.round(n * 10) / 10
 ): RawAgentScore {
@@ -134,6 +140,9 @@ function versAgent(
     totalInService: 0,
     managerNeutralise: !!s.managerNeutralise,
     colleguesNeutralise: !!s.colleguesNeutralise,
+    situation: s.situation ?? null,
+    nbNotants: s.nbNotants ?? 0,
+    nbNotantsAttendus: s.nbNotantsAttendus ?? 0,
     ...parts(s, poids),
   }
 }
@@ -234,10 +243,13 @@ async function palmaresAnnuel(annee: number, toutesLesCampagnes: unknown[]) {
     },
     select: { id: true },
   })
-  const scores = await prisma.scoreFinal.findMany({
-    where: { campagneId: { in: campagnes.map((c) => c.id) } },
-    include: { utilisateur: { select: SELECT_UTILISATEUR } },
-  })
+  // Un agent non classé à une campagne (sans note du manager) n'y compte pas dans sa moyenne annuelle.
+  const scores = (
+    await prisma.scoreFinal.findMany({
+      where: { campagneId: { in: campagnes.map((c) => c.id) } },
+      include: { utilisateur: { select: SELECT_UTILISATEUR } },
+    })
+  ).filter((s) => estClasse(s.situation))
 
   const parAgent = new Map<string, typeof scores>()
   for (const s of scores) parAgent.set(s.utilisateurId, [...(parAgent.get(s.utilisateurId) ?? []), s])
@@ -267,9 +279,13 @@ async function palmaresAnnuel(annee: number, toutesLesCampagnes: unknown[]) {
     },
     provisoire: false,
     toutesLesCampagnes,
+    nonClasses: [],
     ...computeRankings(rawList),
   }
 }
+
+const parNom = (a: RawAgentScore, b: RawAgentScore) =>
+  a.nom.localeCompare(b.nom, 'fr') || a.prenom.localeCompare(b.prenom, 'fr')
 
 async function getFullClassementData(cible?: string) {
   const { campagnes, toutesLesCampagnes } = await listeCampagnes()
@@ -292,6 +308,7 @@ async function getFullClassementData(cible?: string) {
       groupesDepartement: [],
       groupesService: [],
       tousLesScores: [],
+      nonClasses: [],
     }
   }
 
@@ -308,9 +325,12 @@ async function getFullClassementData(cible?: string) {
   })
   const parId = new Map(utilisateurs.map((u) => [u.id, u]))
 
-  const rawList = scores
+  const agents = scores
     .filter((s) => ROLES_CLASSES.has(parId.get(s.utilisateurId)?.role ?? ''))
     .map((s) => versAgent(s.utilisateurId, parId.get(s.utilisateurId)!, s, campagne))
+  // Sans note du manager, un agent n'est pas classé : il est listé à part, avec son score indicatif.
+  const rawList = agents.filter((a) => estClasse(a.situation))
+  const nonClasses = agents.filter((a) => !estClasse(a.situation)).sort(parNom)
 
   return {
     campagne: {
@@ -320,6 +340,7 @@ async function getFullClassementData(cible?: string) {
       poidsCollegues: campagne.poidsCollegues,
       poidsManager: campagne.poidsManager,
       poidsClient: campagne.poidsClient,
+      seuilNotants: campagne.seuilNotants,
       prixGlobal: campagne.prixGlobal || PRIX_PAR_DEFAUT.prixGlobal,
       prixDirection: campagne.prixDirection || PRIX_PAR_DEFAUT.prixDirection,
       prixDepartement: campagne.prixDepartement || PRIX_PAR_DEFAUT.prixDepartement,
@@ -327,6 +348,7 @@ async function getFullClassementData(cible?: string) {
     },
     provisoire,
     toutesLesCampagnes,
+    nonClasses,
     ...computeRankings(rawList),
   }
 }
@@ -360,13 +382,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Campagne introuvable' }, { status: 404 })
     }
 
-    await enregistrerScores(campagne.id)
+    const scores = await enregistrerScores(campagne.id)
     if (campagne.statut === 'CLOTUREE') {
       await prisma.campagne.update({ where: { id: campagne.id }, data: { statut: 'CALCULEE' } })
     }
 
     return NextResponse.json(
-      { success: true, message: 'Classement recalculé et enregistré.', ...(await getFullClassementData(campagne.id)) },
+      {
+        success: true,
+        message: 'Classement recalculé et enregistré.',
+        bilan: compterSituations(scores),
+        ...(await getFullClassementData(campagne.id)),
+      },
       { headers: NO_STORE }
     )
   } catch (error) {

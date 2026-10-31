@@ -113,6 +113,9 @@ model Campagne {
   prixDepartement String?        @default("Certificat de Mérite + Prime")
   prixService     String?        @default("Diplôme d'Honneur + Prime")
   prixGlobal      String?        @default("Super Lauréat DSM 360°")
+  /// Nombre de notants (manager compris) à partir duquel un notant défaillant ne pénalise plus le noté.
+  /// null : règle historique des campagnes antérieures (une note oubliée compte 0, pas d'exclusion).
+  seuilNotants    Int?           @default(3)
 
   @@index([statut])
 }
@@ -210,6 +213,12 @@ model ScoreFinal {
   /// Part manager / collègues neutralisée suite à l'invalidation de tous ses notants
   managerNeutralise   Boolean @default(false)
   colleguesNeutralise Boolean @default(false)
+  /// Situation du noté face aux notants défaillants (null : campagne en règle historique)
+  situation         SituationScore?
+  /// Notants ayant soumis / notants affectés, hors notants invalidés
+  nbNotants         Int @default(0)
+  nbNotantsAttendus Int @default(0)
+  /// null : non classé (aucune note du manager)
   rang           Int?
   createdAt      DateTime    @default(now())
   campagne       Campagne    @relation(fields: [campagneId], references: [id], onDelete: Cascade)
@@ -237,6 +246,18 @@ enum StatutAffectation {
   EN_ATTENTE
   BROUILLON
   TERMINEE
+}
+
+/// Situation d'un noté à la clôture, selon les notants qui ont soumis leur évaluation
+enum SituationScore {
+  /// Tous ses notants ont soumis
+  COMPLET
+  /// Seuil atteint, manager compris : les notants défaillants sont ignorés
+  PROTEGE
+  /// Seuil non atteint : chaque notant défaillant compte 0
+  PENALISE
+  /// Aucune note du manager : non classé
+  SANS_MANAGER
 }
 
 enum MotifInvalidation {

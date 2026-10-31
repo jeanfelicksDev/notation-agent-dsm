@@ -12,26 +12,29 @@ export type PerspectiveRepartition = 'BY_EVALUE' | 'BY_EVALUATEUR'
 
 /**
  * Onglet Répartition : affecter les Pairs d'un même service entre eux, remettre la répartition à zéro,
- * ou contrôler en un clic les Pairs sans notant, sans noté ou sans manager.
+ * ou contrôler en un clic les Pairs sans notant, sans noté, sans manager ou sous le seuil de notants.
  */
 export default function OutilsRepartition({
   campagneId,
   agents,
   affectations,
+  seuilNotants = null,
   onUpdate,
   onSelectionner,
 }: {
   campagneId: string
   agents: AgentControle[]
   affectations: (AffectationControle & { statut: string })[]
+  /** null : règle historique, sans contrôle du seuil de notants */
+  seuilNotants?: number | null
   onUpdate: () => void
   /** Ouvre la répartition sur cet agent, pour corriger un manque signalé par le contrôle. */
   onSelectionner: (agentId: string, perspective: PerspectiveRepartition) => void
 }) {
   const [enCours, setEnCours] = useState<'service' | 'reset' | null>(null)
   const [controleOuvert, setControleOuvert] = useState(false)
-  const controle = useMemo(() => controlerRepartition(agents, affectations), [agents, affectations])
-  const nbAlertes = controle.sansNotant.length + controle.sansNote.length + controle.sansManager.length
+  const controle = useMemo(() => controlerRepartition(agents, affectations, seuilNotants), [agents, affectations, seuilNotants])
+  const nbAlertes = controle.sansNotant.length + controle.sansNote.length + controle.sansManager.length + controle.sousLeSeuil.length
   const soumises = affectations.filter((a) => a.statut === 'TERMINEE').length
 
   const appeler = async (action: 'service' | 'reset', requete: RequestInit, succes: (data: Record<string, number>) => string) => {
@@ -163,10 +166,11 @@ export default function OutilsRepartition({
           {nbAlertes === 0 ? (
             <p className="flex items-center gap-2 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800 ring-1 ring-emerald-200">
               <CircleCheck className="h-4 w-4" aria-hidden />
-              Tous les Pairs ont au moins un notant, un noté et un manager.
+              Tous les Pairs ont au moins un notant, un noté et un manager
+              {seuilNotants !== null && <>, et au moins {pluriel(seuilNotants, 'notant')} affectés</>}.
             </p>
           ) : (
-            <div className="grid gap-4 lg:grid-cols-3">
+            <div className={`grid gap-4 ${seuilNotants !== null ? 'lg:grid-cols-2 2xl:grid-cols-4' : 'lg:grid-cols-3'}`}>
               <ListeControle
                 titre="Sans notant"
                 consequence="Aucun évaluateur : pas de score."
@@ -176,11 +180,23 @@ export default function OutilsRepartition({
               />
               <ListeControle
                 titre="Sans manager"
-                consequence="Aucun manager hiérarchique : 0 sur le bloc manager."
+                consequence={
+                  seuilNotants !== null
+                    ? 'Aucun manager hiérarchique valide : il ne sera pas classé, sauf manager invalidé pour force majeure.'
+                    : 'Aucun manager hiérarchique : 0 sur le bloc manager.'
+                }
                 grave
                 agents={controle.sansManager}
                 onChoisir={(id) => onSelectionner(id, 'BY_EVALUE')}
               />
+              {seuilNotants !== null && (
+                <ListeControle
+                  titre={`Moins de ${pluriel(seuilNotants, 'notant')}`}
+                  consequence="Manager compris, cadres exclus : un notant défaillant le pénalisera."
+                  agents={controle.sousLeSeuil}
+                  onChoisir={(id) => onSelectionner(id, 'BY_EVALUE')}
+                />
+              )}
               <ListeControle
                 titre="Sans noté"
                 consequence="Personne à noter : son avis manque à ses collègues."

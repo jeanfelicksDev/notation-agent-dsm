@@ -17,6 +17,8 @@ import { confirmer, toast } from '@/components/ui/feedback'
 import { typesDuCritere } from '@/lib/criteres'
 import { estCadre } from '@/lib/roles'
 import { getAppreciationInfo } from '@/lib/default-criteres'
+import { resumerBilanCloture, SEUIL_NOTANTS_MAX, SEUIL_NOTANTS_PAR_DEFAUT } from '@/lib/eligibilite'
+import { BadgeSituation, ListeNonClasses, PrevisionSituations } from '@/components/SituationNotants'
 
 interface Critere {
   id: string
@@ -54,6 +56,8 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
     poidsCollegues: 45,
     poidsManager: 55,
     poidsClient: 25,
+    // Vide : règle historique (campagnes antérieures), sans protection contre les notants défaillants
+    seuilNotants: SEUIL_NOTANTS_PAR_DEFAUT as number | '',
     statut: 'OUVERTE',
     prixGlobal: '',
     prixDirection: '',
@@ -81,6 +85,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
   const [focusRepartition, setFocusRepartition] = useState<FocusRepartition | null>(null)
   const [closing, setClosing] = useState(false)
   const [calculating, setCalculating] = useState(false)
+  const seuilActif = formData.seuilNotants === '' ? null : formData.seuilNotants
 
   const handleSeedOfficialCriteres = async () => {
     const ok = await confirmer({
@@ -148,6 +153,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
             poidsCollegues: data.poidsCollegues ?? 45,
             poidsManager: data.poidsManager ?? 55,
             poidsClient: data.poidsClient ?? 25,
+            seuilNotants: data.seuilNotants ?? '',
             statut: data.statut || 'OUVERTE',
             prixGlobal: data.prixGlobal ?? '',
             prixDirection: data.prixDirection ?? '',
@@ -218,22 +224,25 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
   const handleCloture = async () => {
     const ok = await confirmer({
       titre: 'Clôturer la campagne ?',
-      message: 'Les évaluateurs ne pourront plus noter. Le classement sera calculé et enregistré à partir des seules évaluations soumises.',
+      message: `Les évaluateurs ne pourront plus noter. Le classement sera calculé et enregistré à partir des seules évaluations soumises, ${
+        seuilActif === null ? 'selon la règle historique (sans seuil de notants)' : `avec un seuil de ${seuilActif} notant${seuilActif > 1 ? 's' : ''}, manager compris`
+      }.`,
       confirmer: 'Clôturer et calculer',
     })
     if (!ok) return
     setClosing(true)
     setError('')
     try {
+      // Le seuil affiché (et utilisé par la prévision du Suivi) est celui appliqué, même s'il n'a pas été enregistré
       const res = await fetch(`/api/admin/campagnes/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ statut: 'CLOTUREE' })
+        body: JSON.stringify({ statut: 'CLOTUREE', seuilNotants: formData.seuilNotants })
       })
       const data = await res.json().catch(() => ({}))
       if (res.ok) {
         setFormData(prev => ({ ...prev, statut: data.statut ?? 'CALCULEE' }))
-        toast.success('Campagne clôturée, classement enregistré.')
+        toast.success(`Campagne clôturée, classement enregistré. ${resumerBilanCloture(data.bilan)}`.trim())
       } else {
         setError(data.error || 'La clôture a échoué.')
       }
@@ -256,7 +265,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
       const data = await res.json().catch(() => ({}))
       if (res.ok) {
         if (data.campagne?.statut) setFormData(prev => ({ ...prev, statut: data.campagne.statut }))
-        toast.success('Classement recalculé et enregistré.')
+        toast.success(`Classement recalculé et enregistré. ${resumerBilanCloture(data.bilan)}`.trim())
       } else {
         setError(data.error || 'Le calcul des scores a échoué.')
       }
@@ -577,9 +586,43 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                           <p className="text-xs text-slate-500">
                             Quand un agent a des avis de collègues et de clients : collègues {formData.poidsCollegues - formData.poidsClient} pts,
                             clients {formData.poidsClient} pts. Sinon, la source présente prend les {formData.poidsCollegues} pts.
-                            Une source absente compte pour 0.
+                            Une source absente compte pour 0, sauf protection par le seuil de notants ci-dessous.
                           </p>
                         </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 md:col-span-2">
+                      <label htmlFor="seuil-notants" className="text-2xs font-bold text-slate-400 uppercase tracking-widest ml-1">
+                        Seuil de notants
+                      </label>
+                      <div className="flex flex-col gap-4 bg-slate-50 p-6 rounded-3xl border border-slate-100 sm:flex-row sm:items-center">
+                        <input
+                          id="seuil-notants"
+                          type="number"
+                          min={1}
+                          max={SEUIL_NOTANTS_MAX}
+                          placeholder="Aucun"
+                          aria-describedby="seuil-notants-aide"
+                          className="w-full sm:w-36 px-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold text-navy-800 text-xl"
+                          value={formData.seuilNotants}
+                          onChange={e => {
+                            const saisie = e.target.value
+                            const val = saisie === '' ? '' : Math.min(SEUIL_NOTANTS_MAX, Math.max(1, parseInt(saisie) || 1))
+                            setFormData({ ...formData, seuilNotants: val })
+                          }}
+                        />
+                        <p id="seuil-notants-aide" className="text-xs text-slate-500">
+                          {seuilActif === null ? (
+                            <>Vide : règle historique. Une note oubliée compte 0 et un agent sans note du manager reste classé.</>
+                          ) : (
+                            <>
+                              Un agent noté par au moins {seuilActif} personne{seuilActif > 1 ? 's' : ''}, manager compris, n&apos;est pas
+                              pénalisé par un notant qui n&apos;a pas soumis à la clôture. En dessous, chaque notant défaillant compte 0.
+                              Sans note du manager, l&apos;agent n&apos;est pas classé. Les cadres et les clients QR ne comptent pas.
+                            </>
+                          )}
+                        </p>
                       </div>
                     </div>
 
@@ -968,6 +1011,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                     campagneId={id}
                     agents={allUsers}
                     affectations={affectations}
+                    seuilNotants={seuilActif}
                     onUpdate={loadAffectations}
                     onSelectionner={(agentId, perspective) => setFocusRepartition(f => ({ agentId, perspective, n: (f?.n ?? 0) + 1 }))}
                   />
@@ -983,7 +1027,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
               )}
 
               {activeTab === 'suivi' && (
-                <SuiviDashboard campagneId={id} affectations={affectations} users={allUsers} onUpdate={loadAffectations} />
+                <SuiviDashboard campagneId={id} affectations={affectations} users={allUsers} seuilNotants={seuilActif} onUpdate={loadAffectations} />
               )}
 
               {activeTab === 'prix' && (
@@ -994,18 +1038,18 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                         <Trophy className="w-4 h-4" /> Récompenses & Palmarès Officiels
                       </div>
                       <h3 className="text-2xl font-semibold text-slate-900">Grille des Prix & Distinctions</h3>
-                      <p className="text-slate-500 text-sm font-medium">Définissez les 3 paliers officiels de distinctions : Direction (Super Lauréat), Département et Service.</p>
+                      <p className="text-slate-500 text-sm font-medium">Définissez les 3 distinctions officielles : Captain (direction), Chief officer (département) et 2nd officer (service).</p>
                     </div>
 
                   </div>
 
                   {/* Summary preview cards (3 Paliers Officiels) */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {/* 1. Super Lauréat Direction */}
+                    {/* 1. Captain (direction) */}
                     <div className="bg-gold-50 border border-gold-200 rounded-2xl p-5 flex flex-col justify-between shadow-sm relative overflow-hidden">
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 text-amber-700 font-bold text-xs uppercase tracking-wider">
-                          <Trophy className="w-4 h-4 text-amber-600 flex-shrink-0" /> Super Lauréat Direction DSM
+                          <Trophy className="w-4 h-4 text-amber-600 flex-shrink-0" /> Captain · Direction
                         </div>
                         <p className="text-sm font-bold text-amber-950 mt-2 line-clamp-2">
                           {formData.prixDirection || formData.prixGlobal || "Non configuré"}
@@ -1018,7 +1062,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                     <div className="bg-teal-50 border border-teal-200 rounded-2xl p-5 flex flex-col justify-between shadow-sm">
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 text-teal-700 font-bold text-xs uppercase tracking-wider">
-                          <Medal className="w-4 h-4 text-teal-600 flex-shrink-0" /> Meilleur Agent par Département
+                          <Medal className="w-4 h-4 text-teal-600 flex-shrink-0" /> Chief officer · Département
                         </div>
                         <p className="text-sm font-semibold text-teal-950 mt-2 line-clamp-2">
                           {formData.prixDepartement || "Non configuré"}
@@ -1031,7 +1075,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                     <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 flex flex-col justify-between shadow-sm">
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 text-emerald-700 font-bold text-xs uppercase tracking-wider">
-                          <Gift className="w-4 h-4 text-emerald-600 flex-shrink-0" /> Meilleur Agent de Service
+                          <Gift className="w-4 h-4 text-emerald-600 flex-shrink-0" /> 2nd officer · Service
                         </div>
                         <p className="text-sm font-semibold text-emerald-950 mt-2 line-clamp-2">
                           {formData.prixService || "Non configuré"}
@@ -1044,7 +1088,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                   <form onSubmit={handleSubmit} className="space-y-6">
                     {/* Form Cards (3 Paliers) */}
                     <div className="grid grid-cols-1 gap-6">
-                      {/* 1. Super Lauréat Direction */}
+                      {/* 1. Captain (direction) */}
                       <div className="p-6 bg-white rounded-2xl border border-amber-200/80 shadow-sm space-y-3 relative overflow-hidden">
                         <div className="flex items-center gap-3">
                           <div className="w-11 h-11 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-semibold flex-shrink-0 shadow-sm">
@@ -1052,7 +1096,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                           </div>
                           <div>
                             <div className="flex items-center gap-2">
-                              <h4 className="font-bold text-slate-900 text-base">Super Lauréat de la Direction (Meilleur Agent Direction DSM)</h4>
+                              <h4 className="font-bold text-slate-900 text-base">Captain — Meilleur agent de la Direction</h4>
                               <span className="text-2xs font-bold uppercase tracking-wider bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full border border-amber-200">Palier 1</span>
                             </div>
                             <p className="text-xs text-slate-500">Premier de la direction</p>
@@ -1082,7 +1126,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                             </div>
                             <div>
                               <div className="flex items-center gap-2">
-                                <h4 className="font-semibold text-slate-900 text-base">Meilleur Agent par Département</h4>
+                                <h4 className="font-semibold text-slate-900 text-base">Chief officer — Meilleur agent du Département</h4>
                                 <span className="text-2xs font-bold uppercase tracking-wider bg-teal-100 text-teal-800 px-2 py-0.5 rounded-full">Palier 2</span>
                               </div>
                               <p className="text-xs text-slate-500">Premier de chaque département</p>
@@ -1108,7 +1152,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                             </div>
                             <div>
                               <div className="flex items-center gap-2">
-                                <h4 className="font-semibold text-slate-900 text-base">Meilleur Agent de Service / Cellule</h4>
+                                <h4 className="font-semibold text-slate-900 text-base">2nd officer — Meilleur agent du Service</h4>
                                 <span className="text-2xs font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">Palier 3</span>
                               </div>
                               <p className="text-xs text-slate-500">Major de chaque cellule de travail</p>
@@ -1903,7 +1947,7 @@ const MOTIFS_INVALIDATION: Record<string, string> = {
   AUTRE: 'Autre',
 }
 
-function SuiviDashboard({ campagneId, affectations, users, onUpdate }: { campagneId: string, affectations: any[], users: User[], onUpdate: () => void }) {
+function SuiviDashboard({ campagneId, affectations, users, seuilNotants, onUpdate }: { campagneId: string, affectations: any[], users: User[], seuilNotants: number | null, onUpdate: () => void }) {
   const [suiviCategory, setSuiviCategory] = useState<'ALL' | 'PAIR' | 'MANAGER' | 'EXTERNE'>('ALL')
   const [suiviSearch, setSuiviSearch] = useState('')
   // Notant en cours d'invalidation (formulaire ouvert)
@@ -1997,6 +2041,7 @@ function SuiviDashboard({ campagneId, affectations, users, onUpdate }: { campagn
           </span>
         </div>
       )}
+      <PrevisionSituations affectations={affectations} personnes={users} seuilNotants={seuilNotants} />
       {/* Stat Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center">
@@ -2290,7 +2335,7 @@ function ClassementCampagneView({
     if (data.laureats?.majorGlobal) {
       const mg = data.laureats.majorGlobal
       palmaresData.push({
-        Distinction: 'Premier toutes entités',
+        Distinction: 'Captain (premier toutes entités)',
         Entité: mg.direction,
         Matricule: mg.matricule,
         Nom: mg.nom,
@@ -2303,7 +2348,7 @@ function ClassementCampagneView({
     }
     data.laureats?.majorsDepartement?.forEach((md: any) => {
       palmaresData.push({
-        Distinction: 'Premier de département',
+        Distinction: 'Chief officer (premier de département)',
         Entité: `${md.departementNom} (${md.directionNom})`,
         Matricule: md.major.matricule,
         Nom: md.major.nom,
@@ -2316,7 +2361,7 @@ function ClassementCampagneView({
     })
     data.laureats?.majorsService?.forEach((ms: any) => {
       palmaresData.push({
-        Distinction: 'Premier de service',
+        Distinction: '2nd officer (premier de service)',
         Entité: `${ms.serviceNom} (${ms.departementNom})`,
         Matricule: ms.major.matricule,
         Nom: ms.major.nom,
@@ -2554,7 +2599,7 @@ function ClassementCampagneView({
           {/* TAB 1: PALMARÈS & LAURÉATS */}
           {subTab === 'palmares' && (
             <div className="space-y-6">
-              {/* Super Lauréat Direction DSM Card */}
+              {/* Captain Card */}
               {majorGlobal ? (
                 <div className="bg-gold-50 ring-1 ring-gold-300 rounded-3xl p-6 sm:p-8 shadow-xl relative overflow-hidden">
                   <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10">
@@ -2565,7 +2610,7 @@ function ClassementCampagneView({
                       <div className="space-y-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-2xs font-bold uppercase tracking-widest bg-navy-900 text-gold-500 px-3 py-0.5 rounded-full border border-gold-500/30 flex items-center gap-1">
-                            <Trophy className="w-3 h-3" /> Super Lauréat Direction DSM
+                            <Trophy className="w-3 h-3" /> Captain · Direction
                           </span>
                           <span className="text-xs font-semibold text-amber-900">Palier 1</span>
                         </div>
@@ -2600,7 +2645,7 @@ function ClassementCampagneView({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Medal className="w-5 h-5 text-teal-600" />
-                    <h4 className="font-bold text-slate-900 text-base">Meilleurs Agents par Département</h4>
+                    <h4 className="font-bold text-slate-900 text-base">Chief officers · Meilleurs agents par département</h4>
                     <span className="text-2xs font-bold bg-teal-100 text-teal-800 px-2.5 py-0.5 rounded-full">
                       Palier 2 • {formData.prixDepartement || '—'}
                     </span>
@@ -2639,7 +2684,7 @@ function ClassementCampagneView({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Gift className="w-5 h-5 text-emerald-600" />
-                    <h4 className="font-bold text-slate-900 text-base">Meilleurs Agents par Service / Cellule</h4>
+                    <h4 className="font-bold text-slate-900 text-base">2nd officers · Meilleurs agents par service</h4>
                     <span className="text-2xs font-bold bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full">
                       Palier 3 • {formData.prixService || '—'}
                     </span>
@@ -2773,6 +2818,7 @@ function ClassementCampagneView({
                                   {anonymized ? `Agent ${score.matricule}` : `${score.prenom} ${score.nom}`}
                                 </p>
                                 <p className="text-2xs text-slate-400 font-medium">Matricule: {score.matricule}</p>
+                                <BadgeSituation situation={score.situation} nbNotants={score.nbNotants} nbNotantsAttendus={score.nbNotantsAttendus} />
                               </td>
                               <td className="py-3.5 px-4">
                                 <p className="font-semibold text-slate-700">{score.service}</p>
@@ -2924,6 +2970,8 @@ function ClassementCampagneView({
           )}
         </div>
       )}
+
+      <ListeNonClasses agents={data?.nonClasses ?? []} anonymise={anonymized} />
     </div>
   )
 }

@@ -34,6 +34,8 @@ import {
   ClipboardList,
 } from 'lucide-react'
 import { getAppreciationInfo } from '@/lib/default-criteres'
+import { resumerBilanCloture, type BilanCloture, type SituationScore } from '@/lib/eligibilite'
+import { BadgeSituation, ListeNonClasses, texteSituation } from '@/components/SituationNotants'
 
 interface ScoreItem {
   utilisateurId: string
@@ -69,6 +71,10 @@ interface ScoreItem {
   maxClient: number
   managerNeutralise?: boolean
   colleguesNeutralise?: boolean
+  /** Situation face aux notants défaillants (null : règle historique ou palmarès annuel) */
+  situation?: SituationScore | null
+  nbNotants?: number
+  nbNotantsAttendus?: number
 }
 
 interface CampagneSummary {
@@ -106,6 +112,10 @@ interface ClassementData {
   groupesDepartement: Array<{ departementNom: string; directionNom: string; scores: ScoreItem[]; major: ScoreItem | null }>
   groupesService: Array<{ serviceNom: string; departementNom: string; directionNom: string; scores: ScoreItem[]; major: ScoreItem | null }>
   tousLesScores: ScoreItem[]
+  /** Agents sans note du manager : hors classement, score indicatif */
+  nonClasses?: ScoreItem[]
+  /** Bilan renvoyé après un recalcul */
+  bilan?: BilanCloture
 }
 
 interface DetailedNote {
@@ -230,7 +240,7 @@ export default function ClassementPage() {
         } else {
           await loadScores(currentId)
         }
-        setToastMessage('Classement et palmarès recalculés et actualisés avec succès !')
+        setToastMessage(`Classement et palmarès recalculés et actualisés avec succès ! ${resumerBilanCloture(resData.bilan)}`.trim())
         setTimeout(() => setToastMessage(null), 4000)
         router.refresh()
       }
@@ -264,7 +274,7 @@ export default function ClassementPage() {
 
     data.laureats.majorsDepartement.forEach((md) => {
       laureatsData.push({
-        Niveau: 'Premier de département',
+        Niveau: 'Chief officer (premier de département)',
         Entité: `${md.departementNom} (${md.directionNom})`,
         Matricule: md.major.matricule,
         Nom: md.major.nom,
@@ -276,7 +286,7 @@ export default function ClassementPage() {
 
     data.laureats.majorsService.forEach((ms) => {
       laureatsData.push({
-        Niveau: 'Premier de service',
+        Niveau: '2nd officer (premier de service)',
         Entité: `${ms.serviceNom} [${ms.departementNom}]`,
         Matricule: ms.major.matricule,
         Nom: ms.major.nom,
@@ -305,7 +315,7 @@ export default function ClassementPage() {
           'Part manager (pts)': s.partManager,
           'Score Total (/100)': s.scoreTotal,
           Appréciation: app.appreciation,
-          Titre: s.isMajorDirection ? 'Premier de direction' : '',
+          Titre: s.isMajorDirection ? 'Captain (premier de direction)' : '',
         })
       })
     })
@@ -327,7 +337,7 @@ export default function ClassementPage() {
           Prénom: s.prenom,
           'Score Total (%)': s.scoreTotal,
           Appréciation: app.appreciation,
-          Titre: s.isMajorDepartement ? 'Premier de département' : '',
+          Titre: s.isMajorDepartement ? 'Chief officer (premier de département)' : '',
         })
       })
     })
@@ -350,7 +360,7 @@ export default function ClassementPage() {
           Prénom: s.prenom,
           'Score Total (%)': s.scoreTotal,
           Appréciation: app.appreciation,
-          Titre: s.isMajorService ? 'Premier de service' : '',
+          Titre: s.isMajorService ? '2nd officer (premier de service)' : '',
         })
       })
     })
@@ -648,9 +658,9 @@ export default function ClassementPage() {
               </div>
               <dl className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:w-auto lg:grid-cols-4">
                 {[
-                  { label: 'Premier de service', valeur: data.campagne.prixService },
-                  { label: 'Premier de département', valeur: data.campagne.prixDepartement },
-                  { label: 'Premier de direction', valeur: data.campagne.prixDirection },
+                  { label: '2nd officer (premier de service)', valeur: data.campagne.prixService },
+                  { label: 'Chief officer (premier de département)', valeur: data.campagne.prixDepartement },
+                  { label: 'Captain (premier de direction)', valeur: data.campagne.prixDirection },
                   { label: 'Premier toutes entités', valeur: data.campagne.prixGlobal, or: true },
                 ].map((d) => (
                   <div key={d.label} className={`rounded-lg p-4 ring-1 ${d.or ? 'bg-gold-500/10 ring-gold-500/40' : 'bg-white/5 ring-white/10'}`}>
@@ -787,13 +797,13 @@ export default function ClassementPage() {
             {/* ============================================================ */}
             {activeTab === 'palmares' && data && (
               <div className="space-y-8">
-                {/* Spotlight Super Lauréat Direction DSM */}
+                {/* Spotlight Captain (meilleur agent de la Direction) */}
                 {data.laureats.majorGlobal && (
                   <div className="bg-navy-950 rounded-[var(--radius-card)] p-6 sm:p-8 text-white shadow-raised relative overflow-hidden ring-1 ring-gold-500/30">
                     <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10">
                       <div className="space-y-2">
                         <p className="flex items-center gap-2 text-sm font-medium text-gold-400">
-                          <Crown className="w-4 h-4" aria-hidden /> Premier toutes entités confondues
+                          <Crown className="w-4 h-4" aria-hidden /> Captain · Premier toutes entités confondues
                         </p>
                         <h3 className="text-2xl sm:text-3xl font-bold">
                           {anonymized ? 'Collaborateur Anonyme' : `${data.laureats.majorGlobal.prenom} ${data.laureats.majorGlobal.nom}`}
@@ -839,7 +849,7 @@ export default function ClassementPage() {
                         <Medal className="w-5 h-5" />
                       </div>
                       <div>
-                        <h3 className="text-lg font-bold text-slate-900">Meilleur Agent par Département</h3>
+                        <h3 className="text-lg font-bold text-slate-900">Chief officer · Meilleur agent par département</h3>
                         <p className="text-xs text-slate-500">Premier de chaque département · {data.campagne?.prixDepartement}</p>
                       </div>
                     </div>
@@ -908,7 +918,7 @@ export default function ClassementPage() {
                         <Award className="w-5 h-5" />
                       </div>
                       <div>
-                        <h3 className="text-lg font-bold text-slate-900">Meilleur Agent par Service & Cellule</h3>
+                        <h3 className="text-lg font-bold text-slate-900">2nd officer · Meilleur agent par service</h3>
                         <p className="text-xs text-slate-500">Premier de chaque service · {data.campagne?.prixService}</p>
                       </div>
                     </div>
@@ -1230,6 +1240,7 @@ export default function ClassementPage() {
                     onSelectScore={handleSelectScore}
                   />
                 </div>
+                <ListeNonClasses agents={data.nonClasses ?? []} anonymise={anonymized} />
               </div>
             )}
           </>
@@ -1271,7 +1282,7 @@ export default function ClassementPage() {
                 </div>
                 {selectedScore.isMajorDirection && (
                   <span className="text-2xs font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-md mt-1 inline-block">
-                    Premier de direction
+                    Captain (premier de direction)
                   </span>
                 )}
               </div>
@@ -1285,7 +1296,7 @@ export default function ClassementPage() {
                 </div>
                 {selectedScore.isMajorDepartement && (
                   <span className="text-2xs font-bold text-teal-700 bg-teal-100 px-2 py-0.5 rounded-md mt-1 inline-block">
-                    Premier de département
+                    Chief officer (premier de département)
                   </span>
                 )}
               </div>
@@ -1299,7 +1310,7 @@ export default function ClassementPage() {
                 </div>
                 {selectedScore.isMajorService && (
                   <span className="text-2xs font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md mt-1 inline-block">
-                    Premier de service
+                   2nd officer (premier de service)
                   </span>
                 )}
               </div>
@@ -1323,8 +1334,11 @@ export default function ClassementPage() {
               const neutralisation = selectedScore.managerNeutralise
                 ? "Part manager neutralisée (notant invalidé pour cas de force majeure) : score ramené sur les autres évaluations."
                 : selectedScore.colleguesNeutralise
-                ? "Part collègues neutralisée (notants invalidés pour cas de force majeure) : score ramené sur l'évaluation manager."
+                ? selectedScore.situation === 'PROTEGE'
+                  ? "Part collègues neutralisée (notants défaillants ou invalidés, seuil de notants atteint) : score ramené sur l'évaluation manager."
+                  : "Part collègues neutralisée (notants invalidés pour cas de force majeure) : score ramené sur l'évaluation manager."
                 : null
+              const situationTexte = texteSituation(selectedScore.situation, selectedScore.nbNotants, selectedScore.nbNotantsAttendus)
               const partManager = selectedScore.partManager
               const maxManager = selectedScore.maxManager
 
@@ -1375,6 +1389,11 @@ export default function ClassementPage() {
                     {neutralisation && (
                       <div className="text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
                         {neutralisation}
+                      </div>
+                    )}
+                    {situationTexte && (
+                      <div className="text-xs font-semibold text-navy-900 bg-navy-50 border border-navy-200 rounded-xl px-3 py-2">
+                        {situationTexte}
                       </div>
                     )}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -1821,6 +1840,7 @@ function ScoreTable({
                   <div className="text-2xs text-slate-400 font-medium">
                     {score.service}
                   </div>
+                  <BadgeSituation situation={score.situation} nbNotants={score.nbNotants} nbNotantsAttendus={score.nbNotantsAttendus} />
                 </td>
 
                 {showStructureTags && (
@@ -1840,22 +1860,22 @@ function ScoreTable({
                   <div className="flex flex-wrap items-center justify-center gap-1">
                     {score.isMajorGlobal && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-bold bg-amber-100 text-amber-800 border border-amber-200 shadow-sm">
-                        👑 Super Lauréat
+                        👑 Captain
                       </span>
                     )}
                     {score.isMajorDirection && !score.isMajorGlobal && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-bold bg-navy-100 text-navy-900 border border-navy-200">
-                        1er de direction
+                        Captain
                       </span>
                     )}
                     {score.isMajorDepartement && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-bold bg-teal-100 text-teal-800 border border-teal-200">
-                        1er de département
+                        Chief officer
                       </span>
                     )}
                     {score.isMajorService && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                        1er de service
+                        2nd officer
                       </span>
                     )}
                     {!score.isMajorGlobal && !score.isMajorDirection && !score.isMajorDepartement && !score.isMajorService && (
