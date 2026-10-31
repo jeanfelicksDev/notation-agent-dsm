@@ -4,7 +4,7 @@ import { Suspense, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
-import { AlertCircle, ArrowLeft, ArrowRight, ArrowUpRight, CircleCheck, Eye, EyeOff, Info, Loader2, Lock, Phone, User } from 'lucide-react'
+import { AlertCircle, ArrowLeft, ArrowRight, ArrowUpRight, CircleCheck, CirclePlay, Eye, EyeOff, Info, Loader2, Lock, Phone, User } from 'lucide-react'
 import { destinationPourRole } from '@/lib/roles'
 import { BrandMark } from '@/components/BrandMark'
 import { libelleCampagne } from '@/lib/libelle'
@@ -185,7 +185,7 @@ function AccueilContenu() {
 
       <div className="relative flex min-h-dvh w-full flex-col px-5 sm:px-10 lg:px-[clamp(3rem,6vw,9rem)]">
         {/* ─── En-tête ─── */}
-        <header className="flex items-center gap-4 border-b border-white/[0.06] py-6 sm:py-7">
+        <header className="flex flex-wrap items-center gap-x-4 gap-y-5 border-b border-white/[0.06] py-6 sm:py-7">
           <span className="rounded-2xl bg-gradient-to-b from-gold-300 to-gold-600 p-[3px] shadow-[0_10px_28px_-8px_rgb(212_175_55/0.6)]">
             <BrandMark size={50} />
           </span>
@@ -198,14 +198,24 @@ function AccueilContenu() {
             </p>
             <p className="mt-1 hidden text-sm tracking-[0.02em] text-navy-200 sm:block">Direction des Solutions Maritimes</p>
           </div>
-          <Link
-            href="/qr"
-            className="group ml-auto inline-flex items-center gap-2 rounded-full bg-white/[0.03] px-4 py-2.5 text-sm text-navy-100 ring-1 ring-white/15 transition-colors hover:bg-white/[0.07] hover:text-white hover:ring-gold-400/40"
-          >
-            <span className="hidden sm:inline">Vous êtes client ?</span>
-            <strong className="font-semibold text-white">Donnez votre avis</strong>
-            <ArrowUpRight className="h-4 w-4 text-gold-400 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" aria-hidden />
-          </Link>
+          <div className="flex w-full items-center gap-2.5 sm:ml-auto sm:w-auto sm:gap-3">
+            {/* Didacticiel animé avec voix off ; sa dernière scène ramène ici. */}
+            <a
+              href="/presentation-connexion.html"
+              className="group inline-flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full sm:flex-none bg-gradient-to-b from-gold-300 to-gold-500 px-4 py-2.5 text-sm font-semibold text-[#071a33] shadow-[0_10px_24px_-10px_rgb(212_175_55/0.7)] ring-1 ring-gold-200/60 animate-clignote transition-[filter,transform] hover:animate-none hover:brightness-110 active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-300"
+            >
+              <CirclePlay className="h-4 w-4 transition-transform group-hover:scale-110" aria-hidden />
+              Comment noter
+            </a>
+            <Link
+              href="/qr"
+              className="group inline-flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full sm:flex-none bg-white/[0.03] px-4 py-2.5 text-sm text-navy-100 ring-1 ring-white/15 transition-colors hover:bg-white/[0.07] hover:text-white hover:ring-gold-400/40"
+            >
+              <span className="hidden sm:inline">Vous êtes client ?</span>
+              <strong className="font-semibold text-white">Donnez votre avis</strong>
+              <ArrowUpRight className="h-4 w-4 text-gold-400 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" aria-hidden />
+            </Link>
+          </div>
         </header>
 
         <main className="grid flex-1 items-center gap-12 py-10 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:gap-[clamp(3rem,6vw,10rem)] lg:py-14 2xl:grid-cols-[minmax(0,1fr)_auto] 2xl:gap-[clamp(3rem,4vw,7rem)] 2xl:py-8">
