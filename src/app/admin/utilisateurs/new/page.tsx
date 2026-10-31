@@ -3,11 +3,12 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Save, AlertCircle, User, Mail, Briefcase, Loader2, QrCode } from 'lucide-react'
+import { ArrowLeft, Save, AlertCircle, User, Mail, Phone, Briefcase, Loader2, QrCode } from 'lucide-react'
 import AdminHeader from '@/components/AdminHeader'
 import { SEXES } from '@/lib/agents'
 import { valeurParDefaut } from '@/lib/listes'
 import { ChampListe, useListes } from '@/components/listes'
+import ConnexionClient from '@/components/ConnexionClient'
 
 export default function NewUtilisateurPage() {
   const router = useRouter()
@@ -18,6 +19,7 @@ export default function NewUtilisateurPage() {
     nom: '',
     prenom: '',
     email: '',
+    telephone: '',
     motDePasse: '',
     role: 'UTILISATEUR',
     sexe: '',
@@ -124,6 +126,26 @@ export default function NewUtilisateurPage() {
                       <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                     </div>
                   </div>
+
+                  <div className="space-y-2">
+                    <label className="text-2xs font-bold text-slate-400 uppercase tracking-widest ml-1">Téléphone</label>
+                    <div className="relative">
+                      <input
+                        type="tel"
+                        className="w-full px-5 py-3.5 pl-12 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-semibold"
+                        value={formData.telephone}
+                        onChange={e => setFormData({ ...formData, telephone: e.target.value })}
+                        placeholder="+225 07 00 00 00 00"
+                      />
+                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                    </div>
+                  </div>
+
+                  {formData.role === 'EXTERNE' && (
+                    <div className="md:col-span-2">
+                      <ConnexionClient telephone={formData.telephone} email={formData.email} />
+                    </div>
+                  )}
 
                   <div className="space-y-2">
                     <label className="text-2xs font-bold text-slate-400 uppercase tracking-widest ml-1">Nom *</label>

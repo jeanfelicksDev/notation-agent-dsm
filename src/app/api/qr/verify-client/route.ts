@@ -1,19 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getCampagneOuverte } from '@/lib/campagne'
-import { agentsEvaluablesPar, trouverClientExterne } from '@/lib/client-qr'
+import { agentsEvaluablesPar, identifierClientExterne } from '@/lib/client-qr'
 
 /**
  * POST /api/qr/verify-client — route publique.
- * Identifie un client externe par son téléphone et renvoie les agents qu'il peut évaluer.
+ * Identifie un client externe par son téléphone ou son adresse e-mail (le téléphone prime)
+ * et renvoie les agents qu'il peut évaluer.
  * Seuls les comptes EXTERNE sont acceptés : c'est la même règle que pour la soumission.
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => null)
-    const saisie = typeof body?.telephone === 'string' ? body.telephone.trim() : ''
+    // « telephone » reste accepté pour les pages déjà ouvertes avant le passage à « identifiant »
+    const brut = body?.identifiant ?? body?.telephone
+    const saisie = typeof brut === 'string' ? brut.trim() : ''
     if (!saisie) {
-      return NextResponse.json({ error: 'Le numéro de téléphone est obligatoire.' }, { status: 400 })
+      return NextResponse.json({ error: 'Saisissez votre numéro de téléphone ou votre adresse e-mail.' }, { status: 400 })
     }
 
     const campagne = await getCampagneOuverte()
@@ -21,13 +24,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Aucune campagne d’évaluation n’est ouverte en ce moment.' }, { status: 404 })
     }
 
-    const client = await trouverClientExterne(saisie)
-    if (!client) {
-      return NextResponse.json(
-        { error: 'Ce numéro n’est pas enregistré comme client. Vérifiez-le ou contactez votre interlocuteur DSM.' },
-        { status: 404 }
-      )
+    const identification = await identifierClientExterne(saisie)
+    if (!identification.ok) {
+      return NextResponse.json({ error: identification.erreur }, { status: identification.statut })
     }
+    const { client } = identification
 
     const [agents, dejaNotes] = await Promise.all([
       agentsEvaluablesPar(client.id, campagne.id),

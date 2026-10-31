@@ -1,13 +1,8 @@
 import prisma from '@/lib/prisma'
 import type { Prisma } from '@prisma/client'
+import { MIN_PHONE_DIGITS, normalizePhone } from '@/lib/identifiant-client'
 
-/** Supprime espaces, tirets, parenthèses et « + » d'un numéro de téléphone. */
-export function normalizePhone(phone: string): string {
-  return phone.replace(/[\s\-()+.]/g, '')
-}
-
-/** Un numéro doit avoir au moins 8 chiffres pour servir d'identifiant. */
-const MIN_PHONE_DIGITS = 8
+export { normalizePhone }
 
 /**
  * Retrouve un utilisateur à partir de ce qu'il saisit : matricule, email ou téléphone.
@@ -33,8 +28,16 @@ export async function trouverParIdentifiant<S extends Prisma.UtilisateurSelect>(
     select,
   })
   if (direct) return direct
+  return trouverParTelephone(brut, select, where)
+}
 
-  const tel = normalizePhone(brut)
+/** Retrouve un utilisateur par son numéro exact (après normalisation) ; null si inconnu ou partagé. */
+export async function trouverParTelephone<S extends Prisma.UtilisateurSelect>(
+  saisie: string,
+  select: S,
+  where: Prisma.UtilisateurWhereInput = {}
+) {
+  const tel = normalizePhone(saisie.trim())
   if (!/^\d+$/.test(tel) || tel.length < MIN_PHONE_DIGITS) return null
 
   const candidats = await prisma.utilisateur.findMany({

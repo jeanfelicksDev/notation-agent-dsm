@@ -8,6 +8,7 @@ import { confirmer, toast } from '@/components/ui/feedback'
 import { SEXES } from '@/lib/agents'
 import { ROLES_A_PIN } from '@/lib/roles'
 import { ChampListe, useListes } from '@/components/listes'
+import ConnexionClient from '@/components/ConnexionClient'
 
 export default function UtilisateurDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -234,6 +235,12 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
                   placeholder="+225 07 00 00 00 00"
                 />
               </div>
+
+              {formData.role === 'EXTERNE' && (
+                <div className="md:col-span-2">
+                  <ConnexionClient telephone={formData.telephone} email={formData.email} />
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nom *</label>

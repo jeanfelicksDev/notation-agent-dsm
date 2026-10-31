@@ -5,6 +5,7 @@ import { codePrisma } from '@/lib/erreurs'
 import { normaliserSexe } from '@/lib/agents'
 import { completerListes, directionParDefaut } from '@/lib/listes-serveur'
 import { estRole } from '@/lib/roles'
+import { identifiantExige, MESSAGE_CLIENT_SANS_IDENTIFIANT } from '@/lib/identifiant-client'
 import { requireAdmin, hashPassword, pinEstDefini, normalizeEmail, normalizeMatricule } from '@/lib/auth'
 
 export async function GET() {
@@ -60,6 +61,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Rôle inconnu' }, { status: 400 })
     }
     const finalRole = role || 'UTILISATEUR'
+    // Un client externe se connecte avec son téléphone ou son e-mail : il lui en faut au moins un utilisable
+    if (finalRole === 'EXTERNE' && !identifiantExige({ telephone: telephone ? String(telephone) : null, email: String(email) })) {
+      return NextResponse.json({ error: MESSAGE_CLIENT_SANS_IDENTIFIANT }, { status: 400 })
+    }
     const mdp = typeof motDePasse === 'string' ? motDePasse.trim() : ''
     // Un agent choisit lui-même son PIN à la première connexion ; un administrateur a un vrai mot de passe.
     if (finalRole === 'ADMIN' && mdp.length < 8) {

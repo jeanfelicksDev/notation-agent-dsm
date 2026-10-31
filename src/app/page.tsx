@@ -4,10 +4,11 @@ import { Suspense, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
-import { AlertCircle, ArrowLeft, ArrowRight, ArrowUpRight, CircleCheck, CirclePlay, Eye, EyeOff, Info, Loader2, Lock, Phone, User } from 'lucide-react'
+import { AlertCircle, ArrowLeft, ArrowRight, ArrowUpRight, CircleCheck, CirclePlay, Eye, EyeOff, Info, Loader2, Lock, Mail, Phone, User } from 'lucide-react'
 import { destinationPourRole } from '@/lib/roles'
 import { BrandMark } from '@/components/BrandMark'
 import { libelleCampagne } from '@/lib/libelle'
+import { CLE_TRANSMISSION, typeDeSaisie } from '@/lib/identifiant-client'
 
 const QRCode = dynamic(() => import('qrcode.react').then((m) => m.QRCodeSVG), { ssr: false })
 
@@ -24,6 +25,12 @@ const MESSAGES_REDIRECTION: Record<string, string> = {
 /** Longueur des identifiants saisis : matricule DSM (4 caractères) et téléphone client (10 chiffres). */
 const LONGUEUR_MATRICULE = 4
 const LONGUEUR_TELEPHONE = 10
+const LONGUEUR_EMAIL_MAX = 254
+
+/** Client externe : une lettre ou un « @ » signale une adresse e-mail, sinon on ne garde que les chiffres du numéro. */
+const saisieEmail = (v: string) => /[a-z@]/i.test(v)
+const saisieClient = (v: string) =>
+  saisieEmail(v) ? v.replace(/\s/g, '').slice(0, LONGUEUR_EMAIL_MAX) : v.replace(/\D/g, '').slice(0, LONGUEUR_TELEPHONE)
 
 const ETAPES_GUIDE = [
   ['Identification', 'Saisissez votre matricule officiel DSM pour démarrer votre session.'],
@@ -123,10 +130,10 @@ function AccueilContenu() {
     setLoading(true)
     try {
       if (etape === 'identifiant' && profil === 'client') {
-        const tel = identifiant.trim()
-        if (tel.replace(/\D/g, '').length < 8) return setError('Saisissez votre numéro de téléphone complet.')
-        // Jamais dans l'adresse de la page : le numéro transite par le stockage de session.
-        sessionStorage.setItem('dsm-client-telephone', tel)
+        const saisie = identifiant.trim()
+        if (!typeDeSaisie(saisie)) return setError('Saisissez votre numéro de téléphone complet ou votre adresse e-mail.')
+        // Jamais dans l'adresse de la page : la saisie transite par le stockage de session.
+        sessionStorage.setItem(CLE_TRANSMISSION, saisie)
         window.location.href = '/qr'
         return
       }
@@ -320,7 +327,7 @@ function AccueilContenu() {
                 <p className="mt-4 text-[1.05rem] leading-relaxed text-navy-500">
                   {etape === 'identifiant' &&
                     (estClient
-                      ? 'Le numéro de téléphone enregistré par la DSM est requis pour donner votre avis sur nos agents.'
+                      ? 'Votre téléphone ou votre adresse e-mail enregistré par la DSM est requis pour donner votre avis sur nos agents.'
                       : 'Votre matricule de collaborateur DSM est requis pour poursuivre.')}
                   {etape === 'connexion' && (
                     <>
@@ -342,26 +349,30 @@ function AccueilContenu() {
                   <form onSubmit={handleSubmit} className="mt-9 space-y-6" noValidate>
                     {etape === 'identifiant' && (
                       <div>
-                        <Champ label={estClient ? 'Numéro de téléphone' : 'Matricule collaborateur'} htmlFor="identifiant">
+                        <Champ label={estClient ? 'Téléphone ou adresse e-mail' : 'Matricule collaborateur'} htmlFor="identifiant">
                           <div className="relative">
-                            {estClient ? <Phone className={ICONE_CHAMP} aria-hidden /> : <User className={ICONE_CHAMP} aria-hidden />}
+                            {!estClient ? (
+                              <User className={ICONE_CHAMP} aria-hidden />
+                            ) : saisieEmail(identifiant) ? (
+                              <Mail className={ICONE_CHAMP} aria-hidden />
+                            ) : (
+                              <Phone className={ICONE_CHAMP} aria-hidden />
+                            )}
                             <input
                               key={profil}
                               id="identifiant"
                               value={identifiant}
                               onChange={(e) =>
                                 setIdentifiant(
-                                  estClient
-                                    ? e.target.value.replace(/\D/g, '').slice(0, LONGUEUR_TELEPHONE)
-                                    : e.target.value.trim().slice(0, LONGUEUR_MATRICULE)
+                                  estClient ? saisieClient(e.target.value) : e.target.value.trim().slice(0, LONGUEUR_MATRICULE)
                                 )
                               }
                               maxLength={estClient ? undefined : LONGUEUR_MATRICULE}
-                              type={estClient ? 'tel' : 'text'}
-                              inputMode={estClient ? 'numeric' : 'text'}
-                              autoComplete={estClient ? 'tel' : 'username'}
+                              type="text"
+                              inputMode="text"
+                              autoComplete="username"
                               autoCapitalize={estClient ? 'off' : 'characters'}
-                              placeholder={estClient ? 'Ex. : 0700000000' : 'Ex. : 1234'}
+                              placeholder={estClient ? 'Ex. : 0700000000 ou nom@exemple.ci' : 'Ex. : 1234'}
                               spellCheck={false}
                               autoFocus
                               required
@@ -372,7 +383,9 @@ function AccueilContenu() {
                         </Champ>
                         <p className="mt-3 flex items-start gap-2 text-xs text-navy-400">
                           <Info className="mt-px h-4 w-4 shrink-0 text-gold-600" aria-hidden />
-                          {estClient ? 'Le numéro communiqué à la DSM lors de votre enregistrement.' : 'Format d’identifiant habituel délivré par les Ressources Humaines.'}
+                          {estClient
+                            ? 'Le numéro ou l’adresse e-mail communiqué à la DSM. Si vous avez donné les deux, utilisez votre numéro.'
+                            : 'Format d’identifiant habituel délivré par les Ressources Humaines.'}
                         </p>
                       </div>
                     )}

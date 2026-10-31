@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { AlertCircle, ArrowLeft, Check, CircleCheck, Loader2, Star } from 'lucide-react'
 import { BrandMark } from '@/components/BrandMark'
+import { CLE_TRANSMISSION } from '@/lib/identifiant-client'
 
 interface Critere {
   id: string
@@ -26,7 +27,7 @@ const LIBELLES_ETOILES = ['Très insatisfait', 'Insatisfait', 'Correct', 'Satisf
 
 export default function PortailClient() {
   const [etape, setEtape] = useState<Etape>('identification')
-  const [telephone, setTelephone] = useState('')
+  const [identifiant, setIdentifiant] = useState('')
   const [chargement, setChargement] = useState(false)
   const [erreur, setErreur] = useState('')
   const [indisponible, setIndisponible] = useState<string | null>(null)
@@ -50,17 +51,17 @@ export default function PortailClient() {
       })
       .catch(() => setIndisponible('Connexion impossible. Vérifiez votre réseau puis rechargez la page.'))
 
-    // Numéro saisi sur la page d'accueil (onglet « Client externe ») : lu une seule fois puis effacé.
-    const transmis = sessionStorage.getItem('dsm-client-telephone')
+    // Téléphone ou e-mail saisi sur la page d'accueil (onglet « Client externe ») : lu une seule fois puis effacé.
+    const transmis = sessionStorage.getItem(CLE_TRANSMISSION)
     if (transmis) {
-      sessionStorage.removeItem('dsm-client-telephone')
-      setTelephone(transmis)
+      sessionStorage.removeItem(CLE_TRANSMISSION)
+      setIdentifiant(transmis)
       verifier(false, transmis)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const verifier = async (silencieux = false, numero = telephone) => {
+  const verifier = async (silencieux = false, saisie = identifiant) => {
     if (!silencieux) {
       setErreur('')
       setChargement(true)
@@ -69,11 +70,11 @@ export default function PortailClient() {
       const res = await fetch('/api/qr/verify-client', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ telephone: numero }),
+        body: JSON.stringify({ identifiant: saisie }),
       })
       const data = await res.json()
       if (!res.ok) {
-        if (!silencieux) setErreur(data.error || 'Numéro non reconnu.')
+        if (!silencieux) setErreur(data.error || 'Identifiant non reconnu.')
         return
       }
       setClient(data.client)
@@ -152,7 +153,7 @@ export default function PortailClient() {
           <Carte>
             <h1 className="text-xl font-semibold tracking-tight text-navy-900">Votre avis sur nos agents</h1>
             <p className="mt-2 text-[15px] leading-relaxed text-slate-600">
-              Saisissez le numéro de téléphone enregistré par la DSM pour retrouver les agents qui vous ont accompagné.
+              Saisissez le numéro de téléphone ou l’adresse e-mail enregistré par la DSM pour retrouver les agents qui vous ont accompagné.
             </p>
             <form
               onSubmit={(e) => {
@@ -162,22 +163,24 @@ export default function PortailClient() {
               className="mt-6 space-y-4"
             >
               <div>
-                <label htmlFor="tel" className="mb-1.5 block text-sm font-medium text-slate-800">
-                  Numéro de téléphone
+                <label htmlFor="identifiant" className="mb-1.5 block text-sm font-medium text-slate-800">
+                  Téléphone ou adresse e-mail
                 </label>
                 <input
-                  id="tel"
-                  type="tel"
-                  inputMode="tel"
-                  autoComplete="tel"
+                  id="identifiant"
+                  type="text"
+                  autoComplete="username"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                  placeholder="Ex. : 0700000000 ou nom@exemple.ci"
                   required
-                  value={telephone}
-                  onChange={(e) => setTelephone(e.target.value)}
+                  value={identifiant}
+                  onChange={(e) => setIdentifiant(e.target.value)}
                   className="block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-3 text-base outline-none focus:border-navy-600 focus:ring-3 focus:ring-navy-600/15"
                 />
               </div>
               {erreur && <Erreur>{erreur}</Erreur>}
-              <button type="submit" disabled={chargement || !telephone.trim()} className={BTN}>
+              <button type="submit" disabled={chargement || !identifiant.trim()} className={BTN}>
                 {chargement ? <Loader2 className="h-4.5 w-4.5 animate-spin" aria-hidden /> : 'Continuer'}
               </button>
             </form>
