@@ -1216,7 +1216,8 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate,
   // Cibles dont l'affectation est « client interne » (le pair note les critères Clients internes)
   const [internes, setInternes] = useState<string[]>([])
   const [targetSearch, setTargetSearch] = useState('')
-  const [targetCategory, setTargetCategory] = useState<'ALL' | 'PAIR' | 'MANAGER' | 'EXTERNE'>('ALL')
+  // CLIENT_INTERNE : notants désignés « client interne » pour le collaborateur sélectionné (quel que soit leur rôle)
+  const [targetCategory, setTargetCategory] = useState<'ALL' | 'PAIR' | 'MANAGER' | 'CLIENT_INTERNE' | 'EXTERNE'>('ALL')
   const [targetSort, setTargetSort] = useState<'name_asc' | 'role'>('name_asc')
   const [showSelectedOnly, setShowSelectedOnly] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -1345,7 +1346,10 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate,
         (u.departement && u.departement.toLowerCase().includes(targetSearch.toLowerCase()))
 
       const cat = getRoleCategory(u.role)
-      const matchesCat = perspective === 'BY_EVALUATEUR' || targetCategory === 'ALL' || cat === targetCategory
+      const matchesCat =
+        perspective === 'BY_EVALUATEUR' ||
+        targetCategory === 'ALL' ||
+        (targetCategory === 'CLIENT_INTERNE' ? internes.includes(u.id) : cat === targetCategory)
       const matchesSelection = showSelectedOnly ? targets.includes(u.id) : true
 
       return matchesSearch && matchesCat && matchesSelection
@@ -1758,6 +1762,17 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate,
                         }`}
                       >
                         Managers
+                      </button>
+                      <button
+                        onClick={() => setTargetCategory('CLIENT_INTERNE')}
+                        title="Notants désignés « client interne » pour ce collaborateur"
+                        className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
+                          targetCategory === 'CLIENT_INTERNE'
+                            ? 'bg-emerald-600 text-white shadow-sm'
+                            : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                        }`}
+                      >
+                        Clients internes
                       </button>
                       <button
                         onClick={() => setTargetCategory('EXTERNE')}
