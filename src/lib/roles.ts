@@ -6,6 +6,7 @@ export const ROLES = [
   { valeur: 'ADMIN', libelle: 'Administrateur' },
   { valeur: 'EXTERNE', libelle: 'Client externe' },
   { valeur: 'CADRE', libelle: 'Cadre' },
+  { valeur: 'NON_ELIGIBLE', libelle: 'Non-éligible' },
 ] as const
 
 export type RoleValeur = (typeof ROLES)[number]['valeur']
@@ -28,6 +29,22 @@ export const ROLES_A_PIN: readonly string[] = ['UTILISATEUR', 'MANAGER', 'CADRE'
 export function estCadre(role: string | null | undefined): boolean {
   return role === 'CADRE'
 }
+
+/**
+ * Non-éligible : agent présent dans l'annuaire qui ne remplit pas les critères de participation.
+ * Il ne note pas, n'est pas noté, n'est pas classé et ne se connecte pas.
+ */
+export function estNonEligible(role: string | null | undefined): boolean {
+  return role === 'NON_ELIGIBLE'
+}
+
+/** Peut figurer dans une affectation de campagne, comme notant ou comme noté. */
+export function participeACampagne(role: string | null | undefined): boolean {
+  return !estNonEligible(role)
+}
+
+export const MESSAGE_NON_ELIGIBLE =
+  "Vous ne participez pas à cette campagne : votre profil ne remplit pas les critères de participation. Contactez l'administrateur pour toute question."
 
 /** Page d'accueil d'un utilisateur selon son rôle. */
 export function destinationPourRole(role: string): string {

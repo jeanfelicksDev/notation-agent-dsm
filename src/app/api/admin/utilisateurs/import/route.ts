@@ -5,6 +5,7 @@ import { codePrisma } from '@/lib/erreurs'
 import { normalizeMatricule, requireAdmin } from '@/lib/auth'
 import { normaliserSexe } from '@/lib/agents'
 import { completerListes, directionParDefaut } from '@/lib/listes-serveur'
+import { retirerDesCampagnesOuvertes } from '@/lib/non-eligible'
 import * as XLSX from 'xlsx'
 
 /**
@@ -52,6 +53,8 @@ function champDe(entete: string): Champ | null {
 function roleDepuisStatut(statut: string): Role | null {
   const s = cle(statut)
   if (!s) return null
+  // Avant les autres règles : « Non éligible (manager) » reste non-éligible
+  if (/\b(non eligible|ineligible)\b/.test(s)) return 'NON_ELIGIBLE'
   if (s.includes('manager')) return 'MANAGER'
   if (s.includes('externe') || s.includes('client')) return 'EXTERNE'
   if (s.includes('admin')) return 'ADMIN'
@@ -146,9 +149,13 @@ export async function POST(req: NextRequest) {
         if (existant) {
           const role = roleFichier && existant.role !== 'ADMIN' && roleFichier !== 'ADMIN' ? roleFichier : undefined
           const telephone = v('telephone') || (role === 'EXTERNE' ? brut : '')
-          await prisma.utilisateur.update({
-            where: { id: existant.id },
-            data: { ...champs, ...(role ? { role } : {}), ...(telephone ? { telephone } : {}) },
+          const devientNonEligible = role === 'NON_ELIGIBLE' && existant.role !== 'NON_ELIGIBLE'
+          await prisma.$transaction(async (tx) => {
+            await tx.utilisateur.update({
+              where: { id: existant.id },
+              data: { ...champs, ...(role ? { role } : {}), ...(telephone ? { telephone } : {}) },
+            })
+            if (devientNonEligible) await retirerDesCampagnesOuvertes(tx, existant.id)
           })
           misAJour++
         } else {

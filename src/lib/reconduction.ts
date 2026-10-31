@@ -1,4 +1,5 @@
 import prisma from '@/lib/prisma'
+import { participeACampagne } from '@/lib/roles'
 
 /**
  * Reconduction des affectations d'une campagne vers une autre.
@@ -6,7 +7,8 @@ import prisma from '@/lib/prisma'
  * Les paires notant → noté de la campagne source, avec leur qualité « client interne », remplacent
  * celles de la campagne cible. Les statuts repartent de zéro (EN_ATTENTE) et les invalidations
  * (force majeure) ne sont pas reprises : elles concernent un événement ponctuel.
- * Sont ignorées les paires dont le noté n'est plus un Pair (seuls les Pairs sont notés).
+ * Sont ignorées les paires dont le noté n'est plus un Pair (seuls les Pairs sont notés)
+ * et celles dont le notant est devenu non-éligible.
  * Refusée si la cible a déjà des évaluations soumises, pour ne jamais effacer un vote.
  */
 
@@ -37,9 +39,17 @@ export async function reconduireAffectations(cibleId: string, sourceId: string):
 
   const paires = await prisma.affectation.findMany({
     where: { campagneId: sourceId },
-    select: { evaluateurId: true, evalueId: true, clientInterne: true, evalue: { select: { role: true } } },
+    select: {
+      evaluateurId: true,
+      evalueId: true,
+      clientInterne: true,
+      evalue: { select: { role: true } },
+      evaluateur: { select: { role: true } },
+    },
   })
-  const valides = paires.filter((p) => p.evalue.role === 'UTILISATEUR' && p.evaluateurId !== p.evalueId)
+  const valides = paires.filter(
+    (p) => p.evalue.role === 'UTILISATEUR' && participeACampagne(p.evaluateur.role) && p.evaluateurId !== p.evalueId
+  )
 
   // Les notes de la cible ne sont que des brouillons (aucune évaluation soumise) : elles partent avec leurs affectations.
   const [, supprimees, creees] = await prisma.$transaction([

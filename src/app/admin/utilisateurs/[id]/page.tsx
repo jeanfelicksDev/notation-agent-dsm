@@ -115,6 +115,12 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
       })
 
       if (res.ok) {
+        const { retireesDeCampagne = 0 } = await res.json().catch(() => ({}))
+        if (retireesDeCampagne > 0) {
+          toast.success(
+            `Agent non-éligible : ${retireesDeCampagne} affectation${retireesDeCampagne > 1 ? 's' : ''} retirée${retireesDeCampagne > 1 ? 's' : ''} de la campagne en cours.`
+          )
+        }
         if (formData.role === 'ADMIN' && newPassword.trim().length >= 8) {
           setPwdSuccess(true)
           setNewPassword('')

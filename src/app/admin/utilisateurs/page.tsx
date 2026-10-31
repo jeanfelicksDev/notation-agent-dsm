@@ -24,7 +24,7 @@ import {
 } from 'lucide-react'
 import AdminHeader from '@/components/AdminHeader'
 import { confirmer, toast } from '@/components/ui/feedback'
-import { estCadre, ROLES_A_PIN } from '@/lib/roles'
+import { estCadre, estNonEligible, ROLES_A_PIN } from '@/lib/roles'
 import { libelleRoleDepuis } from '@/lib/listes'
 import { useListes } from '@/components/listes'
 
@@ -46,13 +46,14 @@ interface Utilisateur {
   verrouilleJusqua?: string | null
 }
 
-type Filtre = 'tous' | 'sans_pin' | 'verrouilles' | 'managers' | 'cadres' | 'externes'
+type Filtre = 'tous' | 'sans_pin' | 'verrouilles' | 'managers' | 'cadres' | 'externes' | 'non_eligibles'
 
 const ROLES: Record<string, { label: string; className: string }> = {
   ADMIN: { label: 'Administrateur', className: 'bg-red-50 text-red-800 ring-red-200' },
   MANAGER: { label: 'Manager', className: 'bg-teal-50 text-teal-800 ring-teal-200' },
   EXTERNE: { label: 'Client externe', className: 'bg-gold-50 text-gold-800 ring-gold-200' },
   CADRE: { label: 'Cadre', className: 'bg-slate-100 text-slate-700 ring-slate-300' },
+  NON_ELIGIBLE: { label: 'Non-éligible', className: 'bg-zinc-100 text-zinc-600 ring-zinc-300' },
   UTILISATEUR: { label: 'Pair', className: 'bg-navy-50 text-navy-800 ring-navy-200' },
 }
 
@@ -116,6 +117,7 @@ export default function UtilisateursPage() {
     managers: perimetre.filter((u) => u.role === 'MANAGER').length,
     cadres: perimetre.filter((u) => estCadre(u.role)).length,
     externes: perimetre.filter((u) => u.role === 'EXTERNE').length,
+    non_eligibles: perimetre.filter((u) => estNonEligible(u.role)).length,
   }
 
   const changerDepartement = (valeur: string) => {
@@ -132,6 +134,7 @@ export default function UtilisateursPage() {
       if (filtre === 'managers') return u.role === 'MANAGER'
       if (filtre === 'cadres') return estCadre(u.role)
       if (filtre === 'externes') return u.role === 'EXTERNE'
+      if (filtre === 'non_eligibles') return estNonEligible(u.role)
       return true
     })
   }, [perimetre, recherche, filtre])
@@ -196,6 +199,7 @@ export default function UtilisateursPage() {
     { id: 'managers', label: 'Managers' },
     { id: 'cadres', label: 'Cadres' },
     { id: 'externes', label: 'Clients externes' },
+    { id: 'non_eligibles', label: 'Non-éligibles' },
   ]
 
   return (

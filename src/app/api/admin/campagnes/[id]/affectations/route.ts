@@ -185,6 +185,15 @@ async function synchroniser(
   internes: Set<string>
 ) {
   const demandes = voulus.filter((v): v is string => typeof v === 'string' && v !== '' && v !== soiMeme)
+  // Un agent non-éligible n'apparaît dans aucune affectation, ni comme notant ni comme noté
+  const nonEligibles = await prisma.utilisateur.findMany({
+    where: { id: { in: [soiMeme, ...demandes] }, role: 'NON_ELIGIBLE' },
+    select: { prenom: true, nom: true },
+  })
+  if (nonEligibles.length > 0) {
+    const noms = nonEligibles.map((u) => `${u.prenom} ${u.nom}`.trim()).join(', ')
+    throw new ErreurAffectation(`Hors campagne, car non-éligible : ${noms}.`)
+  }
   // Un cadre peut noter mais ne peut jamais être noté
   const evaluesDemandes = cote === 'evalueId' ? demandes : 'evalueId' in fixe ? [fixe.evalueId] : []
   const cadres = new Set(

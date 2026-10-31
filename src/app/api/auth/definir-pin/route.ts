@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { clientIp, createSession, hashPassword, pinEstDefini } from '@/lib/auth'
 import { trouverParIdentifiant } from '@/lib/identifiant'
+import { estNonEligible, MESSAGE_NON_ELIGIBLE } from '@/lib/roles'
 
 /**
  * POST /api/auth/definir-pin
@@ -34,6 +35,9 @@ export async function POST(request: NextRequest) {
     }
     if (utilisateur.role === 'ADMIN') {
       return NextResponse.json({ error: "Les comptes administrateur ne s'initialisent pas ici." }, { status: 403 })
+    }
+    if (estNonEligible(utilisateur.role)) {
+      return NextResponse.json({ error: MESSAGE_NON_ELIGIBLE }, { status: 403 })
     }
 
     const dejaDefini = NextResponse.json(

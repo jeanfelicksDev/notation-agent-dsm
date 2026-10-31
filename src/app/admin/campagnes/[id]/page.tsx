@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
+import { useState, useEffect, useMemo, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { 
@@ -15,7 +15,7 @@ import OutilsRepartition, { type PerspectiveRepartition } from '@/components/Out
 import ReconductionAffectations from '@/components/ReconductionAffectations'
 import { confirmer, toast } from '@/components/ui/feedback'
 import { typesDuCritere } from '@/lib/criteres'
-import { estCadre } from '@/lib/roles'
+import { estCadre, participeACampagne } from '@/lib/roles'
 import { getAppreciationInfo } from '@/lib/default-criteres'
 import { resumerBilanCloture, SEUIL_NOTANTS_MAX, SEUIL_NOTANTS_PAR_DEFAUT } from '@/lib/eligibilite'
 import { BadgeSituation, ListeNonClasses, PrevisionSituations } from '@/components/SituationNotants'
@@ -80,6 +80,8 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
   })
 
   const [allUsers, setAllUsers] = useState<User[]>([])
+  // Les agents non-éligibles n'apparaissent pas dans la répartition (ni notants, ni notés)
+  const participants = useMemo(() => allUsers.filter((u) => participeACampagne(u.role)), [allUsers])
   const [affectations, setAffectations] = useState<any[]>([])
   // Agent à ouvrir dans la répartition depuis le contrôle (n change à chaque clic, même sur le même agent)
   const [focusRepartition, setFocusRepartition] = useState<FocusRepartition | null>(null)
@@ -1018,7 +1020,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                   <ReconductionAffectations campagneId={id} nbActuelles={affectations.length} onUpdate={loadAffectations} />
                   <AffectationsManager
                     campagneId={id}
-                    users={allUsers}
+                    users={participants}
                     initialAffectations={affectations}
                     onUpdate={loadAffectations}
                     focus={focusRepartition}
@@ -1272,6 +1274,8 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate,
         return { label: 'Admin', badge: 'bg-red-100 text-red-800 border-red-200' }
       case 'CADRE':
         return { label: 'Cadre · facultatif', badge: 'bg-slate-100 text-slate-700 border-slate-300' }
+      case 'NON_ELIGIBLE':
+        return { label: 'Non-éligible', badge: 'bg-zinc-100 text-zinc-600 border-zinc-300' }
       default:
         return { label: 'Pair', badge: 'bg-navy-100 text-navy-900 border-navy-200' }
     }

@@ -274,4 +274,6 @@ enum Role {
   /// Membre du personnel enregistré dans l'annuaire, hors campagne : ni noté, ni notant, sans connexion.
   CADRE
   EXTERNE
+  /// Agent de l'annuaire qui ne remplit pas les critères de participation : ni noté, ni notant, sans connexion.
+  NON_ELIGIBLE
 }
