@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<title>Manuel – Calcul des notes et meilleur agent de la direction</title>
+<title>Manuel – Notation des agents et désignation des lauréats</title>
 <style>
   @page { size: A4; margin: 18mm 17mm 20mm; }
   :root { --navy: #002b49; --gold: #b8952a; --gold-l: #f6ecc8; --gris: #5b6b7b; --fond: #f3f6f9; }
@@ -43,19 +43,56 @@
   .ok { color: #157347; font-weight: 700; }
   .non { color: #c4ccd6; }
   .pied { margin-top: 10mm; padding-top: 3mm; border-top: .6pt solid #d9e1ea; color: var(--gris); font-size: 8.5pt; text-align: center; }
-  .couverture { border-bottom: 1.2pt solid var(--gold); padding-bottom: 5mm; margin-bottom: 7mm; }
+  .couverture { background: var(--navy); border: 1.2pt solid var(--navy); outline: .8pt solid var(--gold); outline-offset: 1.5mm; border-radius: 2mm; padding: 7mm 8mm 6mm; margin: 2mm 0 9mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .couverture h1 { color: #fff; margin: 2mm 0 3mm; font-size: 22pt; }
+  .couverture .sous-titre { color: #c9d4df; border-top: .6pt solid rgba(184,149,42,.6); padding-top: 3mm; }
+  @page garde { margin: 0; }
+  .page-de-garde { page: garde; width: 210mm; height: 297mm; overflow: hidden; break-after: page; }
+  .page-de-garde img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center 22%; }
+  .sommaire h2 { margin-bottom: 4mm; }
+  .sommaire ol { list-style: none; padding: 0; margin: 0; }
+  .sommaire li { display: flex; align-items: baseline; gap: 2mm; margin: 0; padding: 1.6mm 0; border-bottom: .6pt solid #e6ebf0; }
+  .sommaire .n { font-family: Georgia, serif; font-style: italic; color: var(--gold); width: 8mm; flex: none; }
+  .sommaire a { color: #1c2733; text-decoration: none; }
+  .sommaire .points { flex: 1; border-bottom: 1pt dotted #b7c2ce; transform: translateY(-1mm); }
+  .sommaire .p { font-weight: 700; color: var(--navy); min-width: 6mm; text-align: right; }
 </style>
 </head>
 <body>
 
-<div class="couverture">
-  <div class="bandeau">DSM TAMIS · Direction des Solutions Maritimes</div>
-  <h1>Comment sont notés les agents, comment sont calculées les notes, et comment est désigné le meilleur agent de la direction</h1>
-  <div class="sous-titre">Manuel explicatif pour tous · mis à jour le 26 octobre 2026 · critères de la « 1<sup>ère</sup> campagne Meilleur Agent DSM »</div>
+<div class="page-de-garde">
+  <img src="manuel-page-de-garde.webp" alt="TAMIS – Élection du Meilleur Employé, Direction Maritime : Notation des agents et désignation des lauréats">
 </div>
 
-<section>
-  <h2><span class="num">1</span> L’essentiel en quelques lignes</h2>
+<div class="couverture">
+  <div class="bandeau">DSM TAMIS · Direction des Solutions Maritimes</div>
+  <h1>Notation des agents et désignation des lauréats</h1>
+  <div class="sous-titre">Manuel explicatif pour tous · mis à jour le 26 octobre 2026 · critères de la « 1<sup>ère</sup> campagne Meilleur Agent DSM »</div>
+</div>
+</div>
+
+<nav class="sommaire" aria-labelledby="sommaire-titre">
+  <h2 id="sommaire-titre">Sommaire</h2>
+  <ol>
+    <li><span class="n">1</span><a href="#s1">L’essentiel en quelques lignes</a><span class="points"></span><span class="p" data-s="1">3</span></li>
+    <li><span class="n">2</span><a href="#s2">Les mots à connaître</a><span class="points"></span><span class="p" data-s="2">3</span></li>
+    <li><span class="n">3</span><a href="#s3">Qui note qui ?</a><span class="points"></span><span class="p" data-s="3">4</span></li>
+    <li><span class="n">4</span><a href="#s4">La liste complète des critères, famille par famille</a><span class="points"></span><span class="p" data-s="4">5</span></li>
+    <li><span class="n">5</span><a href="#s5">Étape 1 — Noter un critère</a><span class="points"></span><span class="p" data-s="5">9</span></li>
+    <li><span class="n">6</span><a href="#s6">Étape 2 — Le score de chaque évaluateur</a><span class="points"></span><span class="p" data-s="6">9</span></li>
+    <li><span class="n">7</span><a href="#s7">Étape 3 — La moyenne de chaque famille</a><span class="points"></span><span class="p" data-s="7">10</span></li>
+    <li><span class="n">8</span><a href="#s8">Étape 4 — Le mélange des blocs : la note sur 100</a><span class="points"></span><span class="p" data-s="8">10</span></li>
+    <li><span class="n">9</span><a href="#s9">Un exemple complet : la note d’Awa</a><span class="points"></span><span class="p" data-s="9">11</span></li>
+    <li><span class="n">10</span><a href="#s10">Les pièges à connaître</a><span class="points"></span><span class="p" data-s="10">11</span></li>
+    <li><span class="n">11</span><a href="#s11">Le notant défaillant et le cas de force majeure</a><span class="points"></span><span class="p" data-s="11">11</span></li>
+    <li><span class="n">12</span><a href="#s12">Comment est désigné le meilleur agent de la direction</a><span class="points"></span><span class="p" data-s="12">12</span></li>
+    <li><span class="n">13</span><a href="#s13">Distinctions et récompenses</a><span class="points"></span><span class="p" data-s="13">13</span></li>
+    <li><span class="n">14</span><a href="#s14">À retenir</a><span class="points"></span><span class="p" data-s="14">15</span></li>
+  </ol>
+</nav>
+
+<section class="saut">
+  <h2 id="s1"><span class="num">1</span> L’essentiel en quelques lignes</h2>
   <p>Pendant une période appelée <strong>campagne</strong>, plusieurs personnes donnent leur avis sur le travail de chaque agent : son chef, ses collègues et des clients. Chacune répond à une petite liste de questions, appelées <strong>critères</strong> (par exemple : « Est-il ponctuel ? »), en choisissant une appréciation de 1 à 5.</p>
   <p>L’application rassemble ensuite tous ces avis et les transforme en <strong>une seule note sur 100</strong> pour chaque agent. L’agent qui obtient la meilleure note de sa direction devient le <strong>meilleur agent de la direction</strong>.</p>
   <div class="encadre or">
@@ -64,11 +101,11 @@
 </section>
 
 <section>
-  <h2><span class="num">2</span> Les mots à connaître</h2>
+  <h2 id="s2"><span class="num">2</span> Les mots à connaître</h2>
   <table>
     <thead><tr><th style="width:27%">Mot</th><th>Ce qu’il veut dire, simplement</th></tr></thead>
     <tbody>
-      <tr><td><strong>Campagne</strong></td><td>La période pendant laquelle on note (pour la campagne actuelle : du 21 octobre au 16 novembre 2026). Après la date de clôture, on ne peut plus noter.</td></tr>
+      <tr><td><strong>Campagne</strong></td><td>La période pendant laquelle on note. Il y a une campagne par trimestre, soit quatre par an ; la campagne actuelle (Q3) a lieu du 2 au 16 novembre 2026. Après la date de clôture, on ne peut plus noter.</td></tr>
       <tr><td><strong>Critère</strong></td><td>Une qualité précise sur laquelle on donne son avis : la ponctualité, l’esprit d’équipe, la communication…</td></tr>
       <tr><td><strong>Évaluateur</strong> (ou notant)</td><td>La personne qui donne la note.</td></tr>
       <tr><td><strong>Agent noté</strong></td><td>La personne qui reçoit la note. Dans l’application, on l’appelle un <strong>Pair</strong>.</td></tr>
@@ -85,14 +122,14 @@
 </section>
 
 <section>
-  <h2><span class="num">3</span> Qui note qui ?</h2>
+  <h2 id="s3"><span class="num">3</span> Qui note qui ?</h2>
   <p>Seuls les agents qui ont le rôle <strong>Pair</strong> sont notés et classés. Chacun d’eux reçoit des avis de quatre familles de personnes :</p>
   <table>
     <thead><tr><th style="width:18%">Famille</th><th style="width:44%">Qui c’est</th><th>Comment elle note</th></tr></thead>
     <tbody>
       <tr><td><strong>Manager</strong></td><td>Le chef de l’agent : chef de service, chef de section ou chef de département.</td><td>Sur l’application, après connexion avec son matricule et son PIN.</td></tr>
-      <tr><td><strong>Collègues</strong></td><td>Les autres Pairs du <strong>même service</strong> que l’agent.</td><td>Sur l’application, avec son matricule et son PIN.</td></tr>
-      <tr><td><strong>Clients internes</strong></td><td>Des Pairs d’<strong>un autre service</strong> de la DSM qui travaillent avec l’agent, ou un Pair que l’administrateur a désigné « client interne ».</td><td>Sur l’application, avec son matricule et son PIN.</td></tr>
+      <tr><td><strong>Collègues</strong></td><td>Les autres Pairs du <strong>même service</strong> que l’agent, ainsi que les cadres de ce service s’ils choisissent de voter.</td><td>Sur l’application, avec son matricule et son PIN.</td></tr>
+      <tr><td><strong>Clients internes</strong></td><td>Des Pairs ou des cadres d’<strong>un autre service</strong> de la DSM qui travaillent avec l’agent, ou un Pair, un cadre ou un manager que l’administrateur a désigné « client interne ».</td><td>Sur l’application, avec son matricule et son PIN.</td></tr>
       <tr><td><strong>Clients externes</strong></td><td>Des entreprises clientes de la DSM.</td><td>Avec leur numéro de téléphone, en scannant le QR code de la DSM.</td></tr>
     </tbody>
   </table>
@@ -102,15 +139,20 @@
       <li>Personne ne peut se noter soi-même.</li>
       <li>On ne note que les personnes que l’administrateur nous a attribuées.</li>
       <li>Les managers, les clients et les administrateurs <strong>notent</strong>, mais ne sont <strong>pas classés</strong>.</li>
-      <li>Les <strong>cadres</strong> font partie du personnel mais ne participent pas à la campagne : ils ne notent pas, ne sont pas notés et n’ont pas à se connecter.</li>
+      <li>Les <strong>cadres</strong> peuvent noter, mais <strong>ne sont jamais notés</strong> ni classés.</li>
     </ul>
+  </div>
+  <div class="encadre or">
+    <div class="titre-encadre">Le vote des cadres est facultatif</div>
+    <p>Un cadre est appelé à voter avec <strong>les mêmes critères que les Pairs</strong> : il note en tant que <em>collègue</em> les agents de son service, et en tant que <em>client interne</em> ceux d’un autre service. Il se connecte, comme eux, avec son matricule et son PIN.</p>
+    <p>Ce vote n’est <strong>pas obligatoire</strong> : un cadre qui ne vote pas ne reçoit pas de relance et n’est pas compté en retard dans le suivi de la campagne. S’il vote, son avis compte exactement comme celui d’un Pair.</p>
   </div>
   <p><strong>Collègue ou client interne ?</strong> C’est le service qui décide. Si l’évaluateur et l’agent sont dans le même service (par exemple tous deux au service OOCL), l’évaluateur note en tant que <em>collègue</em>. S’ils sont dans deux services différents (OOCL et GSL, par exemple), il note en tant que <em>client interne</em>, car il « reçoit » le travail de l’agent comme le ferait un client.</p>
   <p><strong>Un manager peut aussi être client interne.</strong> Un manager qui n’est pas le chef de l’agent mais reçoit son travail (le chef d’un autre service, par exemple) est désigné « client interne » par l’administrateur, lors de la répartition. Il note alors l’agent sur <strong>les critères des clients internes</strong>, et ses notes comptent dans le bloc « collègues et clients internes », pas dans celui du manager. Le bloc manager reste réservé au chef de l’agent.</p>
 </section>
 
 <section class="saut">
-  <h2><span class="num">4</span> La liste complète des critères, famille par famille</h2>
+  <h2 id="s4"><span class="num">4</span> La liste complète des critères, famille par famille</h2>
   <p>La campagne actuelle compte <strong>14 critères</strong>. Chaque famille n’en note qu’une partie : celle qu’elle est capable d’observer. Un chef voit si l’agent arrive à l’heure ; un client, lui, voit surtout la qualité du service qu’il reçoit. Certains critères, comme la communication, sont notés par plusieurs familles.</p>
   <div class="encadre or"><p>Ces critères sont ceux de la campagne en cours. L’administrateur peut ajouter, modifier ou retirer des critères d’une campagne à l’autre : la liste exacte s’affiche toujours dans l’application au moment de noter.</p></div>
 
@@ -200,7 +242,7 @@
 </section>
 
 <section>
-  <div class="eviter"><h2><span class="num">5</span> Étape 1 — Noter un critère</h2>
+  <div class="eviter"><h2 id="s5"><span class="num">5</span> Étape 1 — Noter un critère</h2>
   <p>Pour chaque critère, l’évaluateur choisit l’appréciation qui correspond le mieux à ce qu’il a observé. Chaque appréciation vaut un nombre de points, de 1 à 5 :</p>
   <table>
     <thead><tr><th style="width:24%">Appréciation</th><th style="width:10%" class="c">Points</th><th>Ce qu’elle signifie</th></tr></thead>
@@ -221,7 +263,7 @@
 </section>
 
 <section class="eviter">
-  <h2><span class="num">6</span> Étape 2 — Le score de chaque évaluateur</h2>
+  <h2 id="s6"><span class="num">6</span> Étape 2 — Le score de chaque évaluateur</h2>
   <p>On additionne les points qu’un évaluateur a donnés à l’agent, puis on les compare au maximum qu’il aurait pu donner. Le résultat est un pourcentage.</p>
   <div class="formule">score d’un évaluateur = points donnés ÷ points maximum possibles × 100</div>
   <p><strong>Exemple :</strong> une collègue note les 5 critères des collègues et donne 4, 5, 4, 4 et 4. Elle a donné 21 points sur 25 possibles, soit 21 ÷ 25 × 100 = <strong>84 %</strong>.</p>
@@ -229,7 +271,7 @@
 </section>
 
 <section class="eviter">
-  <h2><span class="num">7</span> Étape 3 — La moyenne de chaque famille</h2>
+  <h2 id="s7"><span class="num">7</span> Étape 3 — La moyenne de chaque famille</h2>
   <p>Dans chaque famille, on fait la moyenne des pourcentages de ses évaluateurs. Chaque personne compte pour une voix : un évaluateur très sévère ou très généreux ne pèse pas plus qu’un autre.</p>
   <p>Pour le calcul, l’application regroupe les avis en <strong>trois blocs</strong> :</p>
   <ul>
@@ -241,7 +283,7 @@
 </section>
 
 <section>
-  <h2><span class="num">8</span> Étape 4 — Le mélange des blocs : la note sur 100</h2>
+  <h2 id="s8"><span class="num">8</span> Étape 4 — Le mélange des blocs : la note sur 100</h2>
   <p>La note finale est sur 100 points. On peut l’imaginer comme un gâteau partagé en parts :</p>
   <ul>
     <li><strong>55 points</strong> viennent du manager ;</li>
@@ -254,7 +296,7 @@
       <tr><td>collègues (ou clients internes) <strong>et</strong> clients externes</td><td>20 points selon les collègues + 25 points selon les clients externes</td></tr>
       <tr><td>collègues (ou clients internes) seulement</td><td>les 45 points selon les collègues</td></tr>
       <tr><td>clients externes seulement</td><td>les 45 points selon les clients externes</td></tr>
-      <tr><td>personne</td><td>0 point (sauf cas de force majeure, voir la section 11)</td></tr>
+      <tr><td>personne</td><td>0 point (sauf notant défaillant ou cas de force majeure, voir la section 11)</td></tr>
     </tbody>
   </table></div>
   <p>Chaque pourcentage est ensuite transformé en points : on applique simplement le pourcentage aux points disponibles. 80 % de 55 points, c’est 0,80 × 55 = 44 points.</p>
@@ -262,7 +304,7 @@
 </section>
 
 <section class="eviter">
-  <h2><span class="num">9</span> Un exemple complet : la note d’Awa</h2>
+  <h2 id="s9"><span class="num">9</span> Un exemple complet : la note d’Awa</h2>
   <p>Awa obtient <strong>84,8 sur 100</strong>. Voici comment, pas à pas (exemple inventé pour l’explication).</p>
   <ol>
     <li>Son manager note ses 9 critères et lui donne 38 points sur 45, soit <strong>84,4 %</strong>.</li>
@@ -283,41 +325,71 @@
 </section>
 
 <section>
-  <h2><span class="num">10</span> Les pièges à connaître</h2>
+  <h2 id="s10"><span class="num">10</span> Les pièges à connaître</h2>
   <div class="encadre alerte">
-    <div class="titre-encadre">Une famille qui n’a pas noté rapporte zéro point</div>
-    <p>Si le manager d’Awa avait simplement oublié de noter, elle n’aurait que 16,40 + 22,00 = <strong>38,4 sur 100</strong> au lieu de 84,8. Il est donc essentiel que chacun soumette ses notes à temps. Seule exception : l’évaluateur empêché par un cas de force majeure (section 11).</p>
+    <div class="titre-encadre">Sans la note du manager, l’agent n’est pas classé</div>
+    <p>Si le manager d’Awa avait simplement oublié de noter, Awa ne serait <strong>pas classée</strong> : elle ne figurerait ni au classement ni au palmarès, quelle que soit sa note. Il est donc essentiel que chaque manager soumette ses notes à temps. Seule exception : le manager empêché par un cas de force majeure (section 11).</p>
   </div>
   <ul>
     <li><strong>Le brouillon ne compte pas.</strong> L’application enregistre automatiquement les notes pendant la saisie, mais elles ne comptent qu’après le clic sur « Soumettre ».</li>
     <li><strong>La soumission est définitive.</strong> Après « Soumettre », on ne peut plus modifier ni les notes ni les commentaires.</li>
     <li><strong>Tout doit être noté.</strong> On ne peut soumettre que si chaque critère de chaque agent attribué a reçu une note.</li>
+    <li><strong>Un cadre qui ne vote pas ne pénalise personne.</strong> Son avis manque simplement : la moyenne des collègues ou des clients internes se fait avec les autres évaluateurs. Il n’est jamais compté comme notant défaillant.</li>
+    <li><strong>Un autre évaluateur qui ne soumet pas peut coûter des points.</strong> Tout dépend du nombre de personnes qui ont noté l’agent : voir la section 11.</li>
     <li><strong>La date limite compte.</strong> Après le dernier jour de la campagne, la notation est fermée.</li>
   </ul>
 </section>
 
 <section>
-  <h2><span class="num">11</span> Le cas de force majeure : un évaluateur empêché</h2>
+  <h2 id="s11"><span class="num">11</span> Le notant défaillant et le cas de force majeure</h2>
+  <h3>Le notant qui n’a pas soumis à la fin de la campagne</h3>
+  <p>À la clôture, un évaluateur qui n’a pas soumis ses notes (un brouillon ne compte pas) est un <strong>notant défaillant</strong>. Ce que cela change pour l’agent noté dépend du nombre de personnes qui l’ont effectivement noté, <strong>manager compris</strong> :</p>
+  <table>
+    <thead><tr><th>À la clôture, l’agent a reçu…</th><th>Conséquence</th></tr></thead>
+    <tbody>
+      <tr><td>aucune note de son manager</td><td><strong>Non classé</strong> : il ne figure ni au classement ni au palmarès.</td></tr>
+      <tr><td>la note de son manager, et au moins 3 notes au total</td><td><strong>Protégé</strong> : les notants défaillants sont ignorés ; la moyenne se fait avec ceux qui ont noté.</td></tr>
+      <tr><td>la note de son manager, mais moins de 3 notes au total</td><td><strong>Pénalisé</strong> : chaque notant défaillant compte pour 0 dans la moyenne de son bloc.</td></tr>
+    </tbody>
+  </table>
+  <ul>
+    <li>Seuls comptent les évaluateurs désignés lors de la répartition : manager, collègues et clients internes. Les clients externes (QR) ne comptent pas dans les 3.</li>
+    <li>Un cadre compte s’il a noté, mais jamais comme notant défaillant (son vote est facultatif).</li>
+    <li>Le seuil de 3 est réglé par l’administrateur pour chaque campagne. Les campagnes clôturées avant cette règle gardent l’ancien calcul.</li>
+  </ul>
+  <p><strong>Exemple :</strong> Awa est affectée à son manager, à une collègue et à un client interne (section 9).</p>
+  <table class="eviter">
+    <thead><tr><th>Situation</th><th>Calcul</th><th class="n">Note d’Awa</th></tr></thead>
+    <tbody>
+      <tr><td>Tout le monde a noté</td><td>46,44 + 16,40 + 22,00</td><td class="n">84,8</td></tr>
+      <tr><td>Le client interne n’a pas soumis : 2 personnes seulement, Awa est pénalisée</td><td>bloc collègues (84 + 0) ÷ 2 = 42 % → 46,44 + 8,40 + 22,00</td><td class="n">76,8</td></tr>
+      <tr><td>Un 4<sup>e</sup> évaluateur n’a pas soumis, mais les 3 autres ont noté : Awa est protégée</td><td>46,44 + 16,40 + 22,00</td><td class="n">84,8</td></tr>
+      <tr><td>Son manager n’a pas soumis</td><td>—</td><td class="n">Non classée</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Le cas de force majeure : un évaluateur empêché</h3>
   <p>Il arrive qu’un évaluateur ne puisse pas noter pour une raison grave : accident, maladie grave, décès… Dans ce cas, l’administrateur <strong>invalide</strong> ses notes depuis l’onglet « Suivi » de la campagne, en indiquant le motif. L’agent noté n’est pas pénalisé : l’absence de cette note n’est pas comptée comme un zéro.</p>
   <ul>
     <li>Les notes sont écartées, pas effacées : l’administrateur peut les rétablir à tout moment.</li>
     <li>L’évaluateur invalidé ne note plus les agents concernés.</li>
     <li>Si un collègue est empêché, la moyenne se fait sur les autres collègues.</li>
     <li>Si un bloc n’a plus aucune note à cause de l’invalidation, il est <strong>neutralisé</strong> : la note est recalculée sur 100 avec les blocs restants.</li>
+    <li>Un manager invalidé ne fait pas sortir l’agent du classement. Le seuil de 3 se compte alors sur les évaluateurs restants.</li>
   </ul>
   <p><strong>Exemple :</strong> le manager d’Awa a eu un accident et n’a pas pu noter. L’administrateur invalide ses notes.</p>
   <table class="eviter">
     <thead><tr><th>Situation</th><th>Calcul</th><th class="n">Note d’Awa</th></tr></thead>
     <tbody>
-      <tr><td>Manager absent, <strong>sans</strong> invalidation</td><td>0 + 16,40 + 22,00</td><td class="n">38,4</td></tr>
+      <tr><td>Manager absent, <strong>sans</strong> invalidation</td><td>—</td><td class="n">Non classée</td></tr>
       <tr><td>Manager invalidé pour force majeure</td><td>(16,40 + 22,00) ÷ 45 × 100</td><td class="n">85,3</td></tr>
     </tbody>
   </table>
-  <p>Les 45 points des collègues et des clients sont ramenés sur 100. À l’inverse, si ce sont tous les collègues qui sont invalidés et qu’il n’y a aucun avis client, la note est celle du manager seul. Une note simplement oubliée, sans invalidation par l’administration, compte toujours pour 0.</p>
+  <p>Les 45 points des collègues et des clients sont ramenés sur 100. À l’inverse, si ce sont tous les collègues qui sont invalidés et qu’il n’y a aucun avis client, la note est celle du manager seul. Sans invalidation par l’administration, un évaluateur qui n’a pas soumis suit la règle du notant défaillant ci-dessus.</p>
 </section>
 
 <section>
-  <h2><span class="num">12</span> Comment est désigné le meilleur agent de la direction</h2>
+  <h2 id="s12"><span class="num">12</span> Comment est désigné le meilleur agent de la direction</h2>
   <p>Le meilleur agent de la direction est le Pair qui a <strong>la note finale la plus haute</strong> parmi tous les agents de sa direction.</p>
   <ol>
     <li><strong>On regroupe les agents par direction</strong>, celle inscrite sur leur fiche. Seuls les Pairs sont classés.</li>
@@ -326,45 +398,89 @@
     <li><strong>Si tout est vraiment identique</strong>, les deux agents sont ex aequo : ils partagent la 1<sup>re</sup> place, et le suivant est 3<sup>e</sup>.</li>
     <li><strong>Pendant la campagne, le classement est provisoire</strong> : il bouge à chaque nouvelle soumission. À la clôture, l’administrateur l’enregistre et il devient définitif.</li>
   </ol>
-  <p>La même méthode désigne aussi le premier de chaque service, le premier de chaque département et le premier toutes entités confondues. Les récompenses de chaque niveau sont détaillées à la section 13.</p>
+  <p>La même méthode désigne aussi le premier de chaque service, le premier de chaque département et le premier toutes entités confondues. Les distinctions et récompenses de chaque niveau sont détaillées à la section 13.</p>
   <p>Le palmarès annuel prend, pour chaque agent, la moyenne de ses notes sur les campagnes terminées de l’année, puis applique le même classement.</p>
 </section>
 
-<section class="eviter">
-  <h2><span class="num">13</span> Les récompenses</h2>
-  <p>Chaque campagne récompense le premier de chaque entité, sur trois niveaux. Voici les récompenses de la « 1<sup>ère</sup> campagne Meilleur Agent DSM » :</p>
-  <table>
-    <thead><tr><th>Niveau</th><th>Qui est récompensé ?</th><th>Récompense</th></tr></thead>
+<section class="saut">
+  <h2 id="s13"><span class="num">13</span> Distinctions et récompenses</h2>
+  <p>La campagne a lieu <strong>chaque trimestre</strong>, soit quatre fois par an. À chaque campagne, le premier de chaque entité reçoit une distinction et une récompense, sur trois niveaux.</p>
+
+  <h3>Les trois distinctions</h3>
+  <table class="eviter">
+    <thead><tr><th style="width:37%">Distinction</th><th style="width:25%">Qui la reçoit ?</th><th>Récompense</th></tr></thead>
     <tbody>
-      <tr class="total"><td>1 · Direction</td><td>Le meilleur agent de la direction : le « Super Lauréat »</td><td>Gadgets AGL + affichage photo + <strong>250 000 FCFA</strong></td></tr>
-      <tr><td>2 · Département</td><td>Le premier de chaque département</td><td>Gadgets AGL + affichage photo + <strong>100 000 FCFA</strong></td></tr>
-      <tr><td>3 · Service</td><td>Le premier de chaque service</td><td>Gadgets AGL</td></tr>
+      <tr class="total"><td>Meilleur agent de la Direction :<br>le « Captain »</td><td>Le premier de toute la direction</td><td>Gadgets AGL + affichage photo + <strong>250&nbsp;000&nbsp;FCFA</strong></td></tr>
+      <tr><td>Meilleur agent du Département :<br>le « Chief officer »</td><td>Le premier de chaque département</td><td>Gadgets AGL + affichage photo + <strong>100&nbsp;000&nbsp;FCFA</strong></td></tr>
+      <tr><td>Meilleur agent du Service :<br>le « 2nd officer »</td><td>Le premier de chaque service</td><td>Gadgets AGL</td></tr>
     </tbody>
   </table>
+
+  <h3>Combien de lauréats ?</h3>
+  <p>Il y a un lauréat par entité. Pour l’évaluation, la DSM est organisée en <strong>4 départements</strong> et <strong>12 services</strong> : chaque campagne désigne donc <strong>1 Captain, 4 Chief officers et 12 2nd officers</strong>.</p>
+  <table class="eviter">
+    <thead><tr><th>Département</th><th>Services</th><th class="c">Nombre</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Consignation</strong></td><td>OOCL · GSL · Documentation · Opérations · Administration</td><td class="c">5</td></tr>
+      <tr><td><strong>Facturation</strong></td><td>Compte d’escale · Back office · Front office</td><td class="c">3</td></tr>
+      <tr><td><strong>Manutention</strong></td><td>Magasin · Opérations · Matériel</td><td class="c">3</td></tr>
+      <tr><td><strong>Dépôt</strong></td><td>Dépôt</td><td class="c">1</td></tr>
+      <tr class="total"><td>4 départements</td><td></td><td class="c">12</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Qui peut être récompensé ?</h3>
+  <p>Peuvent être élus tous les agents de la DSM qui remplissent les conditions suivantes. Elles sont vérifiées avant chaque campagne trimestrielle.</p>
+  <table>
+    <thead><tr><th class="c">N°</th><th>Critère</th><th>Condition d’éligibilité</th></tr></thead>
+    <tbody>
+      <tr><td class="c">1</td><td><strong>Catégorie professionnelle</strong></td><td>Appartenir à la catégorie des non-cadres.</td></tr>
+      <tr><td class="c">2</td><td><strong>Type de contrat</strong></td><td>Être titulaire d’un CDD ou d’un CDI, y compris en période d’essai.</td></tr>
+      <tr><td class="c">3</td><td><strong>Affectation</strong></td><td>Être affecté à la Direction Maritime.</td></tr>
+      <tr><td class="c">4</td><td><strong>Ancienneté</strong></td><td>Justifier d’au moins 3 mois d’ancienneté à la date de clôture du trimestre évalué.</td></tr>
+      <tr><td class="c">5</td><td><strong>Durée d’activité</strong></td><td>Avoir exercé ses fonctions assez longtemps pour permettre une évaluation objective (durée proposée : 2 mois).</td></tr>
+      <tr><td class="c">6</td><td><strong>Participation à l’évaluation</strong></td><td>Accepter le principe de l’évaluation et respecter les modalités de fonctionnement du dispositif.</td></tr>
+      <tr><td class="c">7</td><td><strong>Respect des règles de l’entreprise</strong></td><td>Ne pas avoir fait l’objet d’une sanction disciplinaire définitive pendant le trimestre, selon les règles internes applicables.</td></tr>
+    </tbody>
+  </table>
+  <div class="encadre alerte">
+    <div class="titre-encadre">Ne peuvent pas être élus</div>
+    <ul>
+      <li>les cadres, qu’ils exercent ou non des fonctions hiérarchiques ;</li>
+      <li>les stagiaires ;</li>
+      <li>les intérimaires ;</li>
+      <li>les prestataires.</li>
+    </ul>
+    <p>Les non-cadres en période d’essai restent éligibles, s’ils remplissent les autres conditions.</p>
+  </div>
+
+  <h3>Les règles d’attribution</h3>
   <ul>
-    <li><strong>Seuls les Pairs sont récompensés</strong>, comme pour le classement (section 12).</li>
-    <li><strong>Il y a un lauréat par entité.</strong> Une direction qui compte quatre départements et dix services désigne donc un lauréat de direction, quatre lauréats de département et dix lauréats de service.</li>
-    <li><strong>Le premier toutes entités confondues</strong> est le meilleur agent de la direction, puisque tous les agents appartiennent à la même direction. Ce titre ne donne pas de récompense en plus de celle de la direction.</li>
-    <li><strong>Les récompenses se cumulent.</strong> Un agent premier à plusieurs niveaux reçoit toutes les récompenses des niveaux où il est premier. Le meilleur agent de la direction est forcément aussi le premier de son département et de son service : il reçoit donc les trois récompenses, soit 350 000 FCFA, l’affichage photo et les gadgets AGL.</li>
+    <li><strong>Les mêmes règles valent pour tous :</strong> les non-cadres en CDD et en CDI sont évalués selon les mêmes critères de notation, définis à l’avance (section 4).</li>
+    <li><strong>Les récompenses se cumulent.</strong> Un agent premier à plusieurs niveaux reçoit toutes les récompenses des niveaux où il est premier. Le Captain est forcément aussi le premier de son département et de son service, donc aussi Chief officer et 2nd officer : il reçoit les trois récompenses, soit 350&nbsp;000&nbsp;FCFA, l’affichage photo et les gadgets AGL.</li>
+    <li><strong>Le premier toutes entités confondues</strong> est le Captain, puisque tous les agents appartiennent à la même direction. Ce titre ne donne pas de récompense en plus.</li>
+    <li><strong>Un ancien lauréat peut être de nouveau candidat</strong> aux campagnes suivantes.</li>
+    <li><strong>Une absence légitime n’exclut pas automatiquement</strong> un agent, à elle seule.</li>
     <li><strong>Les récompenses sont remises sur le classement définitif</strong>, celui que l’administrateur enregistre à la clôture de la campagne. Le classement provisoire, affiché pendant la campagne, ne donne droit à rien.</li>
   </ul>
   <div class="encadre or">
     <div class="titre-encadre">Les récompenses peuvent changer d’une campagne à l’autre</div>
-    <p>L’administrateur les inscrit dans l’onglet « Prix » de chaque campagne. Le tableau ci-dessus vaut pour la 1<sup>ère</sup> campagne ; les récompenses à jour sont toujours affichées dans l’application, sur la page du classement.</p>
+    <p>L’administrateur les inscrit dans l’onglet « Prix » de chaque campagne. Les récompenses à jour sont toujours affichées dans l’application, sur la page du classement.</p>
   </div>
 </section>
 
 <section class="eviter">
-  <h2><span class="num">14</span> À retenir</h2>
+  <h2 id="s14"><span class="num">14</span> À retenir</h2>
   <ol>
     <li>Quatre familles notent l’agent : le manager (9 critères), les collègues (5), les clients internes (5) et les clients externes (5).</li>
+    <li>Les cadres peuvent voter avec les mêmes critères que les Pairs ; ce vote est facultatif et ils ne sont jamais notés.</li>
     <li>Chaque critère est noté de 1 (Insuffisant) à 5 (Excellent).</li>
     <li>Les notes d’un évaluateur deviennent un pourcentage.</li>
     <li>Chaque bloc fait la moyenne de ses évaluateurs ; collègues et clients internes sont réunis.</li>
     <li>Manager = 55 points ; collègues = 20 points ; clients externes = 25 points (ou 45 points pour un seul des deux s’il est seul).</li>
-    <li>Seules les notes soumises comptent ; un bloc qui n’a pas noté vaut 0, sauf cas de force majeure reconnu par l’administration.</li>
+    <li>Seules les notes soumises comptent. Sans la note de son manager, l’agent n’est pas classé. Noté par au moins 3 personnes manager compris, il n’est pas pénalisé par un évaluateur qui n’a pas soumis ; en dessous, chaque évaluateur manquant compte 0. Le cas de force majeure reconnu par l’administration reste une exception.</li>
     <li>La note la plus haute de la direction désigne le meilleur agent de la direction.</li>
-    <li>Le premier de la direction gagne 250 000 FCFA, le premier de chaque département 100 000 FCFA, le premier de chaque service des gadgets AGL, sur le classement définitif. Les récompenses se cumulent.</li>
+    <li>Chaque trimestre, le Captain gagne 250&nbsp;000&nbsp;FCFA, chaque Chief officer (département) 100&nbsp;000&nbsp;FCFA et chaque 2nd officer (service) des gadgets AGL. Les récompenses se cumulent. Seuls les non-cadres éligibles peuvent être élus.</li>
   </ol>
 </section>
 
