@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { requireAdmin } from '@/lib/auth'
+import { pairesManagersDuService } from '@/lib/repartition-service'
 
 export async function GET(
   req: NextRequest,
@@ -90,6 +91,11 @@ export async function POST(
       return NextResponse.json({ success: true, ajoutees })
     }
 
+    // 1 ter. Chaque manager note tous les Pairs de son service (paires manquantes seulement)
+    if (mode === 'managers_service') {
+      return NextResponse.json({ success: true, ...(await affecterManagersDuService(id)) })
+    }
+
     // 2. Mode PAR COLLABORATEUR (Évalué) : la liste `evaluateurIds` devient celle des évaluateurs de `evalueId`.
     if (mode === 'by_evalue' || (evalueId && Array.isArray(evaluateurIds))) {
       if (!evalueId || !Array.isArray(evaluateurIds)) {
@@ -138,6 +144,24 @@ async function affecterPairsDuService(campagneId: string): Promise<number> {
   if (data.length === 0) return 0
   const { count } = await prisma.affectation.createMany({ data, skipDuplicates: true })
   return count
+}
+
+/**
+ * Chaque manager note tous les Pairs de son service (règles : lib/repartition-service). N'ajoute que les
+ * paires manquantes : les affectations existantes (statuts, notes, qualité « client interne ») restent intactes.
+ */
+async function affecterManagersDuService(campagneId: string): Promise<{ ajoutees: number; managersSansService: number }> {
+  const agents = await prisma.utilisateur.findMany({
+    where: { role: { in: ['MANAGER', 'UTILISATEUR'] } },
+    select: { id: true, role: true, service: true },
+  })
+  const { paires, managersSansService } = pairesManagersDuService(agents)
+  if (paires.length === 0) return { ajoutees: 0, managersSansService }
+  const { count } = await prisma.affectation.createMany({
+    data: paires.map((p) => ({ campagneId, ...p })),
+    skipDuplicates: true,
+  })
+  return { ajoutees: count, managersSansService }
 }
 
 /**

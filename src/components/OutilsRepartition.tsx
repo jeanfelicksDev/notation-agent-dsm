@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { CircleCheck, ClipboardCheck, Loader2, RotateCcw, Users, X } from 'lucide-react'
+import { CircleCheck, ClipboardCheck, Loader2, RotateCcw, UserCog, Users, X } from 'lucide-react'
 import { confirmer, toast } from '@/components/ui/feedback'
 import { controlerRepartition, grouperParService, type AgentControle, type AffectationControle } from '@/lib/controle-repartition'
 
@@ -10,8 +10,11 @@ const pluriel = (n: number, mot: string) => `${n} ${mot}${n > 1 ? 's' : ''}`
 /** Disposition de la répartition à ouvrir sur un agent : en tant que noté ou en tant que notant. */
 export type PerspectiveRepartition = 'BY_EVALUE' | 'BY_EVALUATEUR'
 
+type Action = 'service' | 'managers' | 'reset'
+
 /**
- * Onglet Répartition : affecter les Pairs d'un même service entre eux, remettre la répartition à zéro,
+ * Onglet Répartition : affecter les Pairs d'un même service entre eux, faire noter par chaque manager
+ * les Pairs de son service, remettre la répartition à zéro,
  * ou contrôler en un clic les Pairs sans notant, sans noté, sans manager ou sous le seuil de notants.
  */
 export default function OutilsRepartition({
@@ -31,13 +34,13 @@ export default function OutilsRepartition({
   /** Ouvre la répartition sur cet agent, pour corriger un manque signalé par le contrôle. */
   onSelectionner: (agentId: string, perspective: PerspectiveRepartition) => void
 }) {
-  const [enCours, setEnCours] = useState<'service' | 'reset' | null>(null)
+  const [enCours, setEnCours] = useState<Action | null>(null)
   const [controleOuvert, setControleOuvert] = useState(false)
   const controle = useMemo(() => controlerRepartition(agents, affectations, seuilNotants), [agents, affectations, seuilNotants])
   const nbAlertes = controle.sansNotant.length + controle.sansNote.length + controle.sansManager.length + controle.sousLeSeuil.length
   const soumises = affectations.filter((a) => a.statut === 'TERMINEE').length
 
-  const appeler = async (action: 'service' | 'reset', requete: RequestInit, succes: (data: Record<string, number>) => string) => {
+  const appeler = async (action: Action, requete: RequestInit, succes: (data: Record<string, number>) => string) => {
     setEnCours(action)
     try {
       const r = await fetch(`/api/admin/campagnes/${campagneId}/affectations`, requete)
@@ -67,6 +70,29 @@ export default function OutilsRepartition({
       'service',
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'pairs_service' }) },
       (d) => (d.ajoutees ? `${pluriel(d.ajoutees, 'affectation')} ajoutée${d.ajoutees > 1 ? 's' : ''}.` : 'Tous les pairs d’un même service étaient déjà affectés entre eux.')
+    )
+  }
+
+  const affecterManagersDuService = async () => {
+    const ok = await confirmer({
+      titre: 'Affecter à chaque manager les Pairs de son service ?',
+      message:
+        'Chaque manager notera tous les Pairs de son service. Seules les paires manquantes sont ajoutées : les affectations existantes restent intactes.',
+      confirmer: 'Affecter',
+    })
+    if (!ok) return
+    appeler(
+      'managers',
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'managers_service' }) },
+      (d) => {
+        const ajout = d.ajoutees
+          ? `${pluriel(d.ajoutees, 'affectation')} ajoutée${d.ajoutees > 1 ? 's' : ''}.`
+          : 'Chaque manager notait déjà tous les Pairs de son service.'
+        const sansService = d.managersSansService
+          ? ` ${pluriel(d.managersSansService, 'manager')} sans service, non affecté${d.managersSansService > 1 ? 's' : ''}.`
+          : ''
+        return ajout + sansService
+      }
     )
   }
 
@@ -133,6 +159,15 @@ export default function OutilsRepartition({
           >
             {enCours === 'service' ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Users className="h-4 w-4" aria-hidden />}
             Affecter les pairs du même service
+          </button>
+          <button
+            type="button"
+            onClick={affecterManagersDuService}
+            disabled={enCours !== null}
+            className="inline-flex h-10 items-center gap-2 rounded-xl bg-teal-700 px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {enCours === 'managers' ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <UserCog className="h-4 w-4" aria-hidden />}
+            Affecter les managers à leur service
           </button>
           <button
             type="button"
