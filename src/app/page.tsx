@@ -199,9 +199,9 @@ function AccueilContenu() {
             <p className="mt-1 hidden text-sm tracking-[0.02em] text-navy-200 sm:block">Direction des Solutions Maritimes</p>
           </div>
           <div className="flex w-full items-center gap-2.5 sm:ml-auto sm:w-auto sm:gap-3">
-            {/* Didacticiel animé avec voix off ; sa dernière scène ramène ici. */}
+            {/* Didacticiel animé avec voix off, lancé dès l'ouverture ; sa dernière scène ramène ici. */}
             <a
-              href="/presentation-connexion.html"
+              href="/presentation-connexion.html?lancer=1"
               className="group inline-flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full sm:flex-none bg-gradient-to-b from-gold-300 to-gold-500 px-4 py-2.5 text-sm font-semibold text-[#071a33] shadow-[0_10px_24px_-10px_rgb(212_175_55/0.7)] ring-1 ring-gold-200/60 animate-clignote transition-[filter,transform] hover:animate-none hover:brightness-110 active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-300"
             >
               <CirclePlay className="h-4 w-4 transition-transform group-hover:scale-110" aria-hidden />

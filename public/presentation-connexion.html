@@ -1437,6 +1437,24 @@ function choisir(nom) {
   location.href = lienEdge(choix.adresse())
 }
 
+/* ───────── Lancement automatique depuis la page de connexion ───────── */
+/*
+ * Le bouton « Comment noter » de la page de connexion ouvre « ?lancer=1 » : la présentation démarre
+ * aussitôt, sans écran de choix ni détour par Edge. Les voix se chargent après l'ouverture de la page :
+ * on les attend un court instant pour que la première phrase soit lue.
+ */
+const LANCEMENT_AUTO = new URLSearchParams(location.search).has('lancer')
+const ATTENTE_VOIX_MAX = 1500
+
+function lancerAutomatiquement() {
+  const debut = Date.now()
+  const essayer = () => {
+    if (Voix.choisie || !Voix.disponible || Date.now() - debut >= ATTENTE_VOIX_MAX) return demarrer()
+    setTimeout(essayer, 100)
+  }
+  essayer()
+}
+
 function brancherEvenements() {
   $('#b-lancer').addEventListener('click', () => choisir('presentation'))
   $('#b-connexion').addEventListener('click', (e) => {
@@ -1511,7 +1529,9 @@ function init() {
   afficherScene(0)
   majProgression()
   majControles()
-  $('#b-lancer').focus({ preventScroll: true })
+  if (!LANCEMENT_AUTO) return $('#b-lancer').focus({ preventScroll: true })
+  history.replaceState(null, '', location.pathname) // un rechargement revient à l'écran de choix
+  lancerAutomatiquement()
 }
 
 init()
