@@ -31,8 +31,12 @@ export async function identifierClientExterne(saisie: string): Promise<Identific
         })
       : await trouverParTelephone(saisie, SELECT_CLIENT, { role: 'EXTERNE' })
   if (!client) {
-    const quoi = type === 'email' ? 'Cette adresse e-mail n’est pas enregistrée' : 'Ce numéro n’est pas enregistré'
-    return { ok: false, statut: 404, erreur: `${quoi} comme client. Vérifiez votre saisie ou contactez votre interlocuteur DSM.` }
+    // Un numéro inconnu peut être celui d'un client enregistré par son seul e-mail : on l'invite à essayer son adresse.
+    const erreur =
+      type === 'telephone'
+        ? 'Ce numéro n’est pas enregistré comme client. Essayez avec votre adresse e-mail.'
+        : 'Cette adresse e-mail n’est pas enregistrée comme client. Vérifiez votre saisie ou contactez votre interlocuteur DSM.'
+    return { ok: false, statut: 404, erreur }
   }
 
   const verdict = verifierSaisieClient(type, client)
