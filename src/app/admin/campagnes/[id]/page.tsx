@@ -19,6 +19,7 @@ import { estCadre, participeACampagne } from '@/lib/roles'
 import { getAppreciationInfo } from '@/lib/default-criteres'
 import { resumerBilanCloture, SEUIL_NOTANTS_MAX, SEUIL_NOTANTS_PAR_DEFAUT } from '@/lib/eligibilite'
 import { BadgeSituation, ListeNonClasses, PrevisionSituations } from '@/components/SituationNotants'
+import SuiviParNote from '@/components/SuiviParNote'
 
 interface Critere {
   id: string
@@ -1969,6 +1970,8 @@ const MOTIFS_INVALIDATION: Record<string, string> = {
 function SuiviDashboard({ campagneId, affectations, users, seuilNotants, onUpdate }: { campagneId: string, affectations: any[], users: User[], seuilNotants: number | null, onUpdate: () => void }) {
   const [suiviCategory, setSuiviCategory] = useState<'ALL' | 'PAIR' | 'MANAGER' | 'EXTERNE'>('ALL')
   const [suiviSearch, setSuiviSearch] = useState('')
+  // Détail lu depuis les évaluateurs (qui note qui) ou depuis les notés (qui doit encore les noter)
+  const [vueSuivi, setVueSuivi] = useState<'EVALUATEUR' | 'NOTE'>('EVALUATEUR')
   // Notant en cours d'invalidation (formulaire ouvert)
   const [invalidation, setInvalidation] = useState<string | null>(null)
   const [motif, setMotif] = useState('FORCE_MAJEURE')
@@ -2087,7 +2090,24 @@ function SuiviDashboard({ campagneId, affectations, users, seuilNotants, onUpdat
         </div>
       </div>
 
-      {/* Tableau détaillé avec filtres */}
+      <div role="group" aria-label="Organisation du détail" className="inline-flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200">
+        {([['EVALUATEUR', 'Par évaluateur'], ['NOTE', 'Par noté']] as const).map(([vue, libelle]) => (
+          <button
+            key={vue}
+            type="button"
+            aria-pressed={vueSuivi === vue}
+            onClick={() => setVueSuivi(vue)}
+            className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${vueSuivi === vue ? 'bg-navy-700 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+          >
+            {libelle}
+          </button>
+        ))}
+      </div>
+
+      {vueSuivi === 'NOTE' ? (
+        <SuiviParNote affectations={affectations} users={users} />
+      ) : (
+      /* Tableau détaillé avec filtres */
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-4 sm:p-6 border-b border-slate-100 bg-slate-50/50 flex flex-col md:flex-row items-center justify-between gap-4">
           <div>
@@ -2276,11 +2296,12 @@ function SuiviDashboard({ campagneId, affectations, users, seuilNotants, onUpdat
           ))}
         </div>
       </div>
+      )}
     </div>
   )
 }
 
-function ClassementCampagneView({ 
+function ClassementCampagneView({
   campagneId, 
   formData, 
   onRecalculate 

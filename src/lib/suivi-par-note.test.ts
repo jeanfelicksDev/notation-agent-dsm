@@ -1,0 +1,87 @@
+import { describe, expect, it } from 'vitest'
+import { etatAffectation, filtrerSuivi, suiviParNote, trierSuivi } from '@/lib/suivi-par-note'
+
+const aff = (evaluateurId: string, evalueId: string, statut = 'EN_ATTENTE', invalidee = false) => ({
+  evaluateurId,
+  evalueId,
+  statut,
+  invalidee,
+})
+
+const AFFECTATIONS = [
+  aff('m1', 'awa', 'TERMINEE'),
+  aff('p1', 'awa', 'BROUILLON'),
+  aff('p2', 'awa'),
+  aff('c1', 'awa'), // cadre : vote facultatif
+  aff('m1', 'koffi', 'TERMINEE'),
+  aff('p1', 'koffi', 'TERMINEE'),
+  aff('p3', 'koffi', 'TERMINEE', true),
+]
+const estFacultatif = (id: string) => id === 'c1'
+
+describe('etatAffectation', () => {
+  it('fait primer l’invalidation sur le statut', () => {
+    expect(etatAffectation(aff('a', 'b', 'TERMINEE', true))).toBe('INVALIDEE')
+    expect(etatAffectation(aff('a', 'b', 'BROUILLON'))).toBe('BROUILLON')
+  })
+
+  it('traite un statut inconnu comme non commencé', () => {
+    expect(etatAffectation(aff('a', 'b', 'AUTRE'))).toBe('EN_ATTENTE')
+  })
+})
+
+describe('suiviParNote', () => {
+  const suivis = suiviParNote(AFFECTATIONS, estFacultatif)
+  const awa = suivis.find((s) => s.evalueId === 'awa')!
+
+  it('regroupe les notants de chaque noté', () => {
+    expect(suivis.map((s) => s.evalueId).sort()).toEqual(['awa', 'koffi'])
+    expect(awa.notants.map((n) => n.evaluateurId)).toEqual(['m1', 'p1', 'p2', 'c1'])
+  })
+
+  it('compte les notants par état', () => {
+    expect(awa.compte).toEqual({ EN_ATTENTE: 2, BROUILLON: 1, TERMINEE: 1, INVALIDEE: 0 })
+  })
+
+  it('ne compte pas un cadre facultatif parmi les notants attendus', () => {
+    expect(awa.notants.find((n) => n.evaluateurId === 'c1')?.facultatif).toBe(true)
+    expect(awa.restants).toBe(2) // p1 (en cours) et p2 (non commencé)
+  })
+
+  it('ne compte pas un notant invalidé parmi les restants', () => {
+    expect(suivis.find((s) => s.evalueId === 'koffi')!.restants).toBe(0)
+  })
+})
+
+describe('filtrerSuivi', () => {
+  const suivis = suiviParNote(AFFECTATIONS, estFacultatif)
+
+  it('garde tout avec le filtre TOUS', () => {
+    expect(filtrerSuivi(suivis, 'TOUS')).toEqual(suivis)
+  })
+
+  it('ne garde que les notés concernés et, pour chacun, les notants dans l’état choisi', () => {
+    const attente = filtrerSuivi(suivis, 'EN_ATTENTE')
+    expect(attente.map((s) => s.evalueId)).toEqual(['awa'])
+    expect(attente[0].notants.map((n) => n.evaluateurId)).toEqual(['p2', 'c1'])
+  })
+
+  it('ne modifie pas la liste d’origine', () => {
+    filtrerSuivi(suivis, 'TERMINEE')
+    expect(suivis.find((s) => s.evalueId === 'awa')!.notants).toHaveLength(4)
+  })
+})
+
+describe('trierSuivi', () => {
+  const suivis = suiviParNote(AFFECTATIONS, estFacultatif)
+  const noms: Record<string, string> = { awa: 'Zadi Awa', koffi: 'Achi Koffi' }
+  const nomDe = (id: string) => noms[id]
+
+  it('trie par nom', () => {
+    expect(trierSuivi(suivis, 'NOM', nomDe).map((s) => s.evalueId)).toEqual(['koffi', 'awa'])
+  })
+
+  it('met en tête les notés qui attendent le plus de notes', () => {
+    expect(trierSuivi(suivis, 'RESTANTS', nomDe).map((s) => s.evalueId)).toEqual(['awa', 'koffi'])
+  })
+})
