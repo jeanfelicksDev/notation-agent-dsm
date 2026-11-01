@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { emailEstReel, identifiantExige, typeDeSaisie, verifierSaisieClient } from '@/lib/identifiant-client'
+import {
+  emailEstReel,
+  emailFictifClient,
+  erreurFicheClient,
+  identifiantExige,
+  MESSAGE_CLIENT_SANS_IDENTIFIANT,
+  typeDeSaisie,
+  verifierSaisieClient,
+} from '@/lib/identifiant-client'
 
 const client = (telephone: string | null, email: string | null) => ({ telephone, email })
 
@@ -61,5 +69,37 @@ describe('verifierSaisieClient', () => {
 
   it('refuse un client sans téléphone ni e-mail réel', () => {
     expect(verifierSaisieClient('email', client(null, 'x@dsm.local'))).toEqual({ ok: false, raison: 'aucun_identifiant' })
+  })
+})
+
+describe('erreurFicheClient', () => {
+  const fiche = (entite: string, telephone: string, email: string) => ({ entite, telephone, email })
+
+  it('accepte une entité avec un téléphone seul, un e-mail seul ou les deux', () => {
+    expect(erreurFicheClient(fiche('SIVOM', '07 00 00 00 00', ''))).toBeNull()
+    expect(erreurFicheClient(fiche('SIVOM', '', 'contact@sivom.ci'))).toBeNull()
+    expect(erreurFicheClient(fiche('SIVOM', '0700000000', 'contact@sivom.ci'))).toBeNull()
+  })
+
+  it('exige l’entité', () => {
+    expect(erreurFicheClient(fiche('   ', '0700000000', ''))).toMatch(/entité/)
+  })
+
+  it('exige au moins un téléphone ou un e-mail réel', () => {
+    expect(erreurFicheClient(fiche('SIVOM', '', ''))).toBe(MESSAGE_CLIENT_SANS_IDENTIFIANT)
+    expect(erreurFicheClient(fiche('SIVOM', ' ', 'x@dsm.local'))).toBe(MESSAGE_CLIENT_SANS_IDENTIFIANT)
+  })
+
+  it('refuse un numéro trop court ou un e-mail mal formé', () => {
+    expect(erreurFicheClient(fiche('SIVOM', '0700', ''))).toMatch(/chiffres/)
+    expect(erreurFicheClient(fiche('SIVOM', '', 'contact@'))).toMatch(/e-mail/)
+  })
+})
+
+describe('emailFictifClient', () => {
+  it('produit une adresse unique qui ne compte pas comme e-mail réel', () => {
+    const email = emailFictifClient('CLI-1A2B3C4D')
+    expect(email).toBe('cli-1a2b3c4d@dsm.local')
+    expect(emailEstReel(email)).toBe(false)
   })
 })

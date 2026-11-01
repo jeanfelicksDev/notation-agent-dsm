@@ -31,6 +31,16 @@ export async function trouverParIdentifiant<S extends Prisma.UtilisateurSelect>(
   return trouverParTelephone(brut, select, where)
 }
 
+/** Un compte porte-t-il déjà ce numéro (après normalisation) ? Un doublon rendrait le numéro inutilisable. */
+export async function telephoneDejaPris(saisie: string, where: Prisma.UtilisateurWhereInput = {}): Promise<boolean> {
+  const tel = normalizePhone(saisie.trim())
+  const candidats = await prisma.utilisateur.findMany({
+    where: { ...where, telephone: { not: null } },
+    select: { telephone: true },
+  })
+  return candidats.some((u) => u.telephone && normalizePhone(u.telephone) === tel)
+}
+
 /** Retrouve un utilisateur par son numéro exact (après normalisation) ; null si inconnu ou partagé. */
 export async function trouverParTelephone<S extends Prisma.UtilisateurSelect>(
   saisie: string,

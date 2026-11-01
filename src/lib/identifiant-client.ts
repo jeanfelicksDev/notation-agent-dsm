@@ -49,6 +49,25 @@ export function identifiantExige(client: CoordonneesClient): IdentifiantClient |
 export const MESSAGE_CLIENT_SANS_IDENTIFIANT =
   'Un client externe doit avoir un numéro de téléphone ou une adresse e-mail réelle (pas en @dsm.local) pour se connecter.'
 
+/** Ce qu'on demande à l'inscription d'un client externe : son entité, puis son téléphone et/ou son e-mail. */
+export type FicheClient = { entite: string; telephone: string; email: string }
+
+/** Message d'erreur de la fiche d'un nouveau client externe, ou null si elle est complète. */
+export function erreurFicheClient({ entite, telephone, email }: FicheClient): string | null {
+  if (!entite.trim()) return "L'entité du client est obligatoire."
+  if (telephone.trim() && typeDeSaisie(telephone) !== 'telephone') {
+    return `Le numéro de téléphone doit comporter au moins ${MIN_PHONE_DIGITS} chiffres.`
+  }
+  if (email.trim() && typeDeSaisie(email) !== 'email') return "L'adresse e-mail n'est pas valide."
+  if (!identifiantExige({ telephone, email })) return MESSAGE_CLIENT_SANS_IDENTIFIANT
+  return null
+}
+
+/** Adresse unique (exigée par la base) d'un client inscrit sans e-mail : elle ne sert jamais à se connecter. */
+export function emailFictifClient(matricule: string): string {
+  return `${matricule.toLowerCase()}${DOMAINE_FICTIF}`
+}
+
 /** La saisie (déjà rapprochée de ce client) est-elle l'identifiant qu'il doit utiliser ? */
 export function verifierSaisieClient(saisie: IdentifiantClient, client: CoordonneesClient): VerdictSaisie {
   const exige = identifiantExige(client)

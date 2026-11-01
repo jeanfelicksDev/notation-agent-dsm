@@ -3,12 +3,13 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Save, AlertCircle, User, Mail, Phone, Briefcase, Loader2, QrCode } from 'lucide-react'
+import { ArrowLeft, Save, AlertCircle, User, Mail, Phone, Briefcase, Building2, Loader2, QrCode } from 'lucide-react'
 import AdminHeader from '@/components/AdminHeader'
 import { SEXES } from '@/lib/agents'
 import { valeurParDefaut } from '@/lib/listes'
 import { ChampListe, useListes } from '@/components/listes'
 import ConnexionClient from '@/components/ConnexionClient'
+import { erreurFicheClient } from '@/lib/identifiant-client'
 
 export default function NewUtilisateurPage() {
   const router = useRouter()
@@ -41,16 +42,31 @@ export default function NewUtilisateurPage() {
     }))
   )
 
+  // Un client externe ne se décrit que par son entité, son téléphone et/ou son e-mail
+  const estClient = formData.role === 'EXTERNE'
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
     setError('')
 
+    const erreurClient = estClient
+      ? erreurFicheClient({ entite: formData.nom, telephone: formData.telephone, email: formData.email })
+      : null
+    if (erreurClient) {
+      setError(erreurClient)
+      return
+    }
+
+    const corps = estClient
+      ? { role: formData.role, nom: formData.nom, telephone: formData.telephone, email: formData.email }
+      : formData
+
+    setLoading(true)
     try {
       const res = await fetch('/api/admin/utilisateurs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(corps)
       })
 
       const data = await res.json()
@@ -83,8 +99,10 @@ export default function NewUtilisateurPage() {
                   <User className="w-6 h-6" />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-semibold text-slate-900">Profil Collaborateur</h2>
-                  <p className="text-slate-500 text-sm font-medium">Informations d'identification et accès système.</p>
+                  <h2 className="text-2xl font-semibold text-slate-900">{estClient ? 'Client externe' : 'Profil Collaborateur'}</h2>
+                  <p className="text-slate-500 text-sm font-medium">
+                    {estClient ? 'Entité et coordonnées de connexion du client.' : "Informations d'identification et accès système."}
+                  </p>
                 </div>
               </div>
 
@@ -97,31 +115,64 @@ export default function NewUtilisateurPage() {
 
               <form onSubmit={handleSubmit} className="space-y-8">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-2xs font-bold text-slate-400 uppercase tracking-widest ml-1">Matricule *</label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        required
-                        className="w-full px-5 py-3.5 pl-12 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-semibold uppercase"
-                        value={formData.matricule}
-                        onChange={e => setFormData({ ...formData, matricule: e.target.value.toUpperCase() })}
-                        placeholder="Ex: MAT-001"
-                      />
-                      <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                    </div>
+                  {/* Le rôle se choisit d'abord : il détermine les champs à renseigner */}
+                  <div className="md:col-span-2">
+                    <ChampListe
+                      id="role"
+                      label="Rôle *"
+                      liste="ROLE"
+                      value={formData.role}
+                      onChange={(v) => setFormData((f) => ({ ...f, role: v }))}
+                      listes={listes}
+                      onListes={setListes}
+                      labelClassName="ml-1 block text-sm font-medium text-slate-700"
+                      selectClassName="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-semibold"
+                    />
                   </div>
 
+                  {estClient ? (
+                    <div className="md:col-span-2 space-y-2">
+                      <label htmlFor="entite" className="text-2xs font-bold text-slate-400 uppercase tracking-widest ml-1">Entité *</label>
+                      <div className="relative">
+                        <input
+                          id="entite"
+                          type="text"
+                          required
+                          className="w-full px-5 py-3.5 pl-12 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-semibold"
+                          value={formData.nom}
+                          onChange={e => setFormData({ ...formData, nom: e.target.value })}
+                          placeholder="Nom du client ou de son entreprise"
+                        />
+                        <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <label className="text-2xs font-bold text-slate-400 uppercase tracking-widest ml-1">Matricule *</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          required
+                          className="w-full px-5 py-3.5 pl-12 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-semibold uppercase"
+                          value={formData.matricule}
+                          onChange={e => setFormData({ ...formData, matricule: e.target.value.toUpperCase() })}
+                          placeholder="Ex: MAT-001"
+                        />
+                        <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                      </div>
+                    </div>
+                  )}
+
                   <div className="space-y-2">
-                    <label className="text-2xs font-bold text-slate-400 uppercase tracking-widest ml-1">Email *</label>
+                    <label className="text-2xs font-bold text-slate-400 uppercase tracking-widest ml-1">Email{estClient ? '' : ' *'}</label>
                     <div className="relative">
                       <input
                         type="email"
-                        required
+                        required={!estClient}
                         className="w-full px-5 py-3.5 pl-12 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-semibold"
                         value={formData.email}
                         onChange={e => setFormData({ ...formData, email: e.target.value })}
-                        placeholder="email@dsm.com"
+                        placeholder={estClient ? 'contact@entreprise.com' : 'email@dsm.com'}
                       />
                       <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                     </div>
@@ -141,12 +192,15 @@ export default function NewUtilisateurPage() {
                     </div>
                   </div>
 
-                  {formData.role === 'EXTERNE' && (
-                    <div className="md:col-span-2">
+                  {estClient ? (
+                    <div className="md:col-span-2 space-y-2">
+                      <p className="ml-1 text-xs text-slate-500">
+                        Renseignez au moins le téléphone ou l’e-mail : le client s’en servira pour se connecter.
+                      </p>
                       <ConnexionClient telephone={formData.telephone} email={formData.email} />
                     </div>
-                  )}
-
+                  ) : (
+                  <>
                   <div className="space-y-2">
                     <label className="text-2xs font-bold text-slate-400 uppercase tracking-widest ml-1">Nom *</label>
                     <input
@@ -244,21 +298,6 @@ export default function NewUtilisateurPage() {
                     selectClassName="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-semibold"
                   />
 
-                  <ChampListe
-                    id="role"
-                    label="Rôle"
-                    liste="ROLE"
-                    value={formData.role}
-                    onChange={(v) => setFormData((f) => ({ ...f, role: v }))}
-                    listes={listes}
-                    onListes={setListes}
-                    labelClassName="ml-1 block text-sm font-medium text-slate-700"
-                    selectClassName="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-semibold"
-                  />
-
-
-
-
                   {formData.role === 'ADMIN' ? (
                     <div className="md:col-span-2 space-y-2">
                       <label htmlFor="mdp" className="ml-1 block text-sm font-medium text-slate-700">Mot de passe administrateur (8 caractères minimum) *</label>
@@ -325,6 +364,8 @@ export default function NewUtilisateurPage() {
                       </div>
                     </label>
                   </div>
+                  </>
+                  )}
                 </div>
 
                 <div className="pt-6 border-t border-slate-100 flex justify-end gap-4">

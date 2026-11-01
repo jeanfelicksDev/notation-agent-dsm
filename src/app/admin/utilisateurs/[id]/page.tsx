@@ -243,7 +243,7 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
               )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nom *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{formData.role === 'EXTERNE' ? 'Entité *' : 'Nom *'}</label>
                 <input
                   type="text"
                   required
@@ -254,10 +254,11 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Prénom *</label>
+                {/* Un client externe est inscrit sous le seul nom de son entité */}
+                <label className="block text-sm font-medium text-gray-700 mb-1">{formData.role === 'EXTERNE' ? 'Prénom' : 'Prénom *'}</label>
                 <input
                   type="text"
-                  required
+                  required={formData.role !== 'EXTERNE'}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 outline-none"
                   value={formData.prenom}
                   onChange={e => setFormData({ ...formData, prenom: e.target.value })}
