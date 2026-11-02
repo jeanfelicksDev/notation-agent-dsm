@@ -296,6 +296,44 @@ body.plein #stage{border-radius:0}
 .bulle-soumettre{right:150px;top:340px}
 .bulle-soumettre::after{right:80px}
 
+/* ───────── 9 et 10 · Clients externes ───────── */
+.regles-client{display:grid;gap:14px;margin-top:34px}
+.regles-client li{display:flex;align-items:center;gap:14px;padding:16px 20px;border-radius:18px;font-size:20px;line-height:1.35;color:var(--navy-100);background:rgb(255 255 255/.05);box-shadow:inset 0 0 0 1px rgb(255 255 255/.1)}
+.regles-client li b{color:#fff;font-weight:600}
+.regles-client .ic{font-size:24px;color:var(--gold-300)}
+.champ .ic-mail,.champ.mode-email .ic-tel{display:none}
+.champ.mode-email .ic-mail{display:block}
+.erreur-client{display:none;gap:8px;margin-top:12px;padding:10px 14px;border-radius:12px;font-size:14px;line-height:1.4;color:#991b1b;background:#fef2f2;box-shadow:inset 0 0 0 1px #fecaca}
+.erreur-client .ic{margin-top:1px;font-size:16px;color:#dc2626}
+.erreur-client.visible{display:flex}
+.carte-client{position:absolute;top:262px;padding:30px 34px;border-radius:24px;background:var(--carte);color:var(--encre);box-shadow:0 50px 90px -30px rgb(0 0 0/.75)}
+.avis-liste{left:120px;width:560px}
+.avis-form{left:740px;width:740px}
+.carte-client h4{font-size:24px;font-weight:600;color:var(--navy-900)}
+.carte-client .sous{margin-top:4px;font-size:15px;color:var(--ardoise)}
+.agents{margin-top:20px;border-radius:16px;background:#fff;box-shadow:inset 0 0 0 1px var(--trait)}
+.agent{display:flex;align-items:center;gap:14px;padding:14px 18px}
+.agent + .agent{border-top:1px solid #f1f5f9}
+.agent .avatar{display:grid;place-items:center;width:40px;height:40px;flex:none;border-radius:50%;font-size:14px;font-weight:600;color:#fff;background:var(--navy-900)}
+.agent-nom{flex:1;font-size:16px;font-weight:500}
+.agent-nom small{display:block;font-size:13px;font-weight:400;color:var(--ardoise)}
+.agent .action{font-size:15px;font-weight:600;color:var(--navy-800)}
+.agent .fait{display:none;font-size:15px;color:#047857}
+.agent.donne .avatar{color:#047857;background:#ecfdf5}
+.agent.donne .action{display:none}
+.agent.donne .fait{display:inline}
+.avis-form .k{font-size:13px;color:var(--ardoise)}
+.avis-form{padding:24px 32px}
+.critere-client{margin-top:14px}
+.critere-client p{font-size:16px;font-weight:600;color:var(--navy-900)}
+.etoiles{display:flex;gap:8px;margin-top:6px}
+.etoiles .ic{font-size:26px;color:#cbd5e1;transition:color .25s,fill .25s}
+.etoiles.n1 .ic:nth-child(-n+1),.etoiles.n2 .ic:nth-child(-n+2),.etoiles.n3 .ic:nth-child(-n+3),.etoiles.n4 .ic:nth-child(-n+4),.etoiles.n5 .ic:nth-child(-n+5){color:var(--gold-500);fill:var(--gold-400)}
+.avis-form .etiquette{margin:18px 0 8px}
+.avis-form .etiquette small{font-weight:400;letter-spacing:0;text-transform:none;color:var(--ardoise)}
+.avis-form .champ{height:46px;font-size:16px}
+.avis-form .bouton{height:50px;margin-top:16px}
+
 /* ───────── 8 · Aide ───────── */
 .trio-aide{position:absolute;left:120px;top:286px;width:1360px;display:grid;grid-template-columns:repeat(3,1fr);gap:32px}
 .aide-carte{min-height:300px;padding:30px 32px;border-radius:24px;background:linear-gradient(#12294a,#0d2140);box-shadow:0 30px 60px -30px rgb(0 0 0/.6),inset 0 0 0 1px rgb(255 255 255/.08)}
@@ -309,7 +347,7 @@ body.plein #stage{border-radius:0}
 /* ───────── 9 · Fin ───────── */
 .fin{position:absolute;left:0;right:0;top:196px;text-align:center}
 .fin h2{font-size:100px;font-weight:600;line-height:1;letter-spacing:-.035em}
-.recap{display:flex;justify-content:center;gap:18px;margin-top:52px}
+.recap{display:flex;flex-wrap:wrap;justify-content:center;gap:18px;margin-top:52px}
 .recap li{display:flex;align-items:center;gap:14px;padding:14px 28px 14px 16px;border-radius:999px;font-size:23px;background:rgb(255 255 255/.05);box-shadow:inset 0 0 0 1px rgb(255 255 255/.1)}
 .coche{display:grid;place-items:center;width:38px;height:38px;border-radius:50%;font-size:20px;color:var(--navy-950);background:var(--gold-500)}
 .coche .ic{stroke-width:3}
@@ -407,6 +445,9 @@ body.plein.inactif{cursor:none}
   <symbol id="i-croix" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></symbol>
   <symbol id="i-portable" viewBox="0 0 24 24"><path d="M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0 1.28 2.55a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45L4 16"/></symbol>
   <symbol id="i-mobile" viewBox="0 0 24 24"><rect width="14" height="20" x="5" y="2" rx="2"/><path d="M12 18h.01"/></symbol>
+  <symbol id="i-tel" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></symbol>
+  <symbol id="i-etoile" viewBox="0 0 24 24"><path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/></symbol>
   <symbol id="i-loupe" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
   <symbol id="i-envoi" viewBox="0 0 24 24"><path d="M14.54 21.69a.5.5 0 0 0 .94-.03l6.5-19a.5.5 0 0 0-.64-.63l-19 6.5a.5.5 0 0 0-.02.93l7.93 3.18a2 2 0 0 1 1.11 1.11z"/><path d="m21.85 2.15-10.94 10.94"/></symbol>
   <symbol id="i-sortie" viewBox="0 0 24 24"><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/></symbol>
@@ -648,7 +689,58 @@ body.plein.inactif{cursor:none}
     <p class="bandeau" data-b="3"><svg class="ic"><use href="#i-bouclier"/></svg>Votre PIN est personnel : ne le communiquez à personne.</p>
   </section>
 
-  <!-- 9 · Récapitulatif -->
+  <!-- 9 · Clients externes : connexion -->
+  <section class="scene" id="sc-client-connexion" data-avec-curseur="1320,820">
+    <div class="colonne">
+      <div class="titre-scene" data-b="0"><p class="kicker">Vous êtes client de la DSM ?</p><h2>Connectez-vous</h2></div>
+      <ol class="consignes">
+        <li data-b="0" style="--d:400ms"><i>1</i><span>Onglet <b>Client externe</b></span></li>
+        <li data-b="1"><i>2</i><span>Votre <b>téléphone</b> ou votre <b>e-mail</b></span></li>
+        <li data-b="4"><i>3</i><span>Bouton <b>Continuer</b></span></li>
+      </ol>
+      <ul class="regles-client">
+        <li data-b="2"><svg class="ic"><use href="#i-tel"/></svg><span>Téléphone et e-mail enregistrés ?<br>Utilisez votre <b>téléphone</b>.</span></li>
+        <li data-b="3"><svg class="ic"><use href="#i-mail"/></svg><span>Numéro non reconnu ?<br>Essayez votre <b>adresse e-mail</b>.</span></li>
+      </ul>
+    </div>
+    <div class="lueur"></div>
+    <div class="carte-connexion" data-b="0" data-fx="zoom" style="--d:150ms">
+      <svg class="ic cadenas"><use href="#i-cadenas"/></svg>
+      <div class="onglets"><span class="onglet actif" data-onglet="collaborateur">Collaborateur</span><span class="onglet" data-onglet="client">Client externe</span></div>
+      <h3>Connexion</h3>
+      <p class="desc">Votre téléphone ou votre adresse e-mail enregistré par la DSM est requis pour donner votre avis sur nos agents.</p>
+      <span class="etiquette">Téléphone ou adresse e-mail</span>
+      <div class="champ avec-icone" data-champ="client"><svg class="ic ic-tel"><use href="#i-tel"/></svg><svg class="ic ic-mail"><use href="#i-mail"/></svg><span class="val"></span><span class="caret"></span><span class="ph">Ex. : 0700000000 ou nom@exemple.ci</span></div>
+      <p class="erreur-client"><svg class="ic"><use href="#i-info"/></svg>Ce numéro n’est pas enregistré comme client. Essayez avec votre adresse e-mail.</p>
+      <div class="bouton"><span class="lib">Continuer<svg class="ic"><use href="#i-fleche"/></svg></span><span class="spin"></span><span class="ok"><svg class="ic"><use href="#i-coche"/></svg>Identifié</span></div>
+    </div>
+  </section>
+
+  <!-- 10 · Clients externes : donner son avis -->
+  <section class="scene" id="sc-client-avis" data-avec-curseur="1200,820">
+    <div class="haut titre-scene" data-b="0"><p class="kicker">Vous êtes client de la DSM ?</p><h2>Donnez votre avis</h2></div>
+    <div class="carte-client avis-liste" data-b="0" data-fx="zoom" style="--d:200ms">
+      <h4>Bonjour Awa Koné</h4>
+      <p class="sous">Choisissez l’agent à évaluer (3 restants).</p>
+      <div class="agents">
+        <div class="agent" data-agent="1"><span class="avatar">KA</span><span class="agent-nom">Koffi Assi<small>Agent d’exploitation · Quai</small></span><span class="action">Évaluer</span><span class="fait">Avis donné</span></div>
+        <div class="agent" data-agent="2"><span class="avatar">BD</span><span class="agent-nom">Bintou Diallo<small>Chargée de clientèle · Accueil</small></span><span class="action">Évaluer</span><span class="fait">Avis donné</span></div>
+        <div class="agent" data-agent="3"><span class="avatar">YT</span><span class="agent-nom">Yao Touré<small>Agent de transit · Douane</small></span><span class="action">Évaluer</span><span class="fait">Avis donné</span></div>
+      </div>
+    </div>
+    <div class="carte-client avis-form" data-b="1" data-fx="droite">
+      <p class="k">Votre avis sur</p>
+      <h4>Koffi Assi</h4>
+      <div class="critere-client"><p>La qualité de l’assistance</p><div class="etoiles" data-critere="1"><svg class="ic"><use href="#i-etoile"/></svg><svg class="ic"><use href="#i-etoile"/></svg><svg class="ic"><use href="#i-etoile"/></svg><svg class="ic"><use href="#i-etoile"/></svg><svg class="ic"><use href="#i-etoile"/></svg></div></div>
+      <div class="critere-client"><p>Le service rendu</p><div class="etoiles" data-critere="2"><svg class="ic"><use href="#i-etoile"/></svg><svg class="ic"><use href="#i-etoile"/></svg><svg class="ic"><use href="#i-etoile"/></svg><svg class="ic"><use href="#i-etoile"/></svg><svg class="ic"><use href="#i-etoile"/></svg></div></div>
+      <div class="critere-client"><p>La célérité dans le traitement des dossiers</p><div class="etoiles" data-critere="3"><svg class="ic"><use href="#i-etoile"/></svg><svg class="ic"><use href="#i-etoile"/></svg><svg class="ic"><use href="#i-etoile"/></svg><svg class="ic"><use href="#i-etoile"/></svg><svg class="ic"><use href="#i-etoile"/></svg></div></div>
+      <span class="etiquette">Un commentaire ? <small>facultatif</small></span>
+      <div class="champ" data-champ="commentaire"><span class="val"></span><span class="caret"></span></div>
+      <div class="bouton"><span class="lib">Envoyer mon avis<svg class="ic"><use href="#i-envoi"/></svg></span><span class="spin"></span><span class="ok"><svg class="ic"><use href="#i-coche"/></svg>Merci pour votre avis</span></div>
+    </div>
+  </section>
+
+  <!-- 11 · Récapitulatif -->
   <section class="scene" id="sc-fin">
     <div class="fin">
       <h2 data-b="0">Vous êtes prêt !</h2>
@@ -656,6 +748,7 @@ body.plein.inactif{cursor:none}
         <li data-b="0" style="--d:1300ms"><span class="coche"><svg class="ic"><use href="#i-coche"/></svg></span>Votre matricule</li>
         <li data-b="0" style="--d:2500ms"><span class="coche"><svg class="ic"><use href="#i-coche"/></svg></span>Votre code PIN</li>
         <li data-b="0" style="--d:3800ms"><span class="coche"><svg class="ic"><use href="#i-coche"/></svg></span>Vos notations</li>
+        <li data-b="0" style="--d:6200ms"><span class="coche"><svg class="ic"><use href="#i-coche"/></svg></span>Clients : votre téléphone ou votre e-mail</li>
       </ol>
       <p class="merci" data-b="1">Merci pour votre participation à la campagne.</p>
       <div class="actions-fin" data-b="1" style="--d:700ms">
@@ -699,7 +792,11 @@ body.plein.inactif{cursor:none}
     <div class="choix">
       <button type="button" class="choix-option principal" id="b-lancer">
         <svg class="ic"><use href="#i-lecture"/></svg>
-        <span><b>Voir la présentation</b><small>Comment se connecter, pas à pas · environ 3 minutes, avec voix off</small></span>
+        <span><b>Voir la présentation</b><small>Comment se connecter, pas à pas · environ 4 minutes, avec voix off</small></span>
+      </button>
+      <button type="button" class="choix-option secondaire" id="b-client">
+        <svg class="ic"><use href="#i-tel"/></svg>
+        <span><b>Je suis client externe</b><small>Se connecter avec son téléphone ou son e-mail, puis donner son avis · environ 1 minute</small></span>
       </button>
       <a class="choix-option secondaire" id="b-connexion" href="/">
         <svg class="ic"><use href="#i-sortie"/></svg>
@@ -769,7 +866,7 @@ const SCENES = [
   ] },
   { id: 'identification', titre: 'Étape 01 · Identification', etape: 1, temps: [
     {
-      texte: 'Sur la page d’accueil, vérifiez que l’onglet « Collaborateur » est bien sélectionné. L’onglet « Client externe » est réservé aux clients de la DSM : ils s’y identifient avec leur numéro de téléphone ou leur adresse e-mail. S’ils ont communiqué les deux, c’est le numéro qui compte.',
+      texte: 'Sur la page d’accueil, vérifiez que l’onglet « Collaborateur » est bien sélectionné. L’onglet « Client externe » est réservé aux clients de la DSM : leur connexion est expliquée à la fin de ce guide.',
       min: 5000,
       faire(o) {
         o.plusTard(700, () => o.viser('.onglet.actif'))
@@ -875,8 +972,100 @@ const SCENES = [
     { texte: 'Après cinq PIN erronés, le compte est bloqué pendant quinze minutes, par sécurité.' },
     { texte: 'Et surtout, gardez votre PIN pour vous : ne le communiquez à personne.' },
   ] },
+  { id: 'client-connexion', titre: 'Clients · Connexion', etape: 0, temps: [
+    {
+      texte: 'Vous êtes client de la DSM et souhaitez donner votre avis sur nos agents ? Sur la page d’accueil, choisissez l’onglet « Client externe ». Vous n’avez besoin ni de matricule, ni de code PIN.',
+      min: 5200,
+      faire(o) {
+        o.plusTard(1800, () => o.viser('[data-onglet="client"]'))
+        o.plusTard(2900, () => {
+          o.clic('[data-onglet="client"]')
+          o.retirer('[data-onglet="collaborateur"]', 'actif')
+          o.ajouter('[data-onglet="client"]', 'actif')
+        })
+      },
+    },
+    {
+      texte: 'Saisissez ensuite, dans le même champ, le numéro de téléphone ou l’adresse e-mail que vous avez communiqué à la DSM.',
+      min: 4600,
+      faire(o) {
+        o.plusTard(200, () => o.viser('[data-champ="client"]', 0.3))
+        o.plusTard(1300, () => { o.clic(); o.focus('[data-champ="client"]') })
+        o.taperPlusTard(2200, '[data-champ="client"]', '07 00 00 00 00', { vitesse: 110 })
+      },
+    },
+    {
+      texte: 'Si vous avez communiqué les deux, utilisez toujours votre numéro de téléphone : c’est lui qui vous identifie.',
+      min: 3600,
+    },
+    {
+      texte: 'Votre numéro n’est pas reconnu ? La plateforme vous invite alors à essayer avec votre adresse e-mail : effacez le numéro et saisissez votre adresse à la place.',
+      min: 7800,
+      faire(o) {
+        o.plusTard(600, () => o.ajouter('.erreur-client', 'visible'))
+        o.plusTard(3400, () => {
+          o.vider('[data-champ="client"]')
+          o.ajouter('[data-champ="client"]', 'mode-email')
+        })
+        o.taperPlusTard(3700, '[data-champ="client"]', 'awa.kone@exemple.ci', { vitesse: 90 })
+      },
+    },
+    {
+      texte: 'Cliquez enfin sur « Continuer ».',
+      min: 3000,
+      faire(o) {
+        o.focus(null)
+        o.retirer('.erreur-client', 'visible')
+        o.plusTard(100, () => o.viser('.bouton'))
+        o.plusTard(1150, () => { o.clic('.bouton'); o.ajouter('.bouton', 'chargement') })
+        o.plusTard(2300, () => { o.retirer('.bouton', 'chargement'); o.ajouter('.bouton', 'succes') })
+      },
+    },
+  ] },
+  { id: 'client-avis', titre: 'Clients · Votre avis', etape: 0, temps: [
+    {
+      texte: 'La liste des agents qui vous ont accompagné s’affiche. Cliquez sur « Évaluer » à côté de l’agent de votre choix.',
+      min: 4400,
+      faire(o) {
+        o.plusTard(1800, () => o.viser('[data-agent="1"] .action'))
+        o.plusTard(2900, () => o.clic('[data-agent="1"]'))
+      },
+    },
+    {
+      texte: 'Pour chaque critère, attribuez d’une à cinq étoiles : une étoile pour très insatisfait, cinq pour très satisfait.',
+      min: 6000,
+      faire(o) {
+        o.plusTard(900, () => o.viser('[data-critere="1"] .ic:nth-child(4)'))
+        o.plusTard(1800, () => { o.clic(); o.ajouter('[data-critere="1"]', 'n4') })
+        o.plusTard(2700, () => o.viser('[data-critere="2"] .ic:nth-child(5)'))
+        o.plusTard(3600, () => { o.clic(); o.ajouter('[data-critere="2"]', 'n5') })
+        o.plusTard(4500, () => o.viser('[data-critere="3"] .ic:nth-child(4)'))
+        o.plusTard(5400, () => { o.clic(); o.ajouter('[data-critere="3"]', 'n4') })
+      },
+    },
+    {
+      texte: 'Ajoutez un commentaire si vous le souhaitez : c’est facultatif. Puis cliquez sur « Envoyer mon avis ».',
+      min: 6400,
+      faire(o) {
+        o.plusTard(200, () => o.viser('[data-champ="commentaire"]', 0.3))
+        o.plusTard(1100, () => { o.clic(); o.focus('[data-champ="commentaire"]') })
+        const finSaisie = 1500 + o.taperPlusTard(1500, '[data-champ="commentaire"]', 'Accueil rapide et très courtois.', { vitesse: 60 })
+        o.plusTard(finSaisie + 300, () => { o.focus(null); o.viser('.avis-form .bouton') })
+        o.plusTard(finSaisie + 1300, () => { o.clic('.avis-form .bouton'); o.ajouter('.avis-form .bouton', 'chargement') })
+        o.plusTard(finSaisie + 2400, () => { o.retirer('.avis-form .bouton', 'chargement'); o.ajouter('.avis-form .bouton', 'succes') })
+      },
+    },
+    {
+      texte: 'Votre avis est transmis. Revenez à la liste pour évaluer un autre agent : chacun ne peut être évalué qu’une seule fois.',
+      min: 4000,
+      faire(o) {
+        o.plusTard(900, () => o.ajouter('[data-agent="1"]', 'donne'))
+        o.plusTard(1600, () => o.viser('[data-agent="2"] .action'))
+      },
+    },
+  ] },
   { id: 'fin', titre: 'Récapitulatif', etape: 4, temps: [
-    { texte: 'En résumé : votre matricule, votre code PIN, et vous voilà prêt à noter.', min: 4400 },
+    { texte: 'En résumé : votre matricule, votre code PIN, et vous voilà prêt à noter. Pour les clients, votre téléphone ou votre adresse e-mail suffit.', min: 7000 },
     { texte: 'Merci pour votre participation à la campagne d’évaluation !', min: 2000 },
   ] },
 ]
@@ -1139,6 +1328,13 @@ function outils(scene, instant) {
         programmer(180, () => cible.classList.remove('appuye'))
       }
     },
+    /** Efface un champ, pour y taper autre chose. */
+    vider(selecteur) {
+      const champ = q(selecteur)
+      const valeur = champ?.querySelector('.val')
+      if (valeur) valeur.textContent = ''
+      champ?.classList.remove('rempli')
+    },
     /** Tape un texte après un délai ; renvoie la durée de la frappe. */
     taperPlusTard(delai, selecteur, texte, options) {
       plusTard(delai, () => taper(selecteur, texte, options))
@@ -1390,9 +1586,12 @@ function signalerActivite() {
   }, 2500)
 }
 
-function demarrer() {
+/** Première scène de la partie réservée aux clients externes. */
+const DEBUT_CLIENTS = SCENES.findIndex((s) => s.id === 'client-connexion')
+
+function demarrer(depart = 0) {
   $('#demarrage').hidden = true
-  allerA(0, 0, true)
+  allerA(depart, 0, true)
   $('#b-lecture').focus({ preventScroll: true })
 }
 
@@ -1440,16 +1639,19 @@ function choisir(nom) {
 /* ───────── Lancement automatique depuis la page de connexion ───────── */
 /*
  * Le bouton « Comment noter » de la page de connexion ouvre « ?lancer=1 » : la présentation démarre
- * aussitôt, sans écran de choix ni détour par Edge. Les voix se chargent après l'ouverture de la page :
- * on les attend un court instant pour que la première phrase soit lue.
+ * aussitôt, sans écran de choix ni détour par Edge ; « ?lancer=client » démarre directement à la partie
+ * des clients externes. Les voix se chargent après l'ouverture de la page : on les attend un court
+ * instant pour que la première phrase soit lue.
  */
-const LANCEMENT_AUTO = new URLSearchParams(location.search).has('lancer')
+const LANCEMENT = new URLSearchParams(location.search).get('lancer')
+const LANCEMENT_AUTO = LANCEMENT !== null
 const ATTENTE_VOIX_MAX = 1500
 
 function lancerAutomatiquement() {
   const debut = Date.now()
+  const depart = LANCEMENT === 'client' ? DEBUT_CLIENTS : 0
   const essayer = () => {
-    if (Voix.choisie || !Voix.disponible || Date.now() - debut >= ATTENTE_VOIX_MAX) return demarrer()
+    if (Voix.choisie || !Voix.disponible || Date.now() - debut >= ATTENTE_VOIX_MAX) return demarrer(depart)
     setTimeout(essayer, 100)
   }
   essayer()
@@ -1457,6 +1659,8 @@ function lancerAutomatiquement() {
 
 function brancherEvenements() {
   $('#b-lancer').addEventListener('click', () => choisir('presentation'))
+  // Partie courte des clients : lancée sur place, la page relancée dans Edge n'aurait pas le droit de parler
+  $('#b-client').addEventListener('click', () => demarrer(DEBUT_CLIENTS))
   $('#b-connexion').addEventListener('click', (e) => {
     if (!PASSER_PAR_EDGE) return // simple lien vers la plateforme
     e.preventDefault()
