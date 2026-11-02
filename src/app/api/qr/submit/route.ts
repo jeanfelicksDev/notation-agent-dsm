@@ -69,10 +69,11 @@ export async function POST(request: NextRequest) {
       prisma.noteClient.createMany({
         data: lignes.map((l) => ({ ...l, agentId, campagneId: campagne.id, clientId, ipHash })),
       }),
-      prisma.affectation.upsert({
-        where: { evaluateurId_evalueId_campagneId: { evaluateurId: clientId, evalueId: agentId, campagneId: campagne.id } },
-        update: { statut: 'TERMINEE' },
-        create: { evaluateurId: clientId, evalueId: agentId, campagneId: campagne.id, statut: 'TERMINEE' },
+      // Seule l'affectation posée par l'administration passe en « terminée ». Aucune n'est créée :
+      // un client sans affectation resterait sinon limité à ce seul agent (lib/perimetre-client).
+      prisma.affectation.updateMany({
+        where: { evaluateurId: clientId, evalueId: agentId, campagneId: campagne.id },
+        data: { statut: 'TERMINEE' },
       }),
     ])
 

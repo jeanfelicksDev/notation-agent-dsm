@@ -16,6 +16,7 @@ import ReconductionAffectations from '@/components/ReconductionAffectations'
 import { confirmer, toast } from '@/components/ui/feedback'
 import { typesDuCritere } from '@/lib/criteres'
 import { estCadre, participeACampagne } from '@/lib/roles'
+import { coordonneeClient } from '@/lib/perimetre-client'
 import { getAppreciationInfo } from '@/lib/default-criteres'
 import { resumerBilanCloture, SEUIL_NOTANTS_MAX, SEUIL_NOTANTS_PAR_DEFAUT } from '@/lib/eligibilite'
 import { BadgeSituation, ListeNonClasses, PrevisionSituations } from '@/components/SituationNotants'
@@ -39,6 +40,8 @@ interface User {
   service?: string | null
   departement?: string | null
   direction?: string | null
+  telephone?: string | null
+  email?: string | null
 }
 
 export default function CampagneDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -1208,6 +1211,8 @@ type FocusRepartition = { agentId: string; perspective: PerspectiveRepartition; 
 
 function AffectationsManager({ campagneId, users, initialAffectations, onUpdate, focus }: { campagneId: string, users: User[], initialAffectations: any[], onUpdate: () => void, focus?: FocusRepartition | null }) {
   const [perspective, setPerspective] = useState<'BY_EVALUE' | 'BY_EVALUATEUR'>('BY_EVALUE')
+  // Disposition « Clients externes » : notants à gauche, limités aux clients externes
+  const [vueClients, setVueClients] = useState(false)
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<'ALL' | 'PAIR' | 'MANAGER' | 'EXTERNE'>('ALL')
   const [sortOrder, setSortOrder] = useState<'name_asc' | 'role' | 'count_desc'>('name_asc')
@@ -1231,6 +1236,7 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate,
     const agent = users.find(u => u.id === focus.agentId)
     if (agent) {
       setPerspective(focus.perspective)
+      setVueClients(focus.perspective === 'BY_EVALUATEUR' && agent.role === 'EXTERNE')
       setSelectedUser(agent)
       setSearch('')
     }
@@ -1289,19 +1295,22 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate,
   // Liste de gauche (selon perspective)
   const baseLeftUsers = perspective === 'BY_EVALUE'
     ? users.filter(isNoteEligible)
+    : vueClients
+    ? users.filter(u => u.role === 'EXTERNE')
     : users
 
   const filteredLeftUsers = baseLeftUsers
     .filter(u => {
       const matchesSearch =
-        u.nom.toLowerCase().includes(search.toLowerCase()) || 
+        u.nom.toLowerCase().includes(search.toLowerCase()) ||
         u.prenom.toLowerCase().includes(search.toLowerCase()) ||
         u.matricule.toLowerCase().includes(search.toLowerCase()) ||
         (u.service && u.service.toLowerCase().includes(search.toLowerCase())) ||
-        (u.departement && u.departement.toLowerCase().includes(search.toLowerCase()))
+        (u.departement && u.departement.toLowerCase().includes(search.toLowerCase())) ||
+        (u.role === 'EXTERNE' && (coordonneeClient(u) ?? '').toLowerCase().includes(search.toLowerCase()))
 
       const cat = getRoleCategory(u.role)
-      const matchesCat = perspective === 'BY_EVALUE' || categoryFilter === 'ALL' || cat === categoryFilter
+      const matchesCat = perspective === 'BY_EVALUE' || vueClients || categoryFilter === 'ALL' || cat === categoryFilter
 
       return matchesSearch && matchesCat
     })
@@ -1329,6 +1338,15 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate,
   const countPairs = baseLeftUsers.filter(u => getRoleCategory(u.role) === 'PAIR').length
   const countManagers = baseLeftUsers.filter(u => getRoleCategory(u.role) === 'MANAGER').length
   const countExternes = baseLeftUsers.filter(u => getRoleCategory(u.role) === 'EXTERNE').length
+  const idsClients = new Set(users.filter(u => u.role === 'EXTERNE').map(u => u.id))
+  const clientsAvecAgents = new Set(initialAffectations.map(a => a.evaluateurId).filter(id => idsClients.has(id))).size
+
+  const choisirDisposition = (p: 'BY_EVALUE' | 'BY_EVALUATEUR', clients = false) => {
+    if (p === perspective && clients === vueClients) return
+    setPerspective(p)
+    setVueClients(clients)
+    setSelectedUser(null)
+  }
 
   // Liste de droite (les personnes à cocher)
   // RÈGLE ABSOLUE : INTERDICTION DE L'AUTO-ÉVALUATION (u.id !== selectedUser?.id)
@@ -1460,6 +1478,8 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate,
             <h3 className="text-base sm:text-lg font-bold text-slate-900 leading-tight">
               {perspective === 'BY_EVALUE' ? (
                 <>Colonne gauche : <span className="text-navy-800">COLLABORATEURS NOTÉS</span> ➔ Colonne droite : <span className="text-slate-600">LEURS NOTANTS</span></>
+              ) : vueClients ? (
+                <>Colonne gauche : <span className="text-amber-700">CLIENTS EXTERNES</span> ➔ Colonne droite : <span className="text-navy-800">AGENTS QU&apos;ILS NOTENT</span></>
               ) : (
                 <>Colonne gauche : <span className="text-slate-900">ÉVALUATEURS NOTANTS</span> ➔ Colonne droite : <span className="text-navy-800">PERSONNES QU'ILS NOTENT</span></>
               )}
@@ -1472,12 +1492,8 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate,
           <div className="inline-flex p-1 bg-slate-100 rounded-2xl border border-slate-200 text-xs sm:text-sm font-semibold">
             <button
               type="button"
-              onClick={() => {
-                if (perspective !== 'BY_EVALUE') {
-                  setPerspective('BY_EVALUE')
-                  setSelectedUser(null)
-                }
-              }}
+              onClick={() => choisirDisposition('BY_EVALUE')}
+              aria-pressed={perspective === 'BY_EVALUE'}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all ${
                 perspective === 'BY_EVALUE'
                   ? 'bg-navy-800 text-white shadow-md'
@@ -1490,14 +1506,10 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate,
 
             <button
               type="button"
-              onClick={() => {
-                if (perspective !== 'BY_EVALUATEUR') {
-                  setPerspective('BY_EVALUATEUR')
-                  setSelectedUser(null)
-                }
-              }}
+              onClick={() => choisirDisposition('BY_EVALUATEUR')}
+              aria-pressed={perspective === 'BY_EVALUATEUR' && !vueClients}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all ${
-                perspective === 'BY_EVALUATEUR'
+                perspective === 'BY_EVALUATEUR' && !vueClients
                   ? 'bg-slate-900 text-white shadow-md'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
               }`}
@@ -1505,15 +1517,27 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate,
               <UserCheck className="w-4 h-4" />
               <span>2. Notants à gauche</span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => choisirDisposition('BY_EVALUATEUR', true)}
+              aria-pressed={vueClients}
+              title="Choisir un client externe et lui affecter les collaborateurs qu'il notera depuis le portail QR"
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all ${
+                vueClients
+                  ? 'bg-amber-600 text-white shadow-md'
+                  : 'text-amber-800 hover:text-amber-900 hover:bg-amber-100/70'
+              }`}
+            >
+              <Building2 className="w-4 h-4" />
+              <span>3. Clients externes</span>
+            </button>
           </div>
 
           {/* Bouton de Permutation Rapide Notants ↔ Notés */}
           <button
             type="button"
-            onClick={() => {
-              setPerspective(prev => prev === 'BY_EVALUE' ? 'BY_EVALUATEUR' : 'BY_EVALUE')
-              setSelectedUser(null)
-            }}
+            onClick={() => choisirDisposition(perspective === 'BY_EVALUE' ? 'BY_EVALUATEUR' : 'BY_EVALUE')}
             className="flex items-center gap-2.5 px-5 py-2.5 bg-navy-900 hover:bg-navy-800 text-white rounded-2xl text-xs sm:text-sm font-bold shadow-md shadow-amber-500/20 active:scale-95 transition-all cursor-pointer"
             title="Permuter les colonnes (Notants ↔ Notés)"
           >
@@ -1531,11 +1555,13 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate,
               <div className="flex items-center gap-2.5">
                 {perspective === 'BY_EVALUE' ? (
                   <Target className="w-5 h-5 text-navy-800" />
+                ) : vueClients ? (
+                  <Building2 className="w-5 h-5 text-amber-700" />
                 ) : (
                   <UserCheck className="w-5 h-5 text-slate-700" />
                 )}
                 <h3 className="text-base font-bold text-slate-900 uppercase tracking-wide">
-                  {perspective === 'BY_EVALUE' ? 'LES NOTÉS (COLLABORATEURS)' : 'LES NOTANTS (ÉVALUATEURS)'}
+                  {perspective === 'BY_EVALUE' ? 'LES NOTÉS (COLLABORATEURS)' : vueClients ? 'LES CLIENTS EXTERNES' : 'LES NOTANTS (ÉVALUATEURS)'}
                 </h3>
               </div>
               <span className="text-xs sm:text-sm font-bold text-slate-600 bg-slate-100 px-3 py-1 rounded-full">
@@ -1544,7 +1570,13 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate,
             </div>
 
             {/* Filtres par Catégorie (affichés si mode Notant) */}
-            {perspective === 'BY_EVALUATEUR' ? (
+            {vueClients ? (
+              <div className="flex items-center gap-2 py-0.5 flex-wrap">
+                <span className="text-xs sm:text-sm font-semibold text-amber-900 bg-amber-50 border border-amber-200/80 px-3.5 py-1.5 rounded-xl">
+                  {clientsAvecAgents} / {countExternes} client{countExternes > 1 ? 's' : ''} avec des agents affectés
+                </span>
+              </div>
+            ) : perspective === 'BY_EVALUATEUR' ? (
               <div className="flex items-center gap-2 overflow-x-auto pb-1">
                 <button
                   onClick={() => setCategoryFilter('ALL')}
@@ -1603,7 +1635,7 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate,
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input 
                   type="text" 
-                  placeholder={perspective === 'BY_EVALUE' ? "Rechercher par nom, matricule, service..." : "Rechercher un notant..."}
+                  placeholder={perspective === 'BY_EVALUE' ? "Rechercher par nom, matricule, service..." : vueClients ? "Rechercher un client (entité, téléphone, e-mail)..." : "Rechercher un notant..."}
                   className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-navy-700 focus:bg-white outline-none text-xs sm:text-sm font-semibold"
                   value={search}
                   onChange={e => setSearch(e.target.value)}
@@ -1616,7 +1648,7 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate,
                 title="Trier la liste"
               >
                 <option value="name_asc">Nom A-Z</option>
-                {perspective === 'BY_EVALUATEUR' && <option value="role">Par Catégorie</option>}
+                {perspective === 'BY_EVALUATEUR' && !vueClients && <option value="role">Par Catégorie</option>}
                 <option value="count_desc">
                   {perspective === 'BY_EVALUE' ? 'Nb Notants ↓' : 'Nb Cibles ↓'}
                 </option>
@@ -1627,7 +1659,11 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate,
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden max-h-[700px] overflow-y-auto divide-y divide-slate-100">
             {filteredLeftUsers.length === 0 ? (
               <div className="p-10 text-center text-slate-400 text-sm font-medium">
-                Aucun collaborateur ne correspond à votre filtre.
+                {vueClients && baseLeftUsers.length === 0
+                  ? 'Aucun client externe enregistré. Ajoutez-en depuis la page Agents.'
+                  : vueClients
+                  ? 'Aucun client ne correspond à votre recherche.'
+                  : 'Aucun collaborateur ne correspond à votre filtre.'}
               </div>
             ) : (
               filteredLeftUsers.map(user => {
@@ -1636,6 +1672,7 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate,
                   : initialAffectations.filter(a => a.evaluateurId === user.id).length
                 const catInfo = getCategoryLabel(user.role)
                 const isSelected = selectedUser?.id === user.id
+                const coordonnee = user.role === 'EXTERNE' ? coordonneeClient(user) : null
 
                 return (
                   <button
@@ -1669,6 +1706,11 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate,
                               • {user.service}
                             </span>
                           )}
+                          {coordonnee && (
+                            <span className="text-xs text-slate-500 truncate max-w-[180px]">
+                              • {coordonnee}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1676,6 +1718,13 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate,
                       {count > 0 ? (
                         <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold">
                           {count} {perspective === 'BY_EVALUE' ? `notant${count > 1 ? 's' : ''}` : `cible${count > 1 ? 's' : ''}`}
+                        </span>
+                      ) : user.role === 'EXTERNE' ? (
+                        <span
+                          title="Sans affectation, ce client peut évaluer tous les agents dont le QR est activé"
+                          className="px-3 py-1 rounded-full bg-amber-50 text-amber-800 text-xs font-semibold"
+                        >
+                          Libre (QR)
                         </span>
                       ) : (
                         <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-400 text-xs font-semibold">
@@ -1713,8 +1762,17 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate,
                   <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
                     {perspective === 'BY_EVALUE'
                       ? `Sélectionnez les pairs, managers ou clients qui doivent noter ce collaborateur (${targets.length} notant${targets.length > 1 ? 's' : ''} assigné${targets.length > 1 ? 's' : ''}).`
+                      : selectedUser.role === 'EXTERNE'
+                      ? `Sélectionnez les collaborateurs que ce client évaluera depuis le portail QR (${targets.length} sélectionné${targets.length > 1 ? 's' : ''}).`
                       : `Sélectionnez les collaborateurs opérationnels que cet évaluateur devra noter (${targets.length} sélectionné${targets.length > 1 ? 's' : ''}).`}
                   </p>
+                  {perspective === 'BY_EVALUATEUR' && selectedUser.role === 'EXTERNE' && (
+                    <p className="text-xs text-amber-800 font-medium mt-1">
+                      {targets.length > 0
+                        ? 'Ce client ne verra que ces agents, que leur QR soit activé ou non.'
+                        : 'Sans agent affecté, ce client peut évaluer tous les agents dont le QR est activé.'}
+                    </p>
+                  )}
                 </div>
                 <button
                   onClick={saveAffectations}
@@ -1944,11 +2002,13 @@ function AffectationsManager({ campagneId, users, initialAffectations, onUpdate,
             <div className="h-full min-h-[380px] flex flex-col items-center justify-center p-12 bg-white rounded-3xl border border-dashed border-slate-300 opacity-70 space-y-4">
               <Users2 className="w-16 h-16 text-slate-400" />
               <p className="text-lg sm:text-xl font-semibold text-slate-800">
-                {perspective === 'BY_EVALUE' ? "Sélectionnez un collaborateur noté" : "Sélectionnez un notant"}
+                {perspective === 'BY_EVALUE' ? "Sélectionnez un collaborateur noté" : vueClients ? "Sélectionnez un client externe" : "Sélectionnez un notant"}
               </p>
               <p className="text-slate-500 text-xs sm:text-sm text-center max-w-sm font-medium">
                 {perspective === 'BY_EVALUE'
                   ? "Choisissez un agent dans la liste de gauche pour configurer les pairs, managers et clients qui doivent le noter."
+                  : vueClients
+                  ? "Choisissez un client dans la liste de gauche pour lui affecter les collaborateurs qu'il notera depuis le portail QR."
                   : "Choisissez un évaluateur dans la liste de gauche pour lui assigner les personnes qu'il doit noter."}
               </p>
             </div>

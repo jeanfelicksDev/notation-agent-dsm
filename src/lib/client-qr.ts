@@ -1,6 +1,7 @@
 import prisma from '@/lib/prisma'
 import { trouverParTelephone } from '@/lib/identifiant'
 import { typeDeSaisie, verifierSaisieClient } from '@/lib/identifiant-client'
+import { filtreAgentsEvaluables } from '@/lib/perimetre-client'
 
 type ClientIdentifie = { id: string; nom: string; prenom: string }
 export type IdentificationClient = { ok: true; client: ClientIdentifie } | { ok: false; statut: 400 | 403 | 404; erreur: string }
@@ -45,8 +46,8 @@ export async function identifierClientExterne(saisie: string): Promise<Identific
 }
 
 /**
- * Agents qu'un client peut évaluer pendant une campagne : ceux qui lui sont affectés s'il en a,
- * sinon tous les agents dont la notation QR est activée.
+ * Agents qu'un client peut évaluer pendant une campagne : ceux qui lui sont affectés s'il en a
+ * (QR activé ou non), sinon tous les agents dont la notation QR est activée (lib/perimetre-client).
  */
 export async function agentsEvaluablesPar(clientId: string, campagneId: string) {
   const affectations = await prisma.affectation.findMany({
@@ -55,11 +56,7 @@ export async function agentsEvaluablesPar(clientId: string, campagneId: string) 
   })
 
   return prisma.utilisateur.findMany({
-    where: {
-      qrcodeActif: true,
-      role: { in: ['UTILISATEUR', 'MANAGER'] },
-      ...(affectations.length > 0 ? { id: { in: affectations.map((a) => a.evalueId) } } : {}),
-    },
+    where: filtreAgentsEvaluables(affectations.map((a) => a.evalueId)),
     select: { id: true, nom: true, prenom: true, service: true, emploi: true },
     orderBy: [{ nom: 'asc' }, { prenom: 'asc' }],
   })
