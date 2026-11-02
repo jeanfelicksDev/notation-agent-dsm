@@ -5,7 +5,7 @@ import { agentsEvaluablesPar, identifierClientExterne } from '@/lib/client-qr'
 
 /**
  * POST /api/qr/verify-client — route publique.
- * Identifie un client externe par son téléphone ou son adresse e-mail (le téléphone prime)
+ * Identifie un client externe par son téléphone ou son adresse e-mail (au choix s'il a les deux)
  * et renvoie les agents qu'il peut évaluer.
  * Seuls les comptes EXTERNE sont acceptés : c'est la même règle que pour la soumission.
  */

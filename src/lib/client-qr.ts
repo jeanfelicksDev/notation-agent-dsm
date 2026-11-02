@@ -16,7 +16,7 @@ const MESSAGES_REFUS = {
 
 /**
  * Identifie un client externe (rôle EXTERNE) par son téléphone ou son adresse e-mail.
- * Règle (lib/identifiant-client) : le téléphone prime ; l'e-mail ne sert qu'aux clients sans téléphone.
+ * Règle (lib/identifiant-client) : un client qui a les deux se connecte avec l'un ou l'autre, à son choix.
  */
 export async function identifierClientExterne(saisie: string): Promise<IdentificationClient> {
   const type = typeDeSaisie(saisie)

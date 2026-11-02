@@ -3,7 +3,7 @@
  *
  * Un client se connecte avec son téléphone ou son adresse e-mail, selon ce que la DSM connaît de lui :
  * - téléphone seul → téléphone ; e-mail seul → e-mail ;
- * - les deux → le téléphone prime : l'e-mail est refusé, avec l'indication d'utiliser le téléphone ;
+ * - les deux → au choix du client, l'un ou l'autre ;
  * - ni l'un ni l'autre → connexion impossible.
  * Les adresses générées à l'import (…@dsm.local) ne sont pas de vrais e-mails et ne comptent pas.
  */
@@ -39,11 +39,12 @@ export function typeDeSaisie(saisie: string): IdentifiantClient | null {
   return /^\d+$/.test(tel) && tel.length >= MIN_PHONE_DIGITS ? 'telephone' : null
 }
 
-/** Identifiant que le client doit utiliser : le téléphone prime sur l'e-mail. */
-export function identifiantExige(client: CoordonneesClient): IdentifiantClient | null {
-  if (client.telephone?.trim()) return 'telephone'
-  if (emailEstReel(client.email)) return 'email'
-  return null
+/** Identifiants avec lesquels le client peut se connecter, au choix : vide s'il n'en a aucun d'utilisable. */
+export function identifiantsAcceptes(client: CoordonneesClient): IdentifiantClient[] {
+  const acceptes: IdentifiantClient[] = []
+  if (client.telephone?.trim()) acceptes.push('telephone')
+  if (emailEstReel(client.email)) acceptes.push('email')
+  return acceptes
 }
 
 export const MESSAGE_CLIENT_SANS_IDENTIFIANT =
@@ -59,7 +60,7 @@ export function erreurFicheClient({ entite, telephone, email }: FicheClient): st
     return `Le numéro de téléphone doit comporter au moins ${MIN_PHONE_DIGITS} chiffres.`
   }
   if (email.trim() && typeDeSaisie(email) !== 'email') return "L'adresse e-mail n'est pas valide."
-  if (!identifiantExige({ telephone, email })) return MESSAGE_CLIENT_SANS_IDENTIFIANT
+  if (identifiantsAcceptes({ telephone, email }).length === 0) return MESSAGE_CLIENT_SANS_IDENTIFIANT
   return null
 }
 
@@ -68,10 +69,10 @@ export function emailFictifClient(matricule: string): string {
   return `${matricule.toLowerCase()}${DOMAINE_FICTIF}`
 }
 
-/** La saisie (déjà rapprochée de ce client) est-elle l'identifiant qu'il doit utiliser ? */
+/** La saisie (déjà rapprochée de ce client) est-elle l'un des identifiants avec lesquels il peut se connecter ? */
 export function verifierSaisieClient(saisie: IdentifiantClient, client: CoordonneesClient): VerdictSaisie {
-  const exige = identifiantExige(client)
-  if (exige === null) return { ok: false, raison: 'aucun_identifiant' }
-  if (exige === saisie) return { ok: true }
-  return { ok: false, raison: exige === 'telephone' ? 'telephone_exige' : 'email_exige' }
+  const acceptes = identifiantsAcceptes(client)
+  if (acceptes.length === 0) return { ok: false, raison: 'aucun_identifiant' }
+  if (acceptes.includes(saisie)) return { ok: true }
+  return { ok: false, raison: acceptes[0] === 'telephone' ? 'telephone_exige' : 'email_exige' }
 }

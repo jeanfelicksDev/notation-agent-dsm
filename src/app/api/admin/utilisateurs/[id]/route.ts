@@ -7,7 +7,7 @@ import { normaliserSexe } from '@/lib/agents'
 import { estRole } from '@/lib/roles'
 import { completerListes } from '@/lib/listes-serveur'
 import { retirerDesCampagnesOuvertes } from '@/lib/non-eligible'
-import { identifiantExige, MESSAGE_CLIENT_SANS_IDENTIFIANT } from '@/lib/identifiant-client'
+import { identifiantsAcceptes, MESSAGE_CLIENT_SANS_IDENTIFIANT } from '@/lib/identifiant-client'
 import { requireAdmin, hashPassword, normalizeEmail, normalizeMatricule, pinEstDefini } from '@/lib/auth'
 
 export async function GET(
@@ -104,7 +104,7 @@ export async function PATCH(
     if (roleFinal === 'EXTERNE') {
       const telephone = has('telephone') ? optionnel(body.telephone) : actuel.telephone
       const email = has('email') && body.email ? normalizeEmail(String(body.email)) : actuel.email
-      if (!identifiantExige({ telephone, email })) {
+      if (identifiantsAcceptes({ telephone, email }).length === 0) {
         return NextResponse.json({ error: MESSAGE_CLIENT_SANS_IDENTIFIANT }, { status: 400 })
       }
     }

@@ -1,11 +1,11 @@
 import { Mail, Phone, TriangleAlert } from 'lucide-react'
-import { identifiantExige } from '@/lib/identifiant-client'
+import { identifiantsAcceptes } from '@/lib/identifiant-client'
 
-/** Fiche d'un client externe : identifiant qu'il saisira pour noter (le téléphone prime sur l'e-mail). */
+/** Fiche d'un client externe : identifiant(s) qu'il pourra saisir pour noter. */
 export default function ConnexionClient({ telephone, email }: { telephone: string; email: string }) {
-  const exige = identifiantExige({ telephone, email })
+  const acceptes = identifiantsAcceptes({ telephone, email })
 
-  if (exige === null) {
+  if (acceptes.length === 0) {
     return (
       <p className="flex items-start gap-2 rounded-xl bg-amber-50 px-3.5 py-2.5 text-xs font-medium text-amber-900 ring-1 ring-amber-200">
         <TriangleAlert className="mt-px h-4 w-4 shrink-0" aria-hidden />
@@ -14,12 +14,14 @@ export default function ConnexionClient({ telephone, email }: { telephone: strin
     )
   }
 
-  const Icone = exige === 'telephone' ? Phone : Mail
+  const Icone = acceptes[0] === 'telephone' ? Phone : Mail
   return (
     <p className="flex items-start gap-2 rounded-xl bg-emerald-50 px-3.5 py-2.5 text-xs font-medium text-emerald-900 ring-1 ring-emerald-200">
       <Icone className="mt-px h-4 w-4 shrink-0" aria-hidden />
-      {exige === 'telephone'
-        ? 'Connexion du client avec son numéro de téléphone (il prime sur l’adresse e-mail).'
+      {acceptes.length === 2
+        ? 'Connexion du client avec son numéro de téléphone ou son adresse e-mail, à son choix.'
+        : acceptes[0] === 'telephone'
+        ? 'Connexion du client avec son numéro de téléphone (aucune adresse e-mail réelle enregistrée).'
         : 'Connexion du client avec son adresse e-mail (aucun téléphone enregistré).'}
     </p>
   )

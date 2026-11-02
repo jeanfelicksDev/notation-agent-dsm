@@ -3,7 +3,7 @@ import {
   emailEstReel,
   emailFictifClient,
   erreurFicheClient,
-  identifiantExige,
+  identifiantsAcceptes,
   MESSAGE_CLIENT_SANS_IDENTIFIANT,
   typeDeSaisie,
   verifierSaisieClient,
@@ -38,33 +38,39 @@ describe('emailEstReel', () => {
   })
 })
 
-describe('identifiantExige', () => {
-  it('exige le téléphone quand le client n’a qu’un téléphone', () => {
-    expect(identifiantExige(client('0700000000', null))).toBe('telephone')
+describe('identifiantsAcceptes', () => {
+  it('accepte le téléphone quand le client n’a qu’un téléphone', () => {
+    expect(identifiantsAcceptes(client('0700000000', null))).toEqual(['telephone'])
   })
 
-  it('exige l’e-mail quand le client n’a qu’un e-mail réel', () => {
-    expect(identifiantExige(client(null, 'awa@exemple.ci'))).toBe('email')
+  it('accepte l’e-mail quand le client n’a qu’un e-mail réel', () => {
+    expect(identifiantsAcceptes(client(null, 'awa@exemple.ci'))).toEqual(['email'])
   })
 
-  it('fait primer le téléphone quand le client a les deux', () => {
-    expect(identifiantExige(client('0700000000', 'awa@exemple.ci'))).toBe('telephone')
+  it('accepte l’un ou l’autre quand le client a les deux', () => {
+    expect(identifiantsAcceptes(client('0700000000', 'awa@exemple.ci'))).toEqual(['telephone', 'email'])
   })
 
   it('ignore un e-mail fictif et un téléphone vide', () => {
-    expect(identifiantExige(client('  ', 'x@dsm.local'))).toBeNull()
-    expect(identifiantExige(client(null, 'x@dsm.local'))).toBeNull()
+    expect(identifiantsAcceptes(client('  ', 'x@dsm.local'))).toEqual([])
+    expect(identifiantsAcceptes(client(null, 'x@dsm.local'))).toEqual([])
   })
 })
 
 describe('verifierSaisieClient', () => {
-  it('accepte la saisie de l’identifiant exigé', () => {
-    expect(verifierSaisieClient('telephone', client('0700000000', 'awa@exemple.ci'))).toEqual({ ok: true })
+  it('accepte la saisie d’un identifiant enregistré', () => {
+    expect(verifierSaisieClient('telephone', client('0700000000', null))).toEqual({ ok: true })
     expect(verifierSaisieClient('email', client(null, 'awa@exemple.ci'))).toEqual({ ok: true })
   })
 
-  it('refuse l’e-mail d’un client qui a aussi un téléphone', () => {
-    expect(verifierSaisieClient('email', client('0700000000', 'awa@exemple.ci'))).toEqual({ ok: false, raison: 'telephone_exige' })
+  it('laisse le client qui a les deux choisir son téléphone ou son e-mail', () => {
+    expect(verifierSaisieClient('telephone', client('0700000000', 'awa@exemple.ci'))).toEqual({ ok: true })
+    expect(verifierSaisieClient('email', client('0700000000', 'awa@exemple.ci'))).toEqual({ ok: true })
+  })
+
+  it('oriente vers le seul identifiant enregistré', () => {
+    expect(verifierSaisieClient('email', client('0700000000', 'x@dsm.local'))).toEqual({ ok: false, raison: 'telephone_exige' })
+    expect(verifierSaisieClient('telephone', client(null, 'awa@exemple.ci'))).toEqual({ ok: false, raison: 'email_exige' })
   })
 
   it('refuse un client sans téléphone ni e-mail réel', () => {
