@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma'
 import { getSessionUser } from '@/lib/auth'
 import { getCampagneOuverte } from '@/lib/campagne'
 import { ErreurNotation, preparerNotation, type NoteEntrante } from '@/lib/notation'
+import { noteJustifiee, SEUIL_COMMENTAIRE_OBLIGATOIRE } from '@/lib/commentaire-obligatoire'
 
 /**
  * POST /api/evaluation/submit — soumission définitive.
@@ -60,19 +61,25 @@ export async function POST(request: NextRequest) {
           })
         }
 
-        // Contrôle de complétude sur l'état final en base (brouillons antérieurs inclus).
+        // Contrôle sur l'état final en base (brouillons antérieurs inclus) : chaque critère noté,
+        // et toute note basse justifiée par un commentaire.
         const enBase = await tx.note.findMany({
           where: { evaluateurId: sessionUser.id, campagneId: campagne.id, evalueId: { in: evalueIds } },
-          select: { evalueId: true, critereId: true },
+          select: { evalueId: true, critereId: true, valeur: true, commentaire: true },
         })
-        const notees = new Set(enBase.map((n) => `${n.evalueId}:${n.critereId}`))
+        const notees = new Map(enBase.map((n) => [`${n.evalueId}:${n.critereId}`, n]))
         for (const a of affectations) {
-          const manquant = attendus.get(a.evalueId)?.find((c) => !notees.has(`${a.evalueId}:${c.id}`))
-          if (manquant) {
-            throw new ErreurNotation(
-              `Le critère « ${manquant.libelle} » n'est pas noté pour ${a.evalue.prenom} ${a.evalue.nom}.`,
-              400
-            )
+          for (const c of attendus.get(a.evalueId) ?? []) {
+            const note = notees.get(`${a.evalueId}:${c.id}`)
+            if (!note) {
+              throw new ErreurNotation(`Le critère « ${c.libelle} » n'est pas noté pour ${a.evalue.prenom} ${a.evalue.nom}.`, 400)
+            }
+            if (!noteJustifiee(note.valeur, note.commentaire)) {
+              throw new ErreurNotation(
+                `Un commentaire est obligatoire pour la note ${note.valeur} au critère « ${c.libelle} » de ${a.evalue.prenom} ${a.evalue.nom} (toute note inférieure ou égale à ${SEUIL_COMMENTAIRE_OBLIGATOIRE} doit être justifiée).`,
+                400
+              )
+            }
           }
         }
 

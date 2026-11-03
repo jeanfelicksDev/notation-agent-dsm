@@ -5,6 +5,7 @@ import { clientIp } from '@/lib/auth'
 import { getCampagneOuverte, campagneEnCours, messageHorsPeriode } from '@/lib/campagne'
 import { estClientExterne } from '@/lib/criteres'
 import { agentsEvaluablesPar } from '@/lib/client-qr'
+import { commentaireObligatoire, SEUIL_COMMENTAIRE_OBLIGATOIRE } from '@/lib/commentaire-obligatoire'
 
 /**
  * POST /api/qr/submit — route publique.
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
 
     // Chaque critère client doit recevoir exactement une note dans le barème.
     const parCritere = new Map(notes.map((n) => [n.critereId, n]))
-    const lignes = []
+    const lignes: { critereId: string; valeur: number; commentaire: string | null }[] = []
     for (const c of criteres) {
       const n = parCritere.get(c.id)
       const valeur = Number(n?.valeur)
@@ -60,6 +61,17 @@ export async function POST(request: NextRequest) {
       }
       const commentaire = typeof n.commentaire === 'string' ? n.commentaire.trim().slice(0, 2000) : ''
       lignes.push({ critereId: c.id, valeur, commentaire: commentaire || null })
+    }
+
+    // Toute note basse doit être justifiée : le commentaire général du client devient obligatoire.
+    const basses = criteres.filter((_, i) => commentaireObligatoire(lignes[i].valeur))
+    if (basses.length > 0 && !lignes.some((l) => l.commentaire)) {
+      return NextResponse.json(
+        {
+          error: `Merci d’expliquer votre appréciation sur « ${basses.map((c) => c.libelle).join(' », « ')} » : un commentaire est obligatoire pour toute note inférieure ou égale à ${SEUIL_COMMENTAIRE_OBLIGATOIRE}.`,
+        },
+        { status: 400 }
+      )
     }
 
     // L'empreinte IP est conservée à titre d'audit uniquement.

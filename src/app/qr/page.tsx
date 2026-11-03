@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { AlertCircle, ArrowLeft, Check, CircleCheck, Loader2, Star } from 'lucide-react'
 import { BrandMark } from '@/components/BrandMark'
 import { CLE_TRANSMISSION } from '@/lib/identifiant-client'
+import { commentaireObligatoire, SEUIL_COMMENTAIRE_OBLIGATOIRE } from '@/lib/commentaire-obligatoire'
 
 interface Critere {
   id: string
@@ -97,7 +98,12 @@ export default function PortailClient() {
     window.scrollTo({ top: 0 })
   }
 
-  const complet = criteres.length > 0 && criteres.every((c) => (notes[c.id] ?? 0) > 0)
+  const tousNotes = criteres.length > 0 && criteres.every((c) => (notes[c.id] ?? 0) > 0)
+  // Une note basse (≤ 2 étoiles) rend le commentaire général obligatoire
+  const critereBas = criteres.filter((c) => commentaireObligatoire(notes[c.id] ?? 0))
+  const commentaireRequis = critereBas.length > 0
+  const aJustifier = commentaireRequis && !commentaire.trim()
+  const complet = tousNotes && !aJustifier
 
   const envoyer = async () => {
     if (!complet || !agent || !client) return
@@ -252,16 +258,38 @@ export default function PortailClient() {
 
               <div className="mt-6">
                 <label htmlFor="com" className="flex items-baseline justify-between text-sm font-medium text-slate-800">
-                  Un commentaire ? <span className="text-xs font-normal text-slate-400">facultatif</span>
+                  {commentaireRequis ? 'Votre commentaire' : 'Un commentaire ?'}
+                  {commentaireRequis ? (
+                    <span className="text-xs font-semibold text-red-700">obligatoire</span>
+                  ) : (
+                    <span className="text-xs font-normal text-slate-400">facultatif</span>
+                  )}
                 </label>
                 <textarea
                   id="com"
                   rows={3}
                   maxLength={1000}
                   value={commentaire}
+                  required={commentaireRequis}
+                  aria-invalid={aJustifier || undefined}
+                  aria-describedby={aJustifier ? 'aide-com' : undefined}
                   onChange={(e) => setCommentaire(e.target.value)}
-                  className="mt-1.5 block w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-base outline-none focus:border-navy-600 focus:ring-3 focus:ring-navy-600/15"
+                  placeholder={commentaireRequis ? 'Dites-nous ce qui ne vous a pas satisfait.' : undefined}
+                  className={`mt-1.5 block w-full rounded-lg border px-3.5 py-2.5 text-base outline-none focus:ring-3 ${
+                    aJustifier
+                      ? 'border-red-300 bg-red-50/40 focus:border-red-600 focus:ring-red-600/15'
+                      : 'border-slate-300 focus:border-navy-600 focus:ring-navy-600/15'
+                  }`}
                 />
+                {aJustifier && (
+                  <p id="aide-com" className="mt-1.5 flex items-start gap-1.5 text-sm text-red-700">
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+                    <span>
+                      Vous avez attribué {SEUIL_COMMENTAIRE_OBLIGATOIRE} étoiles ou moins à « {critereBas.map((c) => c.libelle).join(' », « ')} » :
+                      merci d’expliquer votre appréciation.
+                    </span>
+                  </p>
+                )}
               </div>
 
               {erreur && (
@@ -273,7 +301,11 @@ export default function PortailClient() {
               <button onClick={envoyer} disabled={!complet || chargement} className={`${BTN} mt-6`}>
                 {chargement ? <Loader2 className="h-4.5 w-4.5 animate-spin" aria-hidden /> : 'Envoyer mon avis'}
               </button>
-              {!complet && <p className="mt-2 text-center text-sm text-slate-500">Notez chaque critère pour envoyer votre avis.</p>}
+              {!complet && (
+                <p className="mt-2 text-center text-sm text-slate-500">
+                  {tousNotes ? 'Ajoutez un commentaire pour envoyer votre avis.' : 'Notez chaque critère pour envoyer votre avis.'}
+                </p>
+              )}
             </Carte>
           </>
         ) : (
