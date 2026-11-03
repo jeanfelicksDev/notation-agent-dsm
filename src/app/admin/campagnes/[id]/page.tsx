@@ -2143,7 +2143,12 @@ function SuiviDashboard({ campagneId, affectations, users, seuilNotants, onUpdat
   const countInvalidee = trackingData.filter(d => d.statut === 'INVALIDEE').length
 
   // Mêmes populations que les compteurs des cartes, pour que la liste corresponde au chiffre cliqué
-  const listeSuivi = suiviStatut === 'ALL' ? filteredTracking : comptes.filter(d => d.statut === suiviStatut)
+  const listeFiltreeStatut = suiviStatut === 'ALL' ? filteredTracking : comptes.filter(d => d.statut === suiviStatut)
+  // Évaluations terminées : de la plus ancienne soumission à la plus récente (sans date en dernier)
+  const listeSuivi = suiviStatut === 'TERMINEE'
+    ? [...listeFiltreeStatut].sort((a, b) =>
+        (a.termineeAt ? Date.parse(a.termineeAt) : Infinity) - (b.termineeAt ? Date.parse(b.termineeAt) : Infinity) || 0)
+    : listeFiltreeStatut
 
   const cartesStatut = [
     { statut: 'ALL', libelle: 'Évaluateurs Filtrés', valeur: total, icone: null,
