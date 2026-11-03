@@ -150,6 +150,8 @@ model Affectation {
   motifInvalidation       MotifInvalidation?
   commentaireInvalidation String?
   invalideeAt             DateTime?
+  /// Date et heure de la soumission définitive (statut TERMINEE)
+  termineeAt   DateTime?
   createdAt    DateTime          @default(now())
   campagne     Campagne          @relation(fields: [campagneId], references: [id], onDelete: Cascade)
   evalue       Utilisateur       @relation("EvalueAffectations", fields: [evalueId], references: [id], onDelete: Cascade)

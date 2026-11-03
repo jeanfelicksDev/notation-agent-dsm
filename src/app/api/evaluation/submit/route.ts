@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
 
         await tx.affectation.updateMany({
           where: { evaluateurId: sessionUser.id, campagneId: campagne.id, evalueId: { in: evalueIds } },
-          data: { statut: 'TERMINEE' },
+          data: { statut: 'TERMINEE', termineeAt: new Date() },
         })
       },
       { timeout: 20000 }

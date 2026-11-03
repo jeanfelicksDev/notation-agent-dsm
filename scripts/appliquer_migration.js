@@ -92,6 +92,8 @@ async function main() {
 }
 
 main().catch((e) => {
-  console.error('Erreur :', e.message)
+  // Un échec de connexion arrive souvent en AggregateError, dont le message est vide
+  const causes = e.errors?.length ? e.errors : [e]
+  for (const c of causes) console.error('Erreur :', c.code || '', c.message || String(c))
   process.exit(1)
 })

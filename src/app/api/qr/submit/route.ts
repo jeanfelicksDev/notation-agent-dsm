@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
       // un client sans affectation resterait sinon limité à ce seul agent (lib/perimetre-client).
       prisma.affectation.updateMany({
         where: { evaluateurId: clientId, evalueId: agentId, campagneId: campagne.id },
-        data: { statut: 'TERMINEE' },
+        data: { statut: 'TERMINEE', termineeAt: new Date() },
       }),
     ])
 

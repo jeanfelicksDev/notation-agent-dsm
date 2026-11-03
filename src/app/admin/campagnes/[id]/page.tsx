@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, use } from 'react'
+import { useState, useEffect, useMemo, useRef, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { 
@@ -135,7 +135,12 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
   const loadAffectations = () => {
     fetch(`/api/admin/campagnes/${id}/affectations`)
       .then(res => res.json())
-      .then(data => setAffectations(data))
+      .then(data => {
+        // Une réponse d'erreur ({ error }) ne doit pas remplacer la liste : la page planterait
+        if (Array.isArray(data)) return setAffectations(data)
+        toast.error(data?.error || 'Impossible de charger les affectations.')
+      })
+      .catch(() => toast.error('Connexion au serveur impossible : affectations non chargées.'))
   }
 
   useEffect(() => {
@@ -2027,11 +2032,29 @@ const MOTIFS_INVALIDATION: Record<string, string> = {
   AUTRE: 'Autre',
 }
 
+type StatutSuivi = 'ALL' | 'TERMINEE' | 'BROUILLON' | 'EN_ATTENTE'
+
+const LIBELLES_STATUT_SUIVI: Record<Exclude<StatutSuivi, 'ALL'>, string> = {
+  TERMINEE: 'Terminées',
+  BROUILLON: 'En cours (Brouillon)',
+  EN_ATTENTE: 'Non commencées',
+}
+
+const FORMAT_DATE_HEURE = new Intl.DateTimeFormat('fr-FR', {
+  day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+})
+
+/** « 03/11/2026 à 14:05 » */
+const formaterDateHeure = (iso: string) => FORMAT_DATE_HEURE.format(new Date(iso)).replace(' ', ' à ')
+
 function SuiviDashboard({ campagneId, affectations, users, seuilNotants, onUpdate }: { campagneId: string, affectations: any[], users: User[], seuilNotants: number | null, onUpdate: () => void }) {
   const [suiviCategory, setSuiviCategory] = useState<'ALL' | 'PAIR' | 'MANAGER' | 'EXTERNE'>('ALL')
   const [suiviSearch, setSuiviSearch] = useState('')
   // Détail lu depuis les évaluateurs (qui note qui) ou depuis les notés (qui doit encore les noter)
   const [vueSuivi, setVueSuivi] = useState<'EVALUATEUR' | 'NOTE'>('EVALUATEUR')
+  // Statut choisi en cliquant sur une carte de synthèse (filtre le détail par évaluateur)
+  const [suiviStatut, setSuiviStatut] = useState<StatutSuivi>('ALL')
+  const detailRef = useRef<HTMLDivElement>(null)
   // Notant en cours d'invalidation (formulaire ouvert)
   const [invalidation, setInvalidation] = useState<string | null>(null)
   const [motif, setMotif] = useState('FORCE_MAJEURE')
@@ -2072,6 +2095,12 @@ function SuiviDashboard({ campagneId, affectations, users, seuilNotants, onUpdat
     const isBrouillon = userAffectations.some(a => a.statut === 'BROUILLON')
     // L'invalidation porte sur l'ensemble des affectations du notant
     const invalidee = userAffectations.find(a => a.invalidee)
+    // Dernière soumission définitive (un client externe peut terminer ses agents séparément)
+    const termineeAt = userAffectations
+      .map(a => a.termineeAt as string | null)
+      .filter((d): d is string => !!d)
+      .sort()
+      .at(-1) ?? null
 
     let statut = 'EN_ATTENTE'
     if (invalidee) statut = 'INVALIDEE'
@@ -2082,6 +2111,7 @@ function SuiviDashboard({ campagneId, affectations, users, seuilNotants, onUpdat
       user: user || { id: evalId, nom: 'Inconnu', prenom: '', matricule: '', role: 'UTILISATEUR' },
       statut,
       invalidee,
+      termineeAt,
       totalToEvaluate: userAffectations.length
     }
   })
@@ -2112,6 +2142,27 @@ function SuiviDashboard({ campagneId, affectations, users, seuilNotants, onUpdat
   const total = comptes.length
   const countInvalidee = trackingData.filter(d => d.statut === 'INVALIDEE').length
 
+  // Mêmes populations que les compteurs des cartes, pour que la liste corresponde au chiffre cliqué
+  const listeSuivi = suiviStatut === 'ALL' ? filteredTracking : comptes.filter(d => d.statut === suiviStatut)
+
+  const cartesStatut = [
+    { statut: 'ALL', libelle: 'Évaluateurs Filtrés', valeur: total, icone: null,
+      fond: 'bg-white border-slate-200', titre: 'text-slate-500', chiffre: 'text-slate-900', anneau: 'ring-slate-400' },
+    { statut: 'TERMINEE', libelle: LIBELLES_STATUT_SUIVI.TERMINEE, valeur: countTerminee, icone: CheckCircle2,
+      fond: 'bg-emerald-50 border-emerald-100', titre: 'text-emerald-600', chiffre: 'text-emerald-700', anneau: 'ring-emerald-500' },
+    { statut: 'BROUILLON', libelle: LIBELLES_STATUT_SUIVI.BROUILLON, valeur: countBrouillon, icone: Activity,
+      fond: 'bg-amber-50 border-amber-100', titre: 'text-amber-600', chiffre: 'text-amber-700', anneau: 'ring-amber-500' },
+    { statut: 'EN_ATTENTE', libelle: LIBELLES_STATUT_SUIVI.EN_ATTENTE, valeur: countAttente, icone: Clock,
+      fond: 'bg-slate-50 border-slate-200', titre: 'text-slate-500', chiffre: 'text-slate-700', anneau: 'ring-slate-500' },
+  ] as const
+
+  const choisirStatut = (statut: StatutSuivi) => {
+    // Un second clic sur la carte active revient à la liste complète
+    setSuiviStatut(courant => (courant === statut ? 'ALL' : statut))
+    setVueSuivi('EVALUATEUR')
+    requestAnimationFrame(() => detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+  }
+
   return (
     <div className="space-y-6">
       {countInvalidee > 0 && (
@@ -2126,31 +2177,28 @@ function SuiviDashboard({ campagneId, affectations, users, seuilNotants, onUpdat
       <PrevisionSituations affectations={affectations} personnes={users} seuilNotants={seuilNotants} />
       {/* Stat Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center">
-          <span className="text-slate-500 font-semibold text-sm">Évaluateurs Filtrés</span>
-          <span className="text-3xl font-bold text-slate-900 mt-2">{total}</span>
-        </div>
-        <div className="bg-emerald-50 p-6 rounded-2xl border border-emerald-100 shadow-sm flex flex-col justify-center">
-          <div className="flex items-center gap-2 text-emerald-600 font-semibold text-sm">
-            <CheckCircle2 className="w-5 h-5" /> Terminées
-          </div>
-          <span className="text-3xl font-bold text-emerald-700 mt-2">{countTerminee}</span>
-        </div>
-        <div className="bg-amber-50 p-6 rounded-2xl border border-amber-100 shadow-sm flex flex-col justify-center">
-          <div className="flex items-center gap-2 text-amber-600 font-semibold text-sm">
-            <Activity className="w-5 h-5" /> En cours (Brouillon)
-          </div>
-          <span className="text-3xl font-bold text-amber-700 mt-2">{countBrouillon}</span>
-        </div>
-        <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center">
-          <div className="flex items-center gap-2 text-slate-500 font-semibold text-sm">
-            <Clock className="w-5 h-5" /> Non commencées
-          </div>
-          <span className="text-3xl font-bold text-slate-700 mt-2">{countAttente}</span>
-        </div>
+        {cartesStatut.map(carte => {
+          const Icone = carte.icone
+          const actif = suiviStatut === carte.statut
+          return (
+            <button
+              key={carte.statut}
+              type="button"
+              aria-pressed={actif}
+              onClick={() => choisirStatut(carte.statut)}
+              title={`Afficher : ${carte.libelle}`}
+              className={`text-left p-6 rounded-2xl border shadow-sm flex flex-col justify-center transition hover:shadow-md hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 ${carte.anneau} ${carte.fond} ${actif ? `ring-2 ${carte.anneau}` : ''}`}
+            >
+              <span className={`flex items-center gap-2 font-semibold text-sm ${carte.titre}`}>
+                {Icone && <Icone className="w-5 h-5" />} {carte.libelle}
+              </span>
+              <span className={`text-3xl font-bold mt-2 ${carte.chiffre}`}>{carte.valeur}</span>
+            </button>
+          )
+        })}
       </div>
 
-      <div role="group" aria-label="Organisation du détail" className="inline-flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200">
+      <div ref={detailRef} role="group" aria-label="Organisation du détail" className="inline-flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200">
         {([['EVALUATEUR', 'Par évaluateur'], ['NOTE', 'Par noté']] as const).map(([vue, libelle]) => (
           <button
             key={vue}
@@ -2173,6 +2221,16 @@ function SuiviDashboard({ campagneId, affectations, users, seuilNotants, onUpdat
           <div>
             <h3 className="text-lg font-semibold text-slate-900">Détail par évaluateur</h3>
             <p className="text-xs text-slate-500 font-medium">Suivi de la participation par profil</p>
+            {suiviStatut !== 'ALL' && (
+              <button
+                type="button"
+                onClick={() => setSuiviStatut('ALL')}
+                className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-navy-50 text-navy-800 text-xs font-semibold hover:bg-navy-100"
+              >
+                Statut : {LIBELLES_STATUT_SUIVI[suiviStatut]} ({listeSuivi.length})
+                <X className="w-3.5 h-3.5" aria-label="Retirer le filtre de statut" />
+              </button>
+            )}
           </div>
 
           <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
@@ -2226,12 +2284,12 @@ function SuiviDashboard({ campagneId, affectations, users, seuilNotants, onUpdat
         </div>
 
         <div className="divide-y divide-slate-100">
-          {filteredTracking.length === 0 && (
+          {listeSuivi.length === 0 && (
             <div className="p-8 text-center text-slate-500 font-medium">
               Aucun évaluateur ne correspond aux filtres.
             </div>
           )}
-          {filteredTracking.map((data, idx) => (
+          {listeSuivi.map((data, idx) => (
             <div key={idx} className="p-4 md:p-6 hover:bg-slate-50 transition-colors">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="flex items-center gap-4">
@@ -2273,8 +2331,15 @@ function SuiviDashboard({ campagneId, affectations, users, seuilNotants, onUpdat
                   </span>
                 )}
                 {data.statut === 'TERMINEE' && (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">
-                    <CheckCircle2 className="w-4 h-4" /> Finalisé
+                  <span className="inline-flex flex-col items-end gap-0.5">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">
+                      <CheckCircle2 className="w-4 h-4" /> Finalisé
+                    </span>
+                    {data.termineeAt && (
+                      <time dateTime={data.termineeAt} className="text-2xs font-semibold text-emerald-700 tabular-nums">
+                        le {formaterDateHeure(data.termineeAt)}
+                      </time>
+                    )}
                   </span>
                 )}
                 {data.statut === 'BROUILLON' && (
