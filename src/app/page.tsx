@@ -212,10 +212,13 @@ function AccueilContenu() {
             {/* Didacticiel animé avec voix off, lancé dès l'ouverture ; sa dernière scène ramène ici. */}
             <a
               href="/presentation-connexion.html?lancer=1"
-              className="group inline-flex items-center justify-center gap-3 whitespace-nowrap rounded-full bg-gradient-to-b from-[#a6ff7a] to-[#39ff14] px-7 py-4 text-2xl leading-none font-bold text-[#071a33] ring-2 ring-[#d4ffc2]/70 animate-clignote transition-[filter,transform] hover:animate-none hover:brightness-110 active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#39ff14] sm:gap-3.5 sm:px-9 sm:py-5 sm:text-[1.75rem]"
+              className="group inline-flex items-center justify-center gap-3 whitespace-nowrap rounded-full bg-gradient-to-b from-[#a6ff7a] to-[#39ff14] px-7 py-3.5 text-[#071a33] ring-2 ring-[#d4ffc2]/70 animate-clignote transition-[filter,transform] hover:animate-none hover:brightness-110 active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#39ff14] sm:gap-4 sm:px-9 sm:py-4"
             >
-              <CirclePlay className="h-7 w-7 transition-transform group-hover:scale-110 sm:h-8 sm:w-8" aria-hidden />
-              Comment noter
+              <CirclePlay className="h-8 w-8 transition-transform group-hover:scale-110 sm:h-10 sm:w-10" aria-hidden />
+              <span className="flex flex-col items-start gap-1.5">
+                <span className="text-2xl leading-none font-bold sm:text-[1.75rem]">Comment noter&nbsp;?</span>
+                <span className="text-sm leading-none font-semibold text-[#071a33]/75">Cliquer pour suivre le tuto.</span>
+              </span>
             </a>
           </div>
           <div className="flex w-full sm:ml-auto sm:w-auto lg:ml-0 lg:justify-self-end">
