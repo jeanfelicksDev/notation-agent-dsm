@@ -192,28 +192,33 @@ function AccueilContenu() {
 
       <div className="relative flex min-h-dvh w-full flex-col px-5 sm:px-10 lg:px-[clamp(3rem,6vw,9rem)]">
         {/* ─── En-tête ─── */}
-        <header className="flex flex-wrap items-center gap-x-4 gap-y-5 border-b border-white/[0.06] py-6 sm:py-7">
-          <span className="rounded-2xl bg-gradient-to-b from-gold-300 to-gold-600 p-[3px] shadow-[0_10px_28px_-8px_rgb(212_175_55/0.6)]">
-            <BrandMark size={50} />
-          </span>
-          <div className="leading-tight">
-            <p className="flex items-center gap-2.5 text-lg font-semibold tracking-[0.02em] sm:text-xl">
-              DSM TAMIS
-              <span className="rounded-full px-2.5 py-0.5 text-2xs font-semibold tracking-[0.12em] text-gold-300 ring-1 ring-gold-400/50">
-                OFFICIEL
-              </span>
-            </p>
-            <p className="mt-1 hidden text-sm tracking-[0.02em] text-navy-200 sm:block">Direction des Solutions Maritimes</p>
+        {/* Grand écran : marque | « Comment noter » centré | lien client ; en dessous, le bouton passe sur sa propre ligne */}
+        <header className="flex flex-wrap items-center gap-x-4 gap-y-5 border-b border-white/[0.06] py-6 sm:py-7 lg:grid lg:grid-cols-[1fr_auto_1fr]">
+          <div className="flex items-center gap-4">
+            <span className="rounded-2xl bg-gradient-to-b from-gold-300 to-gold-600 p-[3px] shadow-[0_10px_28px_-8px_rgb(212_175_55/0.6)]">
+              <BrandMark size={50} />
+            </span>
+            <div className="leading-tight">
+              <p className="flex items-center gap-2.5 text-lg font-semibold tracking-[0.02em] sm:text-xl">
+                DSM TAMIS
+                <span className="rounded-full px-2.5 py-0.5 text-2xs font-semibold tracking-[0.12em] text-gold-300 ring-1 ring-gold-400/50">
+                  OFFICIEL
+                </span>
+              </p>
+              <p className="mt-1 hidden text-sm tracking-[0.02em] text-navy-200 sm:block">Direction des Solutions Maritimes</p>
+            </div>
           </div>
-          <div className="flex w-full items-center gap-2.5 sm:ml-auto sm:w-auto sm:gap-3">
+          <div className="flex w-full justify-center sm:order-last lg:order-none lg:w-auto">
             {/* Didacticiel animé avec voix off, lancé dès l'ouverture ; sa dernière scène ramène ici. */}
             <a
               href="/presentation-connexion.html?lancer=1"
-              className="group inline-flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full sm:flex-none bg-gradient-to-b from-gold-300 to-gold-500 px-4 py-2.5 text-sm font-semibold text-[#071a33] shadow-[0_10px_24px_-10px_rgb(212_175_55/0.7)] ring-1 ring-gold-200/60 animate-clignote transition-[filter,transform] hover:animate-none hover:brightness-110 active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-300"
+              className="group inline-flex items-center justify-center gap-3 whitespace-nowrap rounded-full bg-gradient-to-b from-[#a6ff7a] to-[#39ff14] px-7 py-4 text-2xl leading-none font-bold text-[#071a33] ring-2 ring-[#d4ffc2]/70 animate-clignote transition-[filter,transform] hover:animate-none hover:brightness-110 active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#39ff14] sm:gap-3.5 sm:px-9 sm:py-5 sm:text-[1.75rem]"
             >
-              <CirclePlay className="h-4 w-4 transition-transform group-hover:scale-110" aria-hidden />
+              <CirclePlay className="h-7 w-7 transition-transform group-hover:scale-110 sm:h-8 sm:w-8" aria-hidden />
               Comment noter
             </a>
+          </div>
+          <div className="flex w-full sm:ml-auto sm:w-auto lg:ml-0 lg:justify-self-end">
             <Link
               href="/qr"
               className="group inline-flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full sm:flex-none bg-white/[0.03] px-4 py-2.5 text-sm text-navy-100 ring-1 ring-white/15 transition-colors hover:bg-white/[0.07] hover:text-white hover:ring-gold-400/40"
