@@ -2050,6 +2050,7 @@ const formaterDateHeure = (iso: string) => FORMAT_DATE_HEURE.format(new Date(iso
 function SuiviDashboard({ campagneId, affectations, users, seuilNotants, onUpdate }: { campagneId: string, affectations: any[], users: User[], seuilNotants: number | null, onUpdate: () => void }) {
   const [suiviCategory, setSuiviCategory] = useState<'ALL' | 'PAIR' | 'MANAGER' | 'EXTERNE'>('ALL')
   const [suiviSearch, setSuiviSearch] = useState('')
+  const [suiviService, setSuiviService] = useState('ALL')
   // Détail lu depuis les évaluateurs (qui note qui) ou depuis les notés (qui doit encore les noter)
   const [vueSuivi, setVueSuivi] = useState<'EVALUATEUR' | 'NOTE'>('EVALUATEUR')
   // Statut choisi en cliquant sur une carte de synthèse (filtre le détail par évaluateur)
@@ -2108,7 +2109,7 @@ function SuiviDashboard({ campagneId, affectations, users, seuilNotants, onUpdat
     else if (isBrouillon) statut = 'BROUILLON'
 
     return {
-      user: user || { id: evalId, nom: 'Inconnu', prenom: '', matricule: '', role: 'UTILISATEUR' },
+      user: user || { id: evalId, nom: 'Inconnu', prenom: '', matricule: '', role: 'UTILISATEUR', service: null },
       statut,
       invalidee,
       termineeAt,
@@ -2122,6 +2123,10 @@ function SuiviDashboard({ campagneId, affectations, users, seuilNotants, onUpdat
     return 'PAIR'
   }
 
+  // Services des évaluateurs de la campagne (les clients externes n'en ont pas)
+  const servicesSuivi = [...new Set(trackingData.map(d => d.user.service).filter((s): s is string => !!s))]
+    .sort((a, b) => a.localeCompare(b, 'fr'))
+
   const filteredTracking = trackingData.filter(d => {
     const matchesSearch =
       d.user.nom.toLowerCase().includes(suiviSearch.toLowerCase()) ||
@@ -2130,8 +2135,9 @@ function SuiviDashboard({ campagneId, affectations, users, seuilNotants, onUpdat
 
     const cat = getRoleCategory(d.user.role)
     const matchesCat = suiviCategory === 'ALL' || cat === suiviCategory
+    const matchesService = suiviService === 'ALL' || d.user.service === suiviService
 
-    return matchesSearch && matchesCat
+    return matchesSearch && matchesCat && matchesService
   })
 
   // Le vote des cadres est facultatif : un cadre ne compte dans l'avancement que s'il a soumis
@@ -2274,6 +2280,18 @@ function SuiviDashboard({ campagneId, affectations, users, seuilNotants, onUpdat
                 Clients
               </button>
             </div>
+
+            {servicesSuivi.length > 0 && (
+              <select
+                value={suiviService}
+                onChange={e => setSuiviService(e.target.value)}
+                aria-label="Filtrer par service"
+                className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none max-w-[14rem]"
+              >
+                <option value="ALL">Tous les services</option>
+                {servicesSuivi.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            )}
 
             <div className="relative">
               <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
