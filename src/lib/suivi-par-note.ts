@@ -33,14 +33,26 @@ function bilan(evalueId: string, notants: NotantSuivi[]): SuiviNote {
   return { evalueId, notants, compte, restants: notants.filter(estRestant).length }
 }
 
-/** Regroupe les affectations par noté, dans l'ordre où elles arrivent. */
+/**
+ * Regroupe les affectations par noté, dans l'ordre où elles arrivent.
+ * Un notant évalue tous ses notés d'un seul tenant (la soumission les verrouille ensemble) :
+ * dès qu'il a commencé (un brouillon ou une soumission, hors affectation invalidée),
+ * il apparaît « en cours » chez chacun de ses notés encore non commencés.
+ */
 export function suiviParNote(
   affectations: readonly AffectationSuivi[],
   estFacultatif: (evaluateurId: string) => boolean = () => false
 ): SuiviNote[] {
+  const ontCommence = new Set(
+    affectations.filter((a) => ['BROUILLON', 'TERMINEE'].includes(etatAffectation(a))).map((a) => a.evaluateurId)
+  )
+  const etatDe = (a: AffectationSuivi): EtatNotation => {
+    const etat = etatAffectation(a)
+    return etat === 'EN_ATTENTE' && ontCommence.has(a.evaluateurId) ? 'BROUILLON' : etat
+  }
   const parNote = new Map<string, NotantSuivi[]>()
   for (const a of affectations) {
-    const notant = { evaluateurId: a.evaluateurId, etat: etatAffectation(a), facultatif: estFacultatif(a.evaluateurId) }
+    const notant = { evaluateurId: a.evaluateurId, etat: etatDe(a), facultatif: estFacultatif(a.evaluateurId) }
     parNote.set(a.evalueId, [...(parNote.get(a.evalueId) ?? []), notant])
   }
   return [...parNote].map(([evalueId, notants]) => bilan(evalueId, notants))

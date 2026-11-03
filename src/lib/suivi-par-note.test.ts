@@ -51,6 +51,26 @@ describe('suiviParNote', () => {
   it('ne compte pas un notant invalidé parmi les restants', () => {
     expect(suivis.find((s) => s.evalueId === 'koffi')!.restants).toBe(0)
   })
+
+  it('montre en cours chez tous ses notés un notant qui a commencé son évaluation', () => {
+    const etats = suiviParNote([aff('p4', 'awa', 'BROUILLON'), aff('p4', 'koffi'), aff('p5', 'koffi')])
+    const koffi = etats.find((s) => s.evalueId === 'koffi')!
+    expect(koffi.notants.map((n) => [n.evaluateurId, n.etat])).toEqual([
+      ['p4', 'BROUILLON'],
+      ['p5', 'EN_ATTENTE'],
+    ])
+    expect(koffi.restants).toBe(2)
+  })
+
+  it('montre en cours un nouveau noté confié à un notant qui avait déjà soumis', () => {
+    const etats = suiviParNote([aff('p4', 'awa', 'TERMINEE'), aff('p4', 'koffi')])
+    expect(etats.find((s) => s.evalueId === 'koffi')!.notants[0].etat).toBe('BROUILLON')
+  })
+
+  it('ne tient pas compte d’une affectation invalidée pour dire qu’un notant a commencé', () => {
+    const etats = suiviParNote([aff('p4', 'awa', 'BROUILLON', true), aff('p4', 'koffi')])
+    expect(etats.find((s) => s.evalueId === 'koffi')!.notants[0].etat).toBe('EN_ATTENTE')
+  })
 })
 
 describe('filtrerSuivi', () => {
