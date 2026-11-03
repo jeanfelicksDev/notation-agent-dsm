@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { requireAdmin } from '@/lib/auth'
 import { pairesManagersDuService } from '@/lib/repartition-service'
+import { memeServiceDeNotation, serviceDeNotation } from '@/lib/service-notation'
 
 export async function GET(
   req: NextRequest,
@@ -47,9 +48,9 @@ export async function POST(
       const managerUsers = allUsers.filter(u => u.role === 'MANAGER')
 
       for (const user of evalueUsers) {
-        // A. Assigner les collègues (pairs) du même service, ainsi que les cadres du service (vote facultatif)
+        // A. Assigner les collègues (pairs) du même service de notation, ainsi que les cadres du service (vote facultatif)
         if (user.service) {
-          const sameServicePeers = allUsers.filter(u => u.service === user.service && u.id !== user.id && (u.role === 'UTILISATEUR' || u.role === 'CADRE'))
+          const sameServicePeers = allUsers.filter(u => memeServiceDeNotation(u.service, user.service) && u.id !== user.id && (u.role === 'UTILISATEUR' || u.role === 'CADRE'))
           for (const peer of sameServicePeers) {
             const key = `${peer.id}_${user.id}`
             if (!existingKeys.has(key)) {
@@ -62,7 +63,7 @@ export async function POST(
         // B. Assigner les Managers (du même service ou du même département)
         const relevantManagers = managerUsers.filter(m => 
           (user.departement && m.departement === user.departement) ||
-          (user.service && m.service === user.service)
+          (user.service && memeServiceDeNotation(m.service, user.service))
         )
         for (const mgr of relevantManagers) {
           if (mgr.id !== user.id) {
@@ -121,7 +122,8 @@ export async function POST(
 }
 
 /**
- * Chaque Pair est noté par tous les autres Pairs de son service. N'ajoute que les paires manquantes :
+ * Chaque Pair est noté par tous les autres Pairs de son service de notation (Magasin et Matériel
+ * n'en font qu'un). N'ajoute que les paires manquantes :
  * les affectations existantes (managers, clients internes, statuts, notes) restent intactes.
  */
 async function affecterPairsDuService(campagneId: string): Promise<number> {
@@ -131,7 +133,7 @@ async function affecterPairsDuService(campagneId: string): Promise<number> {
   })
   const parService = new Map<string, string[]>()
   for (const p of pairs) {
-    const service = p.service!.trim()
+    const service = serviceDeNotation(p.service)
     if (!service) continue
     parService.set(service, [...(parService.get(service) ?? []), p.id])
   }
