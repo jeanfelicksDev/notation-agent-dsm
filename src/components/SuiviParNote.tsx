@@ -149,6 +149,7 @@ export default function SuiviParNote({ affectations, users }: { affectations: Af
           // Un cadre (facultatif) ne compte parmi les attendus que s'il a soumis ; un notant invalidé n'est plus attendu
           const attendus = s.compte.TERMINEE + s.restants
           const total = s.compte.TERMINEE + s.compte.BROUILLON + s.compte.EN_ATTENTE + s.compte.INVALIDEE
+          const facultatifs = s.notants.filter((n) => n.facultatif).length
           const panneauId = `notants-${s.evalueId}`
           return (
             <li key={s.evalueId}>
@@ -166,11 +167,12 @@ export default function SuiviParNote({ affectations, users }: { affectations: Af
                     <p className="text-xs text-slate-500 font-medium truncate">
                       {note?.matricule ?? '—'}
                       {note?.service ? ` · ${note.service}` : ''} · {total} notant{total > 1 ? 's' : ''}
+                      {facultatifs > 0 && ` dont ${facultatifs} facultatif${facultatifs > 1 ? 's' : ''}`}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap md:justify-end">
-                  <span className="text-xs font-bold tabular-nums text-slate-700" title="Notants attendus ayant soumis">
+                  <span className="text-xs font-bold tabular-nums text-slate-700" title="Notants attendus ayant soumis. Un notant facultatif (cadre) n’est compté que s’il a soumis ; un notant invalidé ne l’est plus.">
                     {s.compte.TERMINEE}/{attendus} terminé{s.compte.TERMINEE > 1 ? 's' : ''}
                   </span>
                   {s.restants > 0 ? (
