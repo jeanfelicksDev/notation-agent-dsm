@@ -209,6 +209,34 @@ describe('prevoirSituations', () => {
     ])
     expect(managersEnRetard).toEqual(new Map([['M', 1]]))
   })
+
+  it("compte chez le manager tous les agents privés de sa note, même déjà exclus pour n'avoir pas noté", () => {
+    const affectations = [
+      // Le manager M n'a noté aucun de ses 3 agents
+      affectation('M', 'A', { roleEvaluateur: 'MANAGER', statut: 'EN_ATTENTE' }),
+      affectation('M', 'B', { roleEvaluateur: 'MANAGER', statut: 'EN_ATTENTE' }),
+      affectation('M', 'C', { roleEvaluateur: 'MANAGER', statut: 'EN_ATTENTE' }),
+      // A a noté ; B et C n'ont pas soumis leurs propres évaluations
+      affectation('A', 'B'),
+      affectation('B', 'A', { statut: 'EN_ATTENTE' }),
+      affectation('C', 'A', { statut: 'BROUILLON' }),
+    ]
+    const { previsions, managersEnRetard } = prevoirSituations(affectations, 3, () => true)
+    expect(previsions.map((p) => [p.evalueId, p.situation])).toEqual([
+      ['A', 'SANS_MANAGER'],
+      ['B', 'NON_NOTANT'],
+      ['C', 'NON_NOTANT'],
+    ])
+    expect(managersEnRetard).toEqual(new Map([['M', 3]]))
+  })
+
+  it("ne compte pas un manager invalidé, ni un agent dont la note manager est excusée", () => {
+    const affectations = [
+      affectation('M', 'A', { roleEvaluateur: 'MANAGER', statut: 'EN_ATTENTE', invalidee: true }),
+      affectation('C1', 'A'),
+    ]
+    expect(prevoirSituations(affectations, 3, () => true).managersEnRetard.size).toBe(0)
+  })
 })
 
 describe('resumerBilanCloture', () => {

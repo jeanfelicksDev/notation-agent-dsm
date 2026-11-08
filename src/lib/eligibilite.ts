@@ -101,13 +101,20 @@ export function notantsEnRetard(affectations: AffectationBilan[]): Set<string> {
   )
 }
 
+/**
+ * Le noté n'a pas la note de son manager, et rien ne l'excuse (un manager invalidé pour force
+ * majeure n'excuse pas un autre manager, valide, qui n'a pas soumis).
+ */
+function manqueNoteManager(bilan: BilanNotants): boolean {
+  const managerExcuse = bilan.managerInvalide && !bilan.defaillants.some((d) => d.manager)
+  return !bilan.managerSoumis && !managerExcuse
+}
+
 /** `aNote` : le noté a soumis ses propres évaluations (ou n'avait personne à noter). */
 export function situationDuNote(bilan: BilanNotants, seuilNotants: number | null, aNote = true): SituationScore | null {
   if (seuilNotants === null) return null
   if (!aNote) return 'NON_NOTANT'
-  // L'invalidation d'un manager n'excuse pas un autre manager, valide, qui n'a pas soumis
-  const managerExcuse = bilan.managerInvalide && !bilan.defaillants.some((d) => d.manager)
-  if (!bilan.managerSoumis && !managerExcuse) return 'SANS_MANAGER'
+  if (manqueNoteManager(bilan)) return 'SANS_MANAGER'
   if (bilan.nbNotants < seuilNotants) return 'SEUIL_NON_ATTEINT'
   return bilan.nbNotants >= bilan.nbAttendus ? 'COMPLET' : 'PROTEGE'
 }
@@ -116,7 +123,9 @@ export type PrevisionNote = { evalueId: string; bilan: BilanNotants; situation: 
 
 /**
  * Situation de chaque noté si la campagne était clôturée maintenant, et managers en retard :
- * ceux dont la note manque à des notés qui, sans elle, ne seraient pas classés (avec le nombre de notés concernés).
+ * ceux dont la note manque à des notés, qui ne seront pas classés sans elle (avec le nombre de notés
+ * concernés). Un noté déjà exclu pour un autre motif (il n'a pas noté) est compté aussi : la note du
+ * manager lui reste nécessaire.
  */
 export function prevoirSituations(
   affectations: AffectationBilan[],
@@ -134,7 +143,7 @@ export function prevoirSituations(
 
   const managersEnRetard = new Map<string, number>()
   for (const p of previsions) {
-    if (p.situation !== 'SANS_MANAGER') continue
+    if (!manqueNoteManager(p.bilan)) continue
     for (const d of p.bilan.defaillants.filter((x) => x.manager)) {
       managersEnRetard.set(d.evaluateurId, (managersEnRetard.get(d.evaluateurId) ?? 0) + 1)
     }
