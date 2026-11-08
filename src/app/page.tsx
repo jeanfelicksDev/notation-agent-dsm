@@ -4,9 +4,10 @@ import { Suspense, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
-import { AlertCircle, ArrowLeft, ArrowRight, ArrowUpRight, CircleCheck, CirclePlay, Eye, EyeOff, Info, Loader2, Lock, Mail, Phone, User } from 'lucide-react'
+import { AlertCircle, ArrowLeft, ArrowRight, ArrowUpRight, ChevronRight, CircleCheck, CirclePlay, Eye, EyeOff, Info, Loader2, Lock, Mail, Phone, User } from 'lucide-react'
 import { destinationPourRole } from '@/lib/roles'
 import { BrandMark } from '@/components/BrandMark'
+import { ParticipationModal } from '@/components/ParticipationModal'
 import { libelleCampagne } from '@/lib/libelle'
 import { CLE_TRANSMISSION, typeDeSaisie } from '@/lib/identifiant-client'
 
@@ -14,7 +15,7 @@ const QRCode = dynamic(() => import('qrcode.react').then((m) => m.QRCodeSVG), { 
 
 type Etape = 'identifiant' | 'connexion' | 'definir' | 'contact_admin'
 
-type CampagnePublique = { libelle: string; dateFin: string; completionRate: number } | null
+type CampagnePublique = { libelle: string; dateFin: string; tauxInterne: number; tauxExterne: number | null } | null
 
 const MESSAGES_REDIRECTION: Record<string, string> = {
   admin_required: 'Cet espace est réservé aux administrateurs. Connectez-vous avec un compte administrateur.',
@@ -85,6 +86,7 @@ function AccueilContenu() {
   const [error, setError] = useState(() => (reason && MESSAGES_REDIRECTION[reason]) || '')
   const [loading, setLoading] = useState(false)
   const [campagne, setCampagne] = useState<CampagnePublique>(null)
+  const [participationOuverte, setParticipationOuverte] = useState(false)
   const secretRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -262,17 +264,44 @@ function AccueilContenu() {
                   <TitreCampagne libelle={campagne.libelle} />
                 </p>
 
-                <dl className="mt-7 grid grid-cols-3 divide-x divide-white/10 border-t border-white/10 pt-7">
+                <dl className="mt-7 grid grid-cols-2 border-t border-white/10 pt-7">
                   <Statistique libelle="Clôture" className="pr-4">
                     {formatDateCourte(campagne.dateFin)}
                   </Statistique>
-                  <Statistique libelle="Temps restant" className="px-4 text-gold-300 sm:px-6">
+                  <Statistique libelle="Temps restant" className="border-l border-white/10 pl-4 text-gold-300 sm:pl-6">
                     {jours === 0 ? 'Dernier jour' : `${jours} jour${jours === 1 ? '' : 's'}`}
                   </Statistique>
-                  <Statistique libelle="Évaluations" className="pl-4 sm:pl-6">
-                    {campagne.completionRate}%<span className="ml-2 text-xs font-normal text-navy-200">soumises</span>
-                  </Statistique>
+                  <div className="col-span-2 mt-6 grid grid-cols-2 border-t border-white/10 pt-6">
+                    <div className="pr-4">
+                      <dt className="text-xs font-medium tracking-[0.1em] text-navy-200 uppercase">Pairs &amp; clients internes</dt>
+                      <dd className="mt-2">
+                        <button
+                          type="button"
+                          onClick={() => setParticipationOuverte(true)}
+                          aria-haspopup="dialog"
+                          className="group -ml-2 inline-flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg px-2 py-1 text-left transition-colors hover:bg-white/[0.06] focus-visible:outline-2 focus-visible:outline-gold-400"
+                        >
+                          <span className="text-xl font-semibold whitespace-nowrap tabular-nums sm:text-2xl">{campagne.tauxInterne}%</span>
+                          <span className="text-xs text-navy-200">soumises</span>
+                          <span className="inline-flex items-center gap-0.5 rounded-full bg-gold-400/10 py-0.5 pr-1.5 pl-2.5 text-xs font-medium text-gold-300 ring-1 ring-gold-400/30 transition-colors group-hover:bg-gold-400/20">
+                            Détail
+                            <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
+                          </span>
+                        </button>
+                      </dd>
+                    </div>
+                    <Statistique libelle="Clients externes" className="border-l border-white/10 pl-4 sm:pl-6">
+                      {campagne.tauxExterne === null ? (
+                        <span className="text-navy-300" title="Aucun client externe n’a d’agent affecté">—</span>
+                      ) : (
+                        <>
+                          {campagne.tauxExterne}%<span className="ml-2 text-xs font-normal text-navy-200">soumises</span>
+                        </>
+                      )}
+                    </Statistique>
+                  </div>
                 </dl>
+                {participationOuverte && <ParticipationModal onClose={() => setParticipationOuverte(false)} />}
               </div>
             ) : (
               <p className="mt-10 max-w-[45rem] 2xl:max-w-none animate-entree rounded-2xl bg-white/[0.05] p-8 text-navy-100 ring-1 ring-white/10 [animation-delay:180ms]">
