@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma'
 import { requireAdmin } from '@/lib/auth'
 import { attribuerRangs, calculerScores, enregistrerScores } from '@/lib/scores'
 import { compterSituations, estClasse, type SituationScore } from '@/lib/eligibilite'
+import { distinctionSelonPosition, officiers, type Distinction } from '@/lib/distinctions'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,6 +43,8 @@ export interface RawAgentScore {
   isMajorDirection: boolean
   isMajorDepartement: boolean
   isMajorService: boolean
+  /** Captain, Chief officer ou 2nd officer : 1er, 2e et 3e du classement général */
+  distinction: Distinction | null
   totalInDirection: number
   totalInDepartement: number
   totalInService: number
@@ -135,6 +138,7 @@ function versAgent(
     isMajorDirection: false,
     isMajorDepartement: false,
     isMajorService: false,
+    distinction: null,
     totalInDirection: 0,
     totalInDepartement: 0,
     totalInService: 0,
@@ -158,6 +162,8 @@ function computeRankings(rawList: RawAgentScore[]) {
     a.rangGlobal = rang
     a.isMajorGlobal = rang === 1
   })
+  global.forEach((a, position) => (a.distinction = distinctionSelonPosition(position)))
+  const { captain, chiefOfficer, secondOfficer } = officiers(global)
 
   const classerGroupes = (
     map: Map<string, RawAgentScore[]>,
@@ -202,7 +208,9 @@ function computeRankings(rawList: RawAgentScore[]) {
   return {
     tousLesScores: global,
     laureats: {
-      majorGlobal: global[0] ?? null,
+      majorGlobal: captain,
+      chiefOfficer,
+      secondOfficer,
       majorsDirection: groupesDirection.filter((g) => g.major).map((g) => ({ directionNom: g.directionNom, major: g.major!, totalAgents: g.scores.length })),
       majorsDepartement: groupesDepartement.filter((g) => g.major).map((g) => ({ departementNom: g.departementNom, directionNom: g.directionNom, major: g.major!, totalAgents: g.scores.length })),
       majorsService: groupesService.filter((g) => g.major).map((g) => ({ serviceNom: g.serviceNom, departementNom: g.departementNom, directionNom: g.directionNom, major: g.major!, totalAgents: g.scores.length })),
@@ -303,7 +311,7 @@ async function getFullClassementData(cible?: string) {
       campagne: null,
       provisoire: false,
       toutesLesCampagnes,
-      laureats: { majorGlobal: null, majorsDirection: [], majorsDepartement: [], majorsService: [] },
+      laureats: { majorGlobal: null, chiefOfficer: null, secondOfficer: null, majorsDirection: [], majorsDepartement: [], majorsService: [] },
       groupesDirection: [],
       groupesDepartement: [],
       groupesService: [],
