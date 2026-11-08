@@ -3,6 +3,7 @@ import {
   BILAN_VIDE,
   bilansNotants,
   estClasse,
+  notantsEnRetard,
   situationDuNote,
   type AffectationBilan,
   type BilanNotants,
@@ -23,9 +24,11 @@ import {
  *   manager ou collègues/clients n'a plus aucune note pour cette raison, elle est neutralisée :
  *   le score est ramené sur 100 à partir de la part restante ;
  * - notants défaillants, quand la campagne a un seuilNotants (situations : src/lib/eligibilite.ts) :
- *   PENALISE → chaque défaillant compte 0 dans son bloc ; PROTEGE → les défaillants sont ignorés, et une
- *   part vidée par des défaillants est neutralisée comme pour la force majeure ; SANS_MANAGER → score
- *   indicatif, non classé (rang null) ;
+ *   les défaillants sont ignorés, et une part vidée par des défaillants est neutralisée comme pour la
+ *   force majeure ; seuls les COMPLET et PROTEGE sont classés ; NON_NOTANT, SANS_MANAGER et
+ *   SEUIL_NON_ATTEINT gardent un score indicatif, sans rang ;
+ * - un noté sans aucune note de client externe n'est pas pénalisé : la part clients est annulée et
+ *   la part collègues prend tout le poids collègues/clients ;
  * - règle historique (seuilNotants null) : une source absente compte pour 0, un agent sans note manager
  *   plafonne à poidsCollegues.
  */
@@ -147,10 +150,12 @@ function scoreDuNote(
     partNonManager = c ?? q ?? 0
   }
 
-  // Part sans aucune note valide à cause d'un notant invalidé, ou d'un notant défaillant chez un noté
-  // protégé : neutralisée plutôt que comptée 0
-  const ignores = situation === 'PROTEGE' ? bilan.defaillants : []
-  const managerEcarte = bilan.managerInvalide || ignores.some((d) => d.manager)
+  // Part sans aucune note valide à cause d'un notant invalidé ou défaillant : neutralisée plutôt que
+  // comptée 0. En règle historique (situation null), un défaillant n'excuse rien.
+  const ignores = situation !== null ? bilan.defaillants : []
+  // Un manager défaillant ne neutralise la part manager que chez un noté protégé : ailleurs, son absence
+  // vaut 0 (sinon le score indicatif d'un noté sans note du manager serait gonflé).
+  const managerEcarte = bilan.managerInvalide || (situation === 'PROTEGE' && ignores.some((d) => d.manager))
   const colleguesEcartes = bilan.collegueInvalide || ignores.some((d) => !d.manager)
   const managerNeutralise = m === null && managerEcarte && campagne.poidsCollegues > 0
   const colleguesNeutralise = c === null && q === null && colleguesEcartes && campagne.poidsManager > 0
@@ -185,13 +190,10 @@ export function calculerScoresDepuis(donnees: DonneesScores): ScoreCalcule[] {
     for (const [id, bilan] of bilans) if (bilan.nbAttendus > 0) agents.add(id)
   }
 
+  const enRetard = notantsEnRetard(donnees.affectations)
   const resultats = [...agents].map((id) => {
     const bilan = bilans.get(id) ?? BILAN_VIDE
-    const situation = situationDuNote(bilan, campagne.seuilNotants)
-    // Pénalisé : chaque notant défaillant compte 0 dans son bloc (ratio nul, quel que soit le barème)
-    if (situation === 'PENALISE') {
-      for (const d of bilan.defaillants) cumuler(d.manager ? blocs.manager : blocs.collegues, id, d.evaluateurId, 0, 1)
-    }
+    const situation = situationDuNote(bilan, campagne.seuilNotants, !enRetard.has(id))
     return scoreDuNote(id, blocs, bilan, situation, campagne)
   })
 

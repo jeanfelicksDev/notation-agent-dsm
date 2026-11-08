@@ -252,14 +252,18 @@ enum StatutAffectation {
 
 /// Situation d'un noté à la clôture, selon les notants qui ont soumis leur évaluation
 enum SituationScore {
-  /// Tous ses notants ont soumis
+  /// Tous ses notants ont soumis, seuil atteint
   COMPLET
   /// Seuil atteint, manager compris : les notants défaillants sont ignorés
   PROTEGE
-  /// Seuil non atteint : chaque notant défaillant compte 0
+  /// Ancienne règle (scores enregistrés avant la 0011) : seuil non atteint, chaque défaillant comptait 0
   PENALISE
   /// Aucune note du manager : non classé
   SANS_MANAGER
+  /// N'a pas soumis ses propres évaluations : non classé
+  NON_NOTANT
+  /// Moins de notants que le seuil ont soumis : non classé
+  SEUIL_NON_ATTEINT
 }
 
 enum MotifInvalidation {

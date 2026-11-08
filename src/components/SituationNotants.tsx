@@ -2,7 +2,7 @@
 
 import { useId } from 'react'
 import { ShieldCheck, TriangleAlert, UserX } from 'lucide-react'
-import { LIBELLES_SITUATION, prevoirSituations, type SituationScore } from '@/lib/eligibilite'
+import { LIBELLES_SITUATION, prevoirSituations, SITUATIONS_NON_CLASSEES, type SituationScore } from '@/lib/eligibilite'
 
 /**
  * Affichage des notants défaillants (règles : src/lib/eligibilite.ts) : pastille de situation,
@@ -15,11 +15,13 @@ const STYLES: Record<Exclude<SituationScore, 'COMPLET'>, string> = {
   PROTEGE: 'bg-emerald-50 text-emerald-800 ring-emerald-200',
   PENALISE: 'bg-amber-50 text-amber-800 ring-amber-200',
   SANS_MANAGER: 'bg-rose-50 text-rose-800 ring-rose-200',
+  NON_NOTANT: 'bg-violet-50 text-violet-800 ring-violet-200',
+  SEUIL_NON_ATTEINT: 'bg-orange-50 text-orange-800 ring-orange-200',
 }
 
 type PropsBadge = { situation?: SituationScore | null; nbNotants?: number; nbNotantsAttendus?: number }
 
-/** Pastille Protégé / Pénalisé / Non classé ; rien pour un agent complet ou en règle historique. */
+/** Pastille de situation ; rien pour un agent complet ou en règle historique. */
 export function BadgeSituation({ situation, nbNotants = 0, nbNotantsAttendus = 0 }: PropsBadge) {
   if (!situation || situation === 'COMPLET') return null
   const { libelle, description } = LIBELLES_SITUATION[situation]
@@ -44,12 +46,19 @@ export function texteSituation(situation: SituationScore | null | undefined, nbN
     return `${manquants}, mais ${nbNotants} notants, manager compris, ont noté : son score n'est pas pénalisé.`
   }
   if (situation === 'PENALISE') {
-    return `${manquants} et seuls ${nbNotants} ont noté, sous le seuil : chaque notant manquant compte 0.`
+    return `${manquants} et seuls ${nbNotants} ont noté, sous le seuil : chaque notant manquant compte 0 (ancienne règle).`
+  }
+  if (situation === 'SEUIL_NON_ATTEINT') {
+    return `Seuls ${pluriel(nbNotants, 'notant')} sur ${nbNotantsAttendus} ${nbNotants > 1 ? 'ont' : 'a'} soumis, sous le seuil : il n'est pas classé. Le score affiché est indicatif.`
+  }
+  if (situation === 'NON_NOTANT') {
+    return `${LIBELLES_SITUATION.NON_NOTANT.description} Le score affiché est indicatif.`
   }
   return LIBELLES_SITUATION.SANS_MANAGER.description
 }
 
 type AgentNonClasse = {
+  situation?: SituationScore | null
   utilisateurId: string
   nom: string
   prenom: string
@@ -60,7 +69,7 @@ type AgentNonClasse = {
   nbNotantsAttendus?: number
 }
 
-/** Agents sans note du manager : hors classement et palmarès, avec leur score indicatif. */
+/** Agents hors classement et palmarès, avec le motif et leur score indicatif. */
 export function ListeNonClasses({ agents, anonymise = false }: { agents: AgentNonClasse[]; anonymise?: boolean }) {
   const titreId = useId()
   if (agents.length === 0) return null
@@ -73,8 +82,8 @@ export function ListeNonClasses({ agents, anonymise = false }: { agents: AgentNo
             Non classés · {agents.length}
           </h3>
           <p className="text-xs text-slate-600">
-            Aucune note de leur manager (non soumise, ou aucun manager affecté) : ils ne figurent ni au classement ni au palmarès.
-            Le score affiché est indicatif.
+            Ils ne figurent ni au classement ni au palmarès : ils n’ont pas soumis leurs propres évaluations, n’ont pas
+            reçu la note de leur manager, ou trop peu de notants les ont évalués. Le score affiché est indicatif.
           </p>
         </div>
       </div>
@@ -87,9 +96,19 @@ export function ListeNonClasses({ agents, anonymise = false }: { agents: AgentNo
                 {a.service} · {a.nbNotants ?? 0}/{a.nbNotantsAttendus ?? 0} notants
               </p>
             </div>
-            <span className="shrink-0 text-xs font-bold tabular-nums text-slate-500" title="Score indicatif">
-              {a.scoreTotal.toFixed(1)}
-            </span>
+            <div className="flex shrink-0 flex-col items-end gap-1">
+              {a.situation && a.situation !== 'COMPLET' && (
+                <span
+                  title={LIBELLES_SITUATION[a.situation].description}
+                  className={`rounded-full px-2 py-0.5 text-2xs font-bold ring-1 ${STYLES[a.situation]}`}
+                >
+                  {LIBELLES_SITUATION[a.situation].libelle}
+                </span>
+              )}
+              <span className="text-xs font-bold tabular-nums text-slate-500" title="Score indicatif">
+                {a.scoreTotal.toFixed(1)}
+              </span>
+            </div>
           </li>
         ))}
       </ul>
@@ -144,7 +163,7 @@ export function PrevisionSituations({
     return p ? `${p.prenom} ${p.nom}` : 'Inconnu'
   }
   const aRisque = previsions
-    .filter((p) => p.situation === 'PENALISE' || p.situation === 'SANS_MANAGER')
+    .filter((p) => SITUATIONS_NON_CLASSEES.includes(p.situation))
     .sort((a, b) => nomDe(a.evalueId).localeCompare(nomDe(b.evalueId), 'fr'))
 
   return (
@@ -154,16 +173,19 @@ export function PrevisionSituations({
         <div>
           <h3 className="text-base font-semibold text-slate-900">Si la campagne était clôturée maintenant</h3>
           <p className="text-xs text-slate-500">
-            Seuil : {pluriel(seuilNotants, 'notant')}, manager compris. Les cadres (vote facultatif) et les clients QR ne comptent pas.
+            Pour être classé : avoir soumis ses propres évaluations, avoir la note de son manager et au moins{' '}
+            {pluriel(seuilNotants, 'notant')} ayant soumis, manager compris. Les cadres (vote facultatif) et les clients
+            externes ne comptent pas ; sans note de client externe, la part clients est simplement annulée.
           </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
         <Tuile libelle="Complets" nombre={compter('COMPLET')} teinte="bg-slate-50 text-slate-800 ring-slate-200" />
         <Tuile libelle="Protégés" nombre={compter('PROTEGE')} teinte="bg-emerald-50 text-emerald-800 ring-emerald-200" />
-        <Tuile libelle="Pénalisés" nombre={compter('PENALISE')} teinte="bg-amber-50 text-amber-800 ring-amber-200" />
-        <Tuile libelle="Non classés" nombre={compter('SANS_MANAGER')} teinte="bg-rose-50 text-rose-800 ring-rose-200" />
+        <Tuile libelle="N’ont pas noté" nombre={compter('NON_NOTANT')} teinte={STYLES.NON_NOTANT} />
+        <Tuile libelle="Sous le seuil" nombre={compter('SEUIL_NON_ATTEINT')} teinte={STYLES.SEUIL_NON_ATTEINT} />
+        <Tuile libelle="Sans manager" nombre={compter('SANS_MANAGER')} teinte={STYLES.SANS_MANAGER} />
       </div>
 
       {managersEnRetard.size > 0 && (
@@ -184,7 +206,7 @@ export function PrevisionSituations({
       {aRisque.length > 0 && (
         <details className="rounded-2xl ring-1 ring-slate-200">
           <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-slate-800">
-            Agents pénalisés ou non classés · {aRisque.length}
+            Agents qui ne seraient pas classés · {aRisque.length}
           </summary>
           <ul className="flex flex-wrap gap-2 px-4 pb-4">
             {aRisque.map((p) => (

@@ -4,6 +4,7 @@ import {
   compterSituations,
   estClasse,
   lireSeuilNotants,
+  notantsEnRetard,
   prevoirSituations,
   resumerBilanCloture,
   situationDuNote,
@@ -60,16 +61,55 @@ describe('situationDuNote', () => {
     expect(situationDuNote(b, 3)).toBe('SANS_MANAGER')
   })
 
-  it('est COMPLET quand tous les notants affectés ont soumis, même sous le seuil', () => {
-    expect(situationDuNote(bilan({ nbNotants: 2, nbAttendus: 2 }), 3)).toBe('COMPLET')
+  it('est COMPLET quand tous ses notants ont soumis et que le seuil est atteint', () => {
+    expect(situationDuNote(bilan({ nbNotants: 3, nbAttendus: 3 }), 3)).toBe('COMPLET')
   })
 
   it('protège un noté qui atteint le seuil malgré des défaillants', () => {
     expect(situationDuNote(bilan({ nbNotants: 3, nbAttendus: 5 }), 3)).toBe('PROTEGE')
   })
 
-  it('pénalise un noté sous le seuil qui a des défaillants', () => {
-    expect(situationDuNote(bilan({ nbNotants: 2, nbAttendus: 3 }), 3)).toBe('PENALISE')
+  it('exclut un noté sous le seuil qui a des défaillants', () => {
+    expect(situationDuNote(bilan({ nbNotants: 2, nbAttendus: 3 }), 3)).toBe('SEUIL_NON_ATTEINT')
+  })
+
+  it('exclut un noté sous le seuil même si tous ses notants ont soumis', () => {
+    expect(situationDuNote(bilan({ nbNotants: 2, nbAttendus: 2 }), 3)).toBe('SEUIL_NON_ATTEINT')
+  })
+
+  it("exclut un noté qui n'a pas soumis ses propres évaluations, même complet", () => {
+    expect(situationDuNote(bilan({ nbNotants: 4, nbAttendus: 4 }), 3, false)).toBe('NON_NOTANT')
+  })
+
+  it("fait primer « n'a pas noté » sur l'absence de note du manager et le seuil", () => {
+    expect(situationDuNote(bilan({ managerSoumis: false, nbNotants: 1, nbAttendus: 3 }), 3, false)).toBe('NON_NOTANT')
+  })
+
+  it("fait primer l'absence de note du manager sur le seuil", () => {
+    expect(situationDuNote(bilan({ managerSoumis: false, nbNotants: 1, nbAttendus: 3 }), 3)).toBe('SANS_MANAGER')
+  })
+})
+
+describe('notantsEnRetard', () => {
+  it("repère les notants qui n'ont pas soumis toutes leurs évaluations", () => {
+    const enRetard = notantsEnRetard([
+      affectation('A', 'X'),
+      affectation('B', 'X', { statut: 'EN_ATTENTE' }),
+      affectation('C', 'X', { statut: 'BROUILLON' }),
+      affectation('D', 'X'),
+      affectation('D', 'Y', { statut: 'EN_ATTENTE' }),
+    ])
+    expect([...enRetard].sort()).toEqual(['B', 'C', 'D'])
+  })
+
+  it('ignore les évaluations invalidées, les auto-affectations, les cadres et les clients externes', () => {
+    const enRetard = notantsEnRetard([
+      affectation('A', 'X', { statut: 'EN_ATTENTE', invalidee: true }),
+      affectation('B', 'B', { statut: 'EN_ATTENTE' }),
+      affectation('K', 'X', { statut: 'EN_ATTENTE', roleEvaluateur: 'CADRE' }),
+      affectation('Q', 'X', { statut: 'EN_ATTENTE', roleEvaluateur: 'EXTERNE' }),
+    ])
+    expect(enRetard.size).toBe(0)
   })
 })
 
@@ -134,12 +174,16 @@ describe('bilansNotants', () => {
 
 describe('compterSituations', () => {
   it('fait le bilan de clôture, sans compter les scores en règle historique', () => {
-    const situations = ['COMPLET', 'COMPLET', 'PROTEGE', 'PENALISE', 'SANS_MANAGER', null] as const
+    const situations = [
+      'COMPLET', 'COMPLET', 'PROTEGE', 'PENALISE', 'NON_NOTANT', 'SEUIL_NON_ATTEINT', 'SEUIL_NON_ATTEINT', 'SANS_MANAGER', null,
+    ] as const
     expect(compterSituations(situations.map((situation) => ({ situation })))).toEqual({
       complets: 2,
       proteges: 1,
       penalises: 1,
-      nonClasses: 1,
+      nonNotants: 1,
+      sousSeuil: 2,
+      sansManager: 1,
     })
   })
 })
@@ -152,34 +196,54 @@ describe('prevoirSituations', () => {
       affectation('M', 'B', { roleEvaluateur: 'MANAGER' }),
       affectation('C1', 'B', { statut: 'EN_ATTENTE' }),
       affectation('B', 'C1'), // C1 n'est pas un noté suivi
+      affectation('M', 'D', { roleEvaluateur: 'MANAGER' }),
+      affectation('C1', 'D'),
+      affectation('C2', 'D'),
+      affectation('D', 'A', { statut: 'BROUILLON' }), // D n'a pas soumis ses propres évaluations
     ]
     const { previsions, managersEnRetard } = prevoirSituations(affectations, 3, (id) => id !== 'C1')
     expect(previsions.map((p) => [p.evalueId, p.situation])).toEqual([
       ['A', 'SANS_MANAGER'],
-      ['B', 'PENALISE'],
+      ['B', 'SEUIL_NON_ATTEINT'],
+      ['D', 'NON_NOTANT'],
     ])
     expect(managersEnRetard).toEqual(new Map([['M', 1]]))
   })
 })
 
 describe('resumerBilanCloture', () => {
-  it('résume le bilan en une phrase', () => {
-    expect(resumerBilanCloture({ complets: 2, proteges: 1, penalises: 0, nonClasses: 3 })).toBe(
-      '2 complets, 1 protégé, 0 pénalisé, 3 non classés.'
+  const VIDE = { complets: 0, proteges: 0, penalises: 0, nonNotants: 0, sousSeuil: 0, sansManager: 0 }
+
+  it('résume le bilan en une phrase, motifs d’exclusion compris', () => {
+    expect(resumerBilanCloture({ ...VIDE, complets: 2, proteges: 1, nonNotants: 1, sousSeuil: 2, sansManager: 1 })).toBe(
+      '3 classés (2 complets, 1 protégé). 4 non classés : 1 n’a pas noté, 2 sous le seuil de notants, 1 sans note du manager.'
+    )
+  })
+
+  it('ne cite que les motifs présents', () => {
+    expect(resumerBilanCloture({ ...VIDE, complets: 1, sousSeuil: 1 })).toBe(
+      '1 classé (1 complet, 0 protégé). 1 non classé : 1 sous le seuil de notants.'
     )
   })
 
   it('ne dit rien en règle historique ou sans bilan', () => {
-    expect(resumerBilanCloture({ complets: 0, proteges: 0, penalises: 0, nonClasses: 0 })).toBe('')
+    expect(resumerBilanCloture(VIDE)).toBe('')
     expect(resumerBilanCloture(undefined)).toBe('')
   })
 })
 
 describe('estClasse', () => {
-  it("n'exclut que les notés sans note du manager", () => {
-    expect(estClasse('SANS_MANAGER')).toBe(false)
-    expect(estClasse('PENALISE')).toBe(true)
+  it('ne classe que les notés complets ou protégés (et la règle historique)', () => {
+    expect(estClasse('COMPLET')).toBe(true)
+    expect(estClasse('PROTEGE')).toBe(true)
     expect(estClasse(null)).toBe(true)
+    expect(estClasse('NON_NOTANT')).toBe(false)
+    expect(estClasse('SEUIL_NON_ATTEINT')).toBe(false)
+    expect(estClasse('SANS_MANAGER')).toBe(false)
+  })
+
+  it('garde classés les pénalisés enregistrés sous l’ancienne règle', () => {
+    expect(estClasse('PENALISE')).toBe(true)
   })
 })
 
