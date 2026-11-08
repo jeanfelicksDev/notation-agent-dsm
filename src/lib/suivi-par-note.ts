@@ -25,7 +25,22 @@ export function etatAffectation(a: AffectationSuivi): EtatNotation {
   return 'EN_ATTENTE'
 }
 
-const estRestant = (n: NotantSuivi) => !n.facultatif && (n.etat === 'EN_ATTENTE' || n.etat === 'BROUILLON')
+/**
+ * Statut global d'un évaluateur, sur l'ensemble de ses affectations :
+ * - INVALIDEE si l'une est invalidée (l'invalidation porte sur le notant) ;
+ * - TERMINEE seulement si toutes sont soumises ;
+ * - BROUILLON (en cours) s'il en a entamé ou soumis une partie, par exemple quand un noté
+ *   lui a été affecté après sa soumission ;
+ * - EN_ATTENTE sinon.
+ */
+export function statutEvaluateur(affectations: readonly AffectationSuivi[]): EtatNotation {
+  if (affectations.some((a) => a.invalidee)) return 'INVALIDEE'
+  if (affectations.length > 0 && affectations.every((a) => a.statut === 'TERMINEE')) return 'TERMINEE'
+  if (affectations.some((a) => a.statut === 'TERMINEE' || a.statut === 'BROUILLON')) return 'BROUILLON'
+  return 'EN_ATTENTE'
+}
+
+const estRestant =(n: NotantSuivi) => !n.facultatif && (n.etat === 'EN_ATTENTE' || n.etat === 'BROUILLON')
 
 function bilan(evalueId: string, notants: NotantSuivi[]): SuiviNote {
   const compte = Object.fromEntries(ETATS_NOTATION.map((e) => [e, 0])) as Record<EtatNotation, number>

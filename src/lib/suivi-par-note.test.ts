@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { etatAffectation, filtrerSuivi, suiviParNote, trierSuivi } from '@/lib/suivi-par-note'
+import { etatAffectation, filtrerSuivi, statutEvaluateur, suiviParNote, trierSuivi } from '@/lib/suivi-par-note'
 
 const aff = (evaluateurId: string, evalueId: string, statut = 'EN_ATTENTE', invalidee = false) => ({
   evaluateurId,
@@ -103,5 +103,30 @@ describe('trierSuivi', () => {
 
   it('met en tête les notés qui attendent le plus de notes', () => {
     expect(trierSuivi(suivis, 'RESTANTS', nomDe).map((s) => s.evalueId)).toEqual(['awa', 'koffi'])
+  })
+})
+
+describe('statutEvaluateur', () => {
+  const de = (...statuts: string[]) => statuts.map((statut, i) => aff('n', `e${i}`, statut))
+
+  it("n'est terminé que si toutes ses évaluations sont soumises", () => {
+    expect(statutEvaluateur(de('TERMINEE', 'TERMINEE'))).toBe('TERMINEE')
+  })
+
+  it('est en cours si une évaluation reste ouverte après une soumission (affectation ajoutée ensuite)', () => {
+    expect(statutEvaluateur(de('TERMINEE', 'TERMINEE', 'EN_ATTENTE'))).toBe('BROUILLON')
+  })
+
+  it('est en cours avec un brouillon, non commencé sinon', () => {
+    expect(statutEvaluateur(de('BROUILLON', 'EN_ATTENTE'))).toBe('BROUILLON')
+    expect(statutEvaluateur(de('EN_ATTENTE', 'EN_ATTENTE'))).toBe('EN_ATTENTE')
+  })
+
+  it("est invalidé dès qu'une de ses évaluations l'est (l'invalidation porte sur le notant)", () => {
+    expect(statutEvaluateur([aff('n', 'a', 'TERMINEE'), aff('n', 'b', 'EN_ATTENTE', true)])).toBe('INVALIDEE')
+  })
+
+  it('est non commencé sans aucune affectation', () => {
+    expect(statutEvaluateur([])).toBe('EN_ATTENTE')
   })
 })

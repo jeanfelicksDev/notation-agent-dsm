@@ -21,7 +21,9 @@ import { getAppreciationInfo } from '@/lib/default-criteres'
 import { resumerBilanCloture, SEUIL_NOTANTS_MAX, SEUIL_NOTANTS_PAR_DEFAUT } from '@/lib/eligibilite'
 import { BadgeSituation, ListeNonClasses, PrevisionSituations } from '@/components/SituationNotants'
 import { LIBELLES_DISTINCTION } from '@/lib/distinctions'
+import { lignesExportSuivi, nomFichierSuivi } from '@/lib/export-suivi'
 import SuiviParNote from '@/components/SuiviParNote'
+import { statutEvaluateur } from '@/lib/suivi-par-note'
 
 interface Critere {
   id: string
@@ -2093,8 +2095,6 @@ function SuiviDashboard({ campagneId, affectations, users, seuilNotants, onUpdat
   const trackingData = evaluateurIds.map(evalId => {
     const user = users.find(u => u.id === evalId)
     const userAffectations = affectations.filter(a => a.evaluateurId === evalId)
-    const isTerminee = userAffectations.some(a => a.statut === 'TERMINEE')
-    const isBrouillon = userAffectations.some(a => a.statut === 'BROUILLON')
     // L'invalidation porte sur l'ensemble des affectations du notant
     const invalidee = userAffectations.find(a => a.invalidee)
     // Dernière soumission définitive (un client externe peut terminer ses agents séparément)
@@ -2104,10 +2104,9 @@ function SuiviDashboard({ campagneId, affectations, users, seuilNotants, onUpdat
       .sort()
       .at(-1) ?? null
 
-    let statut = 'EN_ATTENTE'
-    if (invalidee) statut = 'INVALIDEE'
-    else if (isTerminee) statut = 'TERMINEE'
-    else if (isBrouillon) statut = 'BROUILLON'
+    // « Terminé » seulement si toutes ses évaluations sont soumises : un noté affecté après
+    // la soumission le remet « en cours » (sinon il serait exclu du classement sans le savoir)
+    const statut: string = statutEvaluateur(userAffectations)
 
     return {
       user: user || { id: evalId, nom: 'Inconnu', prenom: '', matricule: '', role: 'UTILISATEUR', service: null },
@@ -2167,6 +2166,25 @@ function SuiviDashboard({ campagneId, affectations, users, seuilNotants, onUpdat
     { statut: 'EN_ATTENTE', libelle: LIBELLES_STATUT_SUIVI.EN_ATTENTE, valeur: countAttente, icone: Clock,
       fond: 'bg-slate-50 border-slate-200', titre: 'text-slate-500', chiffre: 'text-slate-700', anneau: 'ring-slate-500' },
   ] as const
+
+  // Extraction Excel de la liste affichée : mêmes filtres (profil, service, recherche, statut) et même ordre
+  const exporterSuivi = async () => {
+    if (listeSuivi.length === 0) return
+    const XLSX = await import('xlsx')
+    const feuille = XLSX.utils.json_to_sheet(lignesExportSuivi(listeSuivi))
+    feuille['!cols'] = [{ wch: 11 }, { wch: 22 }, { wch: 28 }, { wch: 22 }, { wch: 16 }, { wch: 20 }, { wch: 18 }, { wch: 17 }]
+    const classeur = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(classeur, feuille, 'Suivi évaluateurs')
+    const profils = { ALL: undefined, PAIR: 'Pairs', MANAGER: 'Managers', EXTERNE: 'Clients' } as const
+    XLSX.writeFile(
+      classeur,
+      nomFichierSuivi({
+        profil: profils[suiviCategory],
+        statut: suiviStatut === 'ALL' ? undefined : suiviStatut,
+        service: suiviService === 'ALL' ? undefined : suiviService,
+      })
+    )
+  }
 
   const choisirStatut = (statut: StatutSuivi) => {
     // Un second clic sur la carte active revient à la liste complète
@@ -2304,6 +2322,17 @@ function SuiviDashboard({ campagneId, affectations, users, seuilNotants, onUpdat
                 className="pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold outline-none"
               />
             </div>
+
+            <button
+              type="button"
+              onClick={exporterSuivi}
+              disabled={listeSuivi.length === 0}
+              title="Extraire la liste affichée (matricule, nom, service…) au format Excel"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-semibold shadow-sm transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" aria-hidden />
+              Exporter ({listeSuivi.length})
+            </button>
           </div>
         </div>
 
