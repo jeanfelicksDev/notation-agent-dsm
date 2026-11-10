@@ -24,19 +24,27 @@ import {
 /** À l'écran, le Captain est en haut ; la révélation, elle, remonte des 2nd officers au Captain. */
 const ORDRE_AFFICHAGE: readonly Distinction[] = ['CAPTAIN', 'CHIEF_OFFICER', 'SECOND_OFFICER']
 
-type Niveau = { titre: string; annonce: string; taille: TailleCarte; grille: string }
+type Niveau = { titre: string; sousTitre: string; annonce: string; taille: TailleCarte; grille: string }
 
 /** Chaque niveau tient sur une seule ligne dès que l'écran est assez large. */
 const NIVEAUX: Record<Distinction, Niveau> = {
-  CAPTAIN: { titre: 'Captain', annonce: 'le Captain', taille: 'grande', grille: 'mx-auto w-full max-w-3xl grid-cols-1' },
+  CAPTAIN: {
+    titre: 'Captain',
+    sousTitre: LIBELLES_DISTINCTION.CAPTAIN.portee,
+    annonce: 'le Captain',
+    taille: 'grande',
+    grille: 'mx-auto w-full max-w-3xl grid-cols-1',
+  },
   CHIEF_OFFICER: {
     titre: 'Chief officers',
+    sousTitre: 'Les meilleurs agents de chaque Département',
     annonce: 'les Chief officers',
     taille: 'moyenne',
     grille: 'grid-cols-2 gap-4 lg:grid-cols-[repeat(var(--colonnes),minmax(0,1fr))]',
   },
   SECOND_OFFICER: {
     titre: '2nd officers',
+    sousTitre: 'Les meilleurs agents de chaque Service',
     annonce: 'les 2nd officers',
     taille: 'compacte',
     grille: 'grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-[repeat(var(--colonnes),minmax(0,1fr))]',
@@ -213,7 +221,7 @@ type LigneNiveauProps = {
 }
 
 function LigneNiveau({ niveau, laureats, estRevele: revele, refLigne }: LigneNiveauProps) {
-  const { titre, taille, grille } = NIVEAUX[niveau]
+  const { titre, sousTitre, taille, grille } = NIVEAUX[niveau]
   const colonnes = { '--colonnes': laureats.length } as CSSProperties
   return (
     <section ref={refLigne} aria-labelledby={`niveau-${niveau}`} className="space-y-3">
@@ -221,7 +229,7 @@ function LigneNiveau({ niveau, laureats, estRevele: revele, refLigne }: LigneNiv
         <span aria-hidden className="h-px flex-1 bg-gradient-to-r from-transparent to-gold-500/40" />
         <h2 id={`niveau-${niveau}`} className="font-display text-lg font-semibold text-gold-300 sm:text-xl">
           {titre}
-          <span className="ml-3 font-sans text-xs font-normal text-navy-200">{LIBELLES_DISTINCTION[niveau].portee}</span>
+          <span className="ml-3 font-sans text-xs font-normal text-navy-200">{sousTitre}</span>
         </h2>
         <span aria-hidden className="h-px flex-1 bg-gradient-to-l from-transparent to-gold-500/40" />
       </div>
