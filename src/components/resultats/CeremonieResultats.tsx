@@ -6,7 +6,8 @@ import { ArrowLeft, RotateCcw, Sparkles, Volume2, VolumeX } from 'lucide-react'
 import { BrandMark } from '@/components/BrandMark'
 import { CarteLaureat, type TailleCarte } from '@/components/resultats/CarteLaureat'
 import { Decompte } from '@/components/resultats/Decompte'
-import { useSonDecompte } from '@/components/resultats/useSonDecompte'
+import { celebrer } from '@/components/resultats/confettis'
+import { useSonCeremonie } from '@/components/resultats/useSonCeremonie'
 import { LIBELLES_DISTINCTION, type Distinction } from '@/lib/distinctions'
 import { versPalmares, type Laureat, type Palmares, type ReponseClassement } from '@/lib/palmares-ceremonie'
 import {
@@ -171,7 +172,11 @@ function Message({ children, role }: { children: React.ReactNode; role?: 'alert'
 function Scene({ palmares }: { palmares: Palmares }) {
   const { etat, dernierRevele, lancer, recommencer } = useRevelation(palmares.niveaux)
   const [sonActif, setSonActif] = useState(true)
-  const { preparer: preparerSon } = useSonDecompte(etat.decompte, sonActif)
+  const captainRevele = estRevele(etat, 'CAPTAIN')
+  const { preparer: preparerSon } = useSonCeremonie({ decompte: etat.decompte, captainRevele, estActif: sonActif })
+
+  // Le Captain apparaît dans une explosion de confettis, arrêtée si l'on recommence.
+  useEffect(() => (captainRevele ? celebrer() : undefined), [captainRevele])
   const lignes = useRef<Partial<Record<Distinction, HTMLElement | null>>>({})
 
   // Le son est préparé dans le geste (clic ou touche) qui lance le décompte : le navigateur l'exige.
