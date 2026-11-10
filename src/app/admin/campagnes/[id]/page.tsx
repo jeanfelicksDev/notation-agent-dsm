@@ -23,7 +23,9 @@ import { BadgeSituation, ListeNonClasses, PrevisionSituations } from '@/componen
 import { LIBELLES_DISTINCTION } from '@/lib/distinctions'
 import { lignesExportSuivi, nomFichierSuivi } from '@/lib/export-suivi'
 import SuiviParNote from '@/components/SuiviParNote'
+import AvancementParService from '@/components/AvancementParService'
 import { statutEvaluateur } from '@/lib/suivi-par-note'
+import { aDesNonSoumises, avancementParService, cleServiceSuivi } from '@/lib/avancement-service'
 
 interface Critere {
   id: string
@@ -2035,12 +2037,15 @@ const MOTIFS_INVALIDATION: Record<string, string> = {
   AUTRE: 'Autre',
 }
 
-type StatutSuivi = 'ALL' | 'TERMINEE' | 'BROUILLON' | 'EN_ATTENTE'
+// NON_SOUMIS (choisi depuis le graphique par service) : évaluateurs à qui il reste au moins
+// une évaluation, cadres et notants invalidés compris, comme le comptage du graphique
+type StatutSuivi = 'ALL' | 'TERMINEE' | 'BROUILLON' | 'EN_ATTENTE' | 'NON_SOUMIS'
 
 const LIBELLES_STATUT_SUIVI: Record<Exclude<StatutSuivi, 'ALL'>, string> = {
   TERMINEE: 'Terminées',
   BROUILLON: 'En cours (Brouillon)',
   EN_ATTENTE: 'Non commencées',
+  NON_SOUMIS: 'Non soumises',
 }
 
 const FORMAT_DATE_HEURE = new Intl.DateTimeFormat('fr-FR', {
@@ -2113,7 +2118,8 @@ function SuiviDashboard({ campagneId, affectations, users, seuilNotants, onUpdat
       statut,
       invalidee,
       termineeAt,
-      totalToEvaluate: userAffectations.length
+      totalToEvaluate: userAffectations.length,
+      soumises: userAffectations.filter(a => a.statut === 'TERMINEE').length
     }
   })
 
@@ -2124,8 +2130,10 @@ function SuiviDashboard({ campagneId, affectations, users, seuilNotants, onUpdat
   }
 
   // Services des évaluateurs de la campagne (les clients externes n'en ont pas)
-  const servicesSuivi = [...new Set(trackingData.map(d => d.user.service).filter((s): s is string => !!s))]
+  const servicesSuivi = [...new Set(trackingData.map(d => cleServiceSuivi(d.user)).filter((s): s is string => !!s))]
     .sort((a, b) => a.localeCompare(b, 'fr'))
+  // Graphique par service : tous les évaluateurs internes, indépendamment des filtres du détail
+  const avancementServices = avancementParService(trackingData)
 
   const filteredTracking = trackingData.filter(d => {
     const matchesSearch =
@@ -2135,7 +2143,7 @@ function SuiviDashboard({ campagneId, affectations, users, seuilNotants, onUpdat
 
     const cat = getRoleCategory(d.user.role)
     const matchesCat = suiviCategory === 'ALL' || cat === suiviCategory
-    const matchesService = suiviService === 'ALL' || d.user.service === suiviService
+    const matchesService = suiviService === 'ALL' || cleServiceSuivi(d.user) === suiviService
 
     return matchesSearch && matchesCat && matchesService
   })
@@ -2149,7 +2157,11 @@ function SuiviDashboard({ campagneId, affectations, users, seuilNotants, onUpdat
   const countInvalidee = trackingData.filter(d => d.statut === 'INVALIDEE').length
 
   // Mêmes populations que les compteurs des cartes, pour que la liste corresponde au chiffre cliqué
-  const listeFiltreeStatut = suiviStatut === 'ALL' ? filteredTracking : comptes.filter(d => d.statut === suiviStatut)
+  // (sauf « non soumises », qui suit le comptage du graphique par service)
+  const listeFiltreeStatut =
+    suiviStatut === 'ALL' ? filteredTracking
+    : suiviStatut === 'NON_SOUMIS' ? filteredTracking.filter(aDesNonSoumises)
+    : comptes.filter(d => d.statut === suiviStatut)
   // Évaluations terminées : de la plus ancienne soumission à la plus récente (sans date en dernier)
   const listeSuivi = suiviStatut === 'TERMINEE'
     ? [...listeFiltreeStatut].sort((a, b) =>
@@ -2193,6 +2205,21 @@ function SuiviDashboard({ campagneId, affectations, users, seuilNotants, onUpdat
     requestAnimationFrame(() => detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
   }
 
+  // Service dont la liste des non-soumis est affichée (mis en évidence dans le graphique)
+  const serviceNonSoumisActif = suiviStatut === 'NON_SOUMIS' && suiviService !== 'ALL' ? suiviService : null
+
+  const voirNonSoumisDuService = (service: string) => {
+    // Un second clic sur le service actif revient à la liste complète
+    const dejaActif = service === serviceNonSoumisActif
+    setSuiviService(dejaActif ? 'ALL' : service)
+    setSuiviStatut(dejaActif ? 'ALL' : 'NON_SOUMIS')
+    // Les autres filtres masqueraient une partie des non-soumis comptés par le graphique
+    setSuiviCategory('ALL')
+    setSuiviSearch('')
+    setVueSuivi('EVALUATEUR')
+    if (!dejaActif) requestAnimationFrame(() => detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+  }
+
   return (
     <div className="space-y-6">
       {countInvalidee > 0 && (
@@ -2227,6 +2254,12 @@ function SuiviDashboard({ campagneId, affectations, users, seuilNotants, onUpdat
           )
         })}
       </div>
+
+      <AvancementParService
+        services={avancementServices}
+        serviceActif={serviceNonSoumisActif}
+        onChoisir={voirNonSoumisDuService}
+      />
 
       <div ref={detailRef} role="group" aria-label="Organisation du détail" className="inline-flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200">
         {([['EVALUATEUR', 'Par évaluateur'], ['NOTE', 'Par noté']] as const).map(([vue, libelle]) => (

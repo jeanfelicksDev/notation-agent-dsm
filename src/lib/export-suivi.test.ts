@@ -54,6 +54,12 @@ describe('nomFichierSuivi', () => {
     )
   })
 
+  it('nomme les non-soumis choisis depuis le graphique par service', () => {
+    expect(nomFichierSuivi({ statut: 'NON_SOUMIS', service: 'Dépôt' }, jour)).toBe(
+      'Suivi_evaluateurs_Non_soumis_Depot_2026-11-08.xlsx'
+    )
+  })
+
   it('se contente de la date sans filtre', () => {
     expect(nomFichierSuivi({}, jour)).toBe('Suivi_evaluateurs_2026-11-08.xlsx')
   })

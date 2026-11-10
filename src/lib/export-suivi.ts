@@ -27,6 +27,8 @@ const LIBELLES_STATUT: Record<string, string> = {
   BROUILLON: 'En cours (brouillon)',
   EN_ATTENTE: 'Non commencée',
   INVALIDEE: 'Invalidé',
+  // Filtre seulement (en cours + non commencé), jamais le statut d'un évaluateur
+  NON_SOUMIS: 'Non soumis',
 }
 
 export function profilEvaluateur(role: string): string {
