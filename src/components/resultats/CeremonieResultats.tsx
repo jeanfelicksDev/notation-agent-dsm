@@ -82,11 +82,12 @@ function usePalmares(campagneId: string): Chargement {
 }
 
 /**
- * Une fois lancée, la séquence avance seule : le décompte, puis chaque niveau,
+ * Le décompte part dès l'ouverture de la page, puis la séquence avance seule : chaque niveau,
  * au rythme donné par `delaiAvantSuite` (apparition du niveau, puis pause).
+ * Après « Recommencer », la séquence attend d'être relancée.
  */
 function useRevelation(niveaux: Palmares['niveaux']) {
-  const [etat, setEtat] = useState<EtatRevelation>(ETAT_INITIAL)
+  const [etat, setEtat] = useState<EtatRevelation>(() => lancerDecompte(ETAT_INITIAL))
   const dernierRevele: Distinction | undefined = ORDRE_REVELATION[etat.niveauxReveles - 1]
   const delai = delaiAvantSuite(etat, dernierRevele ? niveaux[dernierRevele].length : 0)
 
@@ -173,13 +174,16 @@ function Scene({ palmares }: { palmares: Palmares }) {
   const { etat, dernierRevele, lancer, recommencer } = useRevelation(palmares.niveaux)
   const [sonActif, setSonActif] = useState(true)
   const captainRevele = estRevele(etat, 'CAPTAIN')
-  const { preparer: preparerSon } = useSonCeremonie({ decompte: etat.decompte, captainRevele, estActif: sonActif })
+  const son = useSonCeremonie({ decompte: etat.decompte, captainRevele, estActif: sonActif })
+  const { preparer: preparerSon } = son
+  // Le navigateur attend un geste avant d'autoriser le son : on le signale tant que le son n'est pas coupé.
+  const sonEnAttente = sonActif && son.estBloque
 
   // Le Captain apparaît dans une explosion de confettis, arrêtée si l'on recommence.
   useEffect(() => (captainRevele ? celebrer() : undefined), [captainRevele])
   const lignes = useRef<Partial<Record<Distinction, HTMLElement | null>>>({})
 
-  // Le son est préparé dans le geste (clic ou touche) qui lance le décompte : le navigateur l'exige.
+  // Relance après « Recommencer » : le son est rouvert dans le geste, comme le navigateur l'exige.
   const lancerAvecSon = useCallback(() => {
     preparerSon()
     lancer()
@@ -230,12 +234,14 @@ function Scene({ palmares }: { palmares: Palmares }) {
         phase={phase}
         peutRecommencer={etat.niveauxReveles > 0}
         sonActif={sonActif}
+        sonEnAttente={sonEnAttente}
         onLancer={lancerAvecSon}
         onRecommencer={recommencer}
-        onBasculerSon={() => setSonActif((actif) => !actif)}
+        // Son en attente d'un geste : ce clic l'ouvre, il ne le coupe pas.
+        onBasculerSon={() => (sonEnAttente ? preparerSon() : setSonActif((actif) => !actif))}
       />
 
-      {etat.decompte !== null && <Decompte valeur={etat.decompte} />}
+      {etat.decompte !== null && <Decompte valeur={etat.decompte} sonEnAttente={sonEnAttente} />}
     </>
   )
 }
@@ -276,6 +282,8 @@ type BarreDeCommandeProps = {
   phase: Phase
   peutRecommencer: boolean
   sonActif: boolean
+  /** Son voulu mais bloqué par le navigateur tant qu'il n'y a pas eu de clic ou de touche. */
+  sonEnAttente: boolean
   onLancer: () => void
   onRecommencer: () => void
   onBasculerSon: () => void
@@ -285,8 +293,9 @@ const BOUTON_DISCRET =
   'inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-navy-200 transition-colors hover:bg-white/10 hover:text-white'
 
 function BarreDeCommande(props: BarreDeCommandeProps) {
-  const { phase, peutRecommencer, sonActif, onLancer, onRecommencer, onBasculerSon } = props
-  const IconeSon = sonActif ? Volume2 : VolumeX
+  const { phase, peutRecommencer, sonActif, sonEnAttente, onLancer, onRecommencer, onBasculerSon } = props
+  const IconeSon = sonActif && !sonEnAttente ? Volume2 : VolumeX
+  const libelleSon = !sonActif ? 'Son coupé' : sonEnAttente ? 'Activer le son' : 'Son activé'
   return (
     <footer className="sticky bottom-0 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 border-t border-white/10 bg-navy-950/85 px-6 py-4 backdrop-blur">
       {phase === 'attente' && (
@@ -313,7 +322,7 @@ function BarreDeCommande(props: BarreDeCommandeProps) {
         </button>
       )}
       <button type="button" onClick={onBasculerSon} className={BOUTON_DISCRET}>
-        <IconeSon className="h-4 w-4" aria-hidden /> {sonActif ? 'Son activé' : 'Son coupé'}
+        <IconeSon className="h-4 w-4" aria-hidden /> {libelleSon}
       </button>
     </footer>
   )

@@ -3,13 +3,15 @@ import { DEBUT_DECOMPTE } from '@/lib/revelation'
 type Props = {
   /** Chiffre affiché, de 5 à 0. */
   valeur: number
+  /** Le navigateur attend un clic ou une touche avant d'autoriser le son. */
+  sonEnAttente: boolean
 }
 
 /** Chiffres du décompte, du premier au dernier : 5, 4, 3, 2, 1, 0. */
 const ETAPES = Array.from({ length: DEBUT_DECOMPTE + 1 }, (_, i) => DEBUT_DECOMPTE - i)
 
 /** Écran plein cadre du décompte qui ouvre la révélation. */
-export function Decompte({ valeur }: Props) {
+export function Decompte({ valeur, sonEnAttente }: Props) {
   return (
     <div
       role="timer"
@@ -34,6 +36,11 @@ export function Decompte({ valeur }: Props) {
           />
         ))}
       </ol>
+      {sonEnAttente && (
+        <p className="animate-fade-in absolute bottom-8 rounded-full bg-white/10 px-4 py-2 text-xs font-semibold text-navy-100 ring-1 ring-white/15">
+          Cliquez ou appuyez sur une touche pour activer le son
+        </p>
+      )}
     </div>
   )
 }
