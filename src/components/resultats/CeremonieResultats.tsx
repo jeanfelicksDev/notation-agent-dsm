@@ -1,8 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, RotateCcw, Sparkles, Volume2, VolumeX } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { BrandMark } from '@/components/BrandMark'
 import { CarteLaureat, type TailleCarte } from '@/components/resultats/CarteLaureat'
 import { Decompte } from '@/components/resultats/Decompte'
@@ -84,7 +84,7 @@ function usePalmares(campagneId: string): Chargement {
 /**
  * Le décompte part dès l'ouverture de la page, puis la séquence avance seule : chaque niveau,
  * au rythme donné par `delaiAvantSuite` (apparition du niveau, puis pause).
- * Après « Recommencer », la séquence attend d'être relancée.
+ * Pour la rejouer, on recharge la page.
  */
 function useRevelation(niveaux: Palmares['niveaux']) {
   const [etat, setEtat] = useState<EtatRevelation>(() => lancerDecompte(ETAT_INITIAL))
@@ -97,23 +97,7 @@ function useRevelation(niveaux: Palmares['niveaux']) {
     return () => clearTimeout(minuterie)
   }, [etat, delai])
 
-  const lancer = useCallback(() => setEtat(lancerDecompte), [])
-  const recommencer = useCallback(() => setEtat(ETAT_INITIAL), [])
-  return { etat, dernierRevele, lancer, recommencer }
-}
-
-/** Espace ou Entrée lance la révélation, sauf quand le focus est sur une commande. */
-function useToucheDeLancement(lancer: () => void) {
-  useEffect(() => {
-    const surTouche = (evenement: KeyboardEvent) => {
-      if (evenement.key !== ' ' && evenement.key !== 'Enter') return
-      if (evenement.target instanceof HTMLElement && evenement.target.closest('button, a, input, select, textarea')) return
-      evenement.preventDefault()
-      lancer()
-    }
-    window.addEventListener('keydown', surTouche)
-    return () => window.removeEventListener('keydown', surTouche)
-  }, [lancer])
+  return { etat, dernierRevele }
 }
 
 type CeremonieResultatsProps = { campagneId: string }
@@ -171,24 +155,14 @@ function Message({ children, role }: { children: React.ReactNode; role?: 'alert'
 }
 
 function Scene({ palmares }: { palmares: Palmares }) {
-  const { etat, dernierRevele, lancer, recommencer } = useRevelation(palmares.niveaux)
-  const [sonActif, setSonActif] = useState(true)
+  const { etat, dernierRevele } = useRevelation(palmares.niveaux)
   const captainRevele = estRevele(etat, 'CAPTAIN')
-  const son = useSonCeremonie({ decompte: etat.decompte, captainRevele, estActif: sonActif })
-  const { preparer: preparerSon } = son
-  // Le navigateur attend un geste avant d'autoriser le son : on le signale tant que le son n'est pas coupé.
-  const sonEnAttente = sonActif && son.estBloque
+  // Le navigateur peut attendre un geste (clic ou touche) avant d'autoriser le son : on le signale.
+  const { estBloque: sonEnAttente } = useSonCeremonie({ decompte: etat.decompte, captainRevele })
 
-  // Le Captain apparaît dans une explosion de confettis, arrêtée si l'on recommence.
+  // Le Captain apparaît dans une explosion de confettis, effacée quand on quitte la page.
   useEffect(() => (captainRevele ? celebrer() : undefined), [captainRevele])
   const lignes = useRef<Partial<Record<Distinction, HTMLElement | null>>>({})
-
-  // Relance après « Recommencer » : le son est rouvert dans le geste, comme le navigateur l'exige.
-  const lancerAvecSon = useCallback(() => {
-    preparerSon()
-    lancer()
-  }, [preparerSon, lancer])
-  useToucheDeLancement(lancerAvecSon)
 
   // Le niveau qui commence à apparaître est amené au centre de l'écran.
   useEffect(() => {
@@ -197,12 +171,6 @@ function Scene({ palmares }: { palmares: Palmares }) {
     const sansMouvement = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     lignes.current[dernierRevele]?.scrollIntoView({ behavior: sansMouvement ? 'auto' : 'smooth', block: 'center' })
   }, [dernierRevele])
-
-  const phase: Phase = revelationTerminee(etat)
-    ? 'terminee'
-    : etat.decompte === null && etat.niveauxReveles === 0
-      ? 'attente'
-      : 'enCours'
 
   return (
     <>
@@ -230,16 +198,7 @@ function Scene({ palmares }: { palmares: Palmares }) {
         {dernierRevele ? `Révélation : ${NIVEAUX[dernierRevele].annonce}.` : ''}
       </p>
 
-      <BarreDeCommande
-        phase={phase}
-        peutRecommencer={etat.niveauxReveles > 0}
-        sonActif={sonActif}
-        sonEnAttente={sonEnAttente}
-        onLancer={lancerAvecSon}
-        onRecommencer={recommencer}
-        // Son en attente d'un geste : ce clic l'ouvre, il ne le coupe pas.
-        onBasculerSon={() => (sonEnAttente ? preparerSon() : setSonActif((actif) => !actif))}
-      />
+      <BandeauDEtat estTerminee={revelationTerminee(etat)} />
 
       {etat.decompte !== null && <Decompte valeur={etat.decompte} sonEnAttente={sonEnAttente} />}
     </>
@@ -275,55 +234,17 @@ function LigneNiveau({ niveau, laureats, estRevele: revele, refLigne }: LigneNiv
   )
 }
 
-/** Avant le lancement, pendant la séquence automatique, ou une fois le Captain révélé. */
-type Phase = 'attente' | 'enCours' | 'terminee'
-
-type BarreDeCommandeProps = {
-  phase: Phase
-  peutRecommencer: boolean
-  sonActif: boolean
-  /** Son voulu mais bloqué par le navigateur tant qu'il n'y a pas eu de clic ou de touche. */
-  sonEnAttente: boolean
-  onLancer: () => void
-  onRecommencer: () => void
-  onBasculerSon: () => void
-}
-
-const BOUTON_DISCRET =
-  'inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-navy-200 transition-colors hover:bg-white/10 hover:text-white'
-
-function BarreDeCommande(props: BarreDeCommandeProps) {
-  const { phase, peutRecommencer, sonActif, sonEnAttente, onLancer, onRecommencer, onBasculerSon } = props
-  const IconeSon = sonActif && !sonEnAttente ? Volume2 : VolumeX
-  const libelleSon = !sonActif ? 'Son coupé' : sonEnAttente ? 'Activer le son' : 'Son activé'
+/** Bandeau du bas : l'avancement de la séquence, sans commande (elle se déroule seule). */
+function BandeauDEtat({ estTerminee }: { estTerminee: boolean }) {
   return (
-    <footer className="sticky bottom-0 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 border-t border-white/10 bg-navy-950/85 px-6 py-4 backdrop-blur">
-      {phase === 'attente' && (
-        <>
-          <button
-            type="button"
-            onClick={onLancer}
-            className="inline-flex items-center gap-2 rounded-xl bg-gold-500 px-6 py-3 text-sm font-bold text-navy-950 shadow-raised transition-all hover:bg-gold-400 active:scale-95"
-          >
-            <Sparkles className="h-4 w-4" aria-hidden /> Lancer la révélation
-          </button>
-          <span className="hidden text-xs text-navy-300 sm:inline">ou touche Espace</span>
-        </>
-      )}
-      {phase === 'enCours' && <p className="text-sm font-semibold text-navy-200">Révélation en cours…</p>}
-      {phase === 'terminee' && (
+    <footer className="sticky bottom-0 flex items-center justify-center border-t border-white/10 bg-navy-950/85 px-6 py-4 backdrop-blur">
+      {estTerminee ? (
         <p aria-live="polite" className="font-display text-lg font-semibold text-gold-300">
           Félicitations aux lauréats !
         </p>
+      ) : (
+        <p className="text-sm font-semibold text-navy-200">Révélation en cours…</p>
       )}
-      {peutRecommencer && (
-        <button type="button" onClick={onRecommencer} className={BOUTON_DISCRET}>
-          <RotateCcw className="h-4 w-4" aria-hidden /> Recommencer
-        </button>
-      )}
-      <button type="button" onClick={onBasculerSon} className={BOUTON_DISCRET}>
-        <IconeSon className="h-4 w-4" aria-hidden /> {libelleSon}
-      </button>
     </footer>
   )
 }
