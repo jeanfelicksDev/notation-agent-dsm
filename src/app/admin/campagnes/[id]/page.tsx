@@ -2749,6 +2749,16 @@ function ClassementCampagneView({
             </button>
 
             <Link
+              href={`/resultats/${campagneId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 text-gold-300 border border-gold-500/40 rounded-xl text-xs font-semibold transition-all shadow-md"
+            >
+              <Trophy className="w-4 h-4" />
+              <span>Révéler les résultats</span>
+            </Link>
+
+            <Link
               href={`/admin/classement?campagneId=${campagneId}`}
               className="flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-xl text-xs font-semibold transition-all shadow-md"
             >

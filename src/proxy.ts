@@ -9,7 +9,7 @@ export function proxy(request: NextRequest) {
 
   if (!token) {
     const url = new URL('/', request.url)
-    if (pathname.startsWith('/admin')) {
+    if (pathname.startsWith('/admin') || pathname.startsWith('/resultats')) {
       url.searchParams.set('reason', 'admin_required')
     } else {
       url.searchParams.set('reason', 'auth_required')
@@ -21,5 +21,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/evaluer/:path*', '/admin/:path*'],
+  matcher: ['/evaluer/:path*', '/admin/:path*', '/resultats/:path*'],
 }
