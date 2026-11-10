@@ -1,6 +1,6 @@
 'use client'
 
-import { useId } from 'react'
+import { useId, useState } from 'react'
 import { ShieldCheck, TriangleAlert, UserX } from 'lucide-react'
 import { LIBELLES_SITUATION, prevoirSituations, SITUATIONS_NON_CLASSEES, type SituationScore } from '@/lib/eligibilite'
 
@@ -119,14 +119,32 @@ export function ListeNonClasses({ agents, anonymise = false }: { agents: AgentNo
 type AffectationSuivi = { evaluateurId: string; evalueId: string; statut: string; invalidee?: boolean; clientInterne?: boolean }
 type PersonneSuivi = { id: string; nom: string; prenom: string; role: string }
 
-function Tuile({ libelle, nombre, teinte }: { libelle: string; nombre: number; teinte: string }) {
+type PropsTuile = { libelle: string; nombre: number; teinte: string; active: boolean; onClick: () => void }
+
+function Tuile({ libelle, nombre, teinte, active, onClick }: PropsTuile) {
   return (
-    <div className={`rounded-2xl px-4 py-3 ring-1 ${teinte}`}>
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={nombre === 0}
+      aria-pressed={active}
+      className={`rounded-2xl px-4 py-3 text-left ring-1 transition ${teinte} ${
+        active ? 'shadow-md ring-2 ring-current' : 'hover:-translate-y-0.5 hover:shadow-md'
+      } cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-700 disabled:cursor-default disabled:opacity-60 disabled:hover:translate-y-0 disabled:hover:shadow-none`}
+    >
       <p className="text-xs font-semibold">{libelle}</p>
       <p className="mt-1 text-2xl font-bold tabular-nums">{nombre}</p>
-    </div>
+    </button>
   )
 }
+
+const TUILES: { situation: SituationScore; libelle: string; teinte: string }[] = [
+  { situation: 'COMPLET', libelle: 'Complets', teinte: 'bg-slate-50 text-slate-800 ring-slate-200' },
+  { situation: 'PROTEGE', libelle: 'Protégés', teinte: STYLES.PROTEGE },
+  { situation: 'NON_NOTANT', libelle: 'N’ont pas noté', teinte: STYLES.NON_NOTANT },
+  { situation: 'SEUIL_NON_ATTEINT', libelle: 'Sous le seuil', teinte: STYLES.SEUIL_NON_ATTEINT },
+  { situation: 'SANS_MANAGER', libelle: 'Sans manager', teinte: STYLES.SANS_MANAGER },
+]
 
 /**
  * Onglet Suivi : situation de chaque Pair noté si la campagne était clôturée maintenant,
@@ -141,6 +159,7 @@ export function PrevisionSituations({
   personnes: PersonneSuivi[]
   seuilNotants: number | null
 }) {
+  const [selection, setSelection] = useState<SituationScore | null>(null)
   if (seuilNotants === null) return null
   const parId = new Map(personnes.map((p) => [p.id, p]))
   const { previsions, managersEnRetard } = prevoirSituations(
@@ -162,9 +181,10 @@ export function PrevisionSituations({
     const p = parId.get(id)
     return p ? `${p.prenom} ${p.nom}` : 'Inconnu'
   }
-  const aRisque = previsions
-    .filter((p) => SITUATIONS_NON_CLASSEES.includes(p.situation))
-    .sort((a, b) => nomDe(a.evalueId).localeCompare(nomDe(b.evalueId), 'fr'))
+  const parNom = (a: { evalueId: string }, b: { evalueId: string }) => nomDe(a.evalueId).localeCompare(nomDe(b.evalueId), 'fr')
+  const aRisque = previsions.filter((p) => SITUATIONS_NON_CLASSEES.includes(p.situation)).sort(parNom)
+  const tuileChoisie = TUILES.find((t) => t.situation === selection)
+  const agentsChoisis = selection ? previsions.filter((p) => p.situation === selection).sort(parNom) : []
 
   return (
     <section className="space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
@@ -181,12 +201,47 @@ export function PrevisionSituations({
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-        <Tuile libelle="Complets" nombre={compter('COMPLET')} teinte="bg-slate-50 text-slate-800 ring-slate-200" />
-        <Tuile libelle="Protégés" nombre={compter('PROTEGE')} teinte="bg-emerald-50 text-emerald-800 ring-emerald-200" />
-        <Tuile libelle="N’ont pas noté" nombre={compter('NON_NOTANT')} teinte={STYLES.NON_NOTANT} />
-        <Tuile libelle="Sous le seuil" nombre={compter('SEUIL_NON_ATTEINT')} teinte={STYLES.SEUIL_NON_ATTEINT} />
-        <Tuile libelle="Sans manager" nombre={compter('SANS_MANAGER')} teinte={STYLES.SANS_MANAGER} />
+        {TUILES.map((t) => (
+          <Tuile
+            key={t.situation}
+            libelle={t.libelle}
+            nombre={compter(t.situation)}
+            teinte={t.teinte}
+            active={selection === t.situation}
+            onClick={() => setSelection((s) => (s === t.situation ? null : t.situation))}
+          />
+        ))}
       </div>
+
+      {tuileChoisie && agentsChoisis.length > 0 && (
+        <div className={`rounded-2xl p-4 ring-1 ${tuileChoisie.teinte}`}>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-semibold">
+              {tuileChoisie.libelle} · {agentsChoisis.length}
+            </p>
+            <button
+              type="button"
+              onClick={() => setSelection(null)}
+              className="cursor-pointer rounded-lg px-2 py-1 text-xs font-medium hover:bg-white/70"
+            >
+              Fermer
+            </button>
+          </div>
+          {selection !== 'COMPLET' && (
+            <p className="mt-1 text-xs opacity-80">{LIBELLES_SITUATION[selection as Exclude<SituationScore, 'COMPLET'>].description}</p>
+          )}
+          <ul className="mt-3 flex flex-wrap gap-2">
+            {agentsChoisis.map((p) => (
+              <li key={p.evalueId} className="rounded-lg bg-white px-2.5 py-1 text-xs text-slate-800 ring-1 ring-slate-200">
+                {nomDe(p.evalueId)}
+                <span className="ml-1.5 tabular-nums text-slate-400">
+                  {p.bilan.nbNotants}/{p.bilan.nbAttendus}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {managersEnRetard.size > 0 && (
         <div className="rounded-2xl bg-rose-50 p-4 text-sm text-rose-900 ring-1 ring-rose-200">
