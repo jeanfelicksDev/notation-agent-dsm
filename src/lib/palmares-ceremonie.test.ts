@@ -9,6 +9,8 @@ const agent = (matricule: string, prenom: string, nom: string, service: string, 
   departement,
   direction: 'DIRECTION SOLUTION MARITIME',
   scoreTotal,
+  scoreManager: 90,
+  scoreCollegues: 80,
 })
 
 const awa = agent('100', 'Awa', 'KONE', 'Magasin', 'Manutention', 87)
@@ -43,11 +45,39 @@ describe('versPalmares', () => {
     ])
   })
 
-  it('présente un Chief officer par département', () => {
+  it('présente un Chief officer par département, du plus méritant au moins méritant', () => {
     expect(versPalmares(reponse).niveaux.CHIEF_OFFICER).toEqual([
-      { cle: 'Consignation', entite: 'Consignation', nomComplet: 'Koffi YAO', precision: 'Shipping', scoreTotal: 86.8 },
       { cle: 'Manutention', entite: 'Manutention', nomComplet: 'Awa KONE', precision: 'Magasin', scoreTotal: 87 },
+      { cle: 'Consignation', entite: 'Consignation', nomComplet: 'Koffi YAO', precision: 'Shipping', scoreTotal: 86.8 },
     ])
+  })
+
+  it('range aussi les 2nd officers par ordre de mérite, quel que soit l’ordre reçu', () => {
+    const inverse: ReponseClassement = {
+      ...reponse,
+      laureats: { ...reponse.laureats, majorsService: [...reponse.laureats.majorsService].reverse() },
+    }
+    expect(versPalmares(inverse).niveaux.SECOND_OFFICER.map((laureat) => laureat.scoreTotal)).toEqual([87, 86.8])
+  })
+
+  it('départage deux scores égaux comme le classement : part manager, puis part collègues', () => {
+    const egalite = (matricule: string, scoreManager: number, scoreCollegues: number) => ({
+      ...agent(matricule, 'Agent', matricule, 'Service', 'Département', 80),
+      scoreManager,
+      scoreCollegues,
+    })
+    const palmares = versPalmares({
+      ...reponse,
+      laureats: {
+        ...reponse.laureats,
+        majorsService: [
+          { serviceNom: 'Troisième', departementNom: 'D', major: egalite('C', 85, 70) },
+          { serviceNom: 'Premier', departementNom: 'D', major: egalite('A', 95, 60) },
+          { serviceNom: 'Deuxième', departementNom: 'D', major: egalite('B', 85, 75) },
+        ],
+      },
+    })
+    expect(palmares.niveaux.SECOND_OFFICER.map((laureat) => laureat.entite)).toEqual(['Premier', 'Deuxième', 'Troisième'])
   })
 
   it('présente un 2nd officer par service', () => {

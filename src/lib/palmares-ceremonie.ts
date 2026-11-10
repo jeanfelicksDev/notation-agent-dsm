@@ -1,8 +1,9 @@
+import { comparerScores } from '@/lib/calcul-scores'
 import type { Distinction } from '@/lib/distinctions'
 
 /**
  * Palmarès d'une campagne mis en forme pour la page des résultats :
- * un niveau par distinction, un lauréat par entité.
+ * un niveau par distinction, un lauréat par entité, rangés par ordre de mérite.
  */
 
 /** Champs de la réponse de GET /api/admin/classement utilisés par la page des résultats. */
@@ -14,6 +15,8 @@ interface AgentClasse {
   departement: string
   service: string
   scoreTotal: number
+  scoreManager: number
+  scoreCollegues: number
 }
 
 export interface ReponseClassement {
@@ -55,14 +58,19 @@ function versLaureat(entite: string, agent: AgentClasse, precision: string): Lau
   }
 }
 
+/** Du plus méritant au moins méritant, dans l'ordre du classement (total, part manager, part collègues). */
+function parMerite<T extends { major: AgentClasse }>(laureats: readonly T[]): T[] {
+  return [...laureats].sort((a, b) => comparerScores(a.major, b.major))
+}
+
 export function versPalmares(reponse: ReponseClassement): Palmares {
   const { majorGlobal, majorsDepartement, majorsService } = reponse.laureats
   const niveaux: Record<Distinction, Laureat[]> = {
     CAPTAIN: majorGlobal
       ? [versLaureat(majorGlobal.direction, majorGlobal, `${majorGlobal.service} · ${majorGlobal.departement}`)]
       : [],
-    CHIEF_OFFICER: majorsDepartement.map((d) => versLaureat(d.departementNom, d.major, d.major.service)),
-    SECOND_OFFICER: majorsService.map((s) => versLaureat(s.serviceNom, s.major, s.departementNom)),
+    CHIEF_OFFICER: parMerite(majorsDepartement).map((d) => versLaureat(d.departementNom, d.major, d.major.service)),
+    SECOND_OFFICER: parMerite(majorsService).map((s) => versLaureat(s.serviceNom, s.major, s.departementNom)),
   }
   return {
     libelle: reponse.campagne?.libelle ?? '',
