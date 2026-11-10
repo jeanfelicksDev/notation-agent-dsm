@@ -20,7 +20,7 @@ import { coordonneeClient } from '@/lib/perimetre-client'
 import { getAppreciationInfo } from '@/lib/default-criteres'
 import { resumerBilanCloture, SEUIL_NOTANTS_MAX, SEUIL_NOTANTS_PAR_DEFAUT } from '@/lib/eligibilite'
 import { BadgeSituation, ListeNonClasses, PrevisionSituations } from '@/components/SituationNotants'
-import { LIBELLES_DISTINCTION } from '@/lib/distinctions'
+import { LIBELLES_DISTINCTION, libelleComplet } from '@/lib/distinctions'
 import { lignesExportSuivi, nomFichierSuivi } from '@/lib/export-suivi'
 import SuiviParNote from '@/components/SuiviParNote'
 import AvancementParService from '@/components/AvancementParService'
@@ -1054,7 +1054,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                         <Trophy className="w-4 h-4" /> Récompenses & Palmarès Officiels
                       </div>
                       <h3 className="text-2xl font-semibold text-slate-900">Grille des Prix & Distinctions</h3>
-                      <p className="text-slate-500 text-sm font-medium">Définissez les 3 distinctions officielles, attribuées sur le classement général : Captain (1er), Chief officer (2e) et 2nd officer (3e), toutes entités confondues.</p>
+                      <p className="text-slate-500 text-sm font-medium">Définissez les 3 distinctions officielles, avec un lauréat par entité : le Captain (meilleur agent de la direction), un Chief officer par département et un 2nd officer par service.</p>
                     </div>
 
                   </div>
@@ -1065,39 +1065,39 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                     <div className="bg-gold-50 border border-gold-200 rounded-2xl p-5 flex flex-col justify-between shadow-sm relative overflow-hidden">
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 text-amber-700 font-bold text-xs uppercase tracking-wider">
-                          <Trophy className="w-4 h-4 text-amber-600 flex-shrink-0" /> Captain · 1er général
+                          <Trophy className="w-4 h-4 text-amber-600 flex-shrink-0" /> Captain · Direction
                         </div>
                         <p className="text-sm font-bold text-amber-950 mt-2 line-clamp-2">
                           {formData.prixDirection || formData.prixGlobal || "Non configuré"}
                         </p>
                       </div>
-                      <span className="text-2xs text-amber-800 font-bold mt-3 bg-amber-200/80 px-2.5 py-1 rounded-md w-fit">1er Prix • 1er toutes entités confondues</span>
+                      <span className="text-2xs text-amber-800 font-bold mt-3 bg-amber-200/80 px-2.5 py-1 rounded-md w-fit">Palier 1 • {LIBELLES_DISTINCTION.CAPTAIN.portee}</span>
                     </div>
 
                     {/* 2. Prix Département */}
                     <div className="bg-teal-50 border border-teal-200 rounded-2xl p-5 flex flex-col justify-between shadow-sm">
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 text-teal-700 font-bold text-xs uppercase tracking-wider">
-                          <Medal className="w-4 h-4 text-teal-600 flex-shrink-0" /> Chief officer · 2e général
+                          <Medal className="w-4 h-4 text-teal-600 flex-shrink-0" /> Chief officer · Département
                         </div>
                         <p className="text-sm font-semibold text-teal-950 mt-2 line-clamp-2">
                           {formData.prixDepartement || "Non configuré"}
                         </p>
                       </div>
-                      <span className="text-2xs text-teal-700 font-bold mt-3 bg-teal-100 px-2.5 py-1 rounded-md w-fit">2ème Prix • 2e toutes entités confondues</span>
+                      <span className="text-2xs text-teal-700 font-bold mt-3 bg-teal-100 px-2.5 py-1 rounded-md w-fit">Palier 2 • {LIBELLES_DISTINCTION.CHIEF_OFFICER.portee}</span>
                     </div>
 
                     {/* 3. Prix Service / Cellule */}
                     <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 flex flex-col justify-between shadow-sm">
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 text-emerald-700 font-bold text-xs uppercase tracking-wider">
-                          <Gift className="w-4 h-4 text-emerald-600 flex-shrink-0" /> 2nd officer · 3e général
+                          <Gift className="w-4 h-4 text-emerald-600 flex-shrink-0" /> 2nd officer · Service
                         </div>
                         <p className="text-sm font-semibold text-emerald-950 mt-2 line-clamp-2">
                           {formData.prixService || "Non configuré"}
                         </p>
                       </div>
-                      <span className="text-2xs text-emerald-700 font-bold mt-3 bg-emerald-100 px-2.5 py-1 rounded-md w-fit">3ème Prix • 3e toutes entités confondues</span>
+                      <span className="text-2xs text-emerald-700 font-bold mt-3 bg-emerald-100 px-2.5 py-1 rounded-md w-fit">Palier 3 • {LIBELLES_DISTINCTION.SECOND_OFFICER.portee}</span>
                     </div>
                   </div>
 
@@ -1112,10 +1112,10 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                           </div>
                           <div>
                             <div className="flex items-center gap-2">
-                              <h4 className="font-bold text-slate-900 text-base">Captain — 1er toutes entités confondues</h4>
+                              <h4 className="font-bold text-slate-900 text-base">Captain — Meilleur agent de la Direction</h4>
                               <span className="text-2xs font-bold uppercase tracking-wider bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full border border-amber-200">Palier 1</span>
                             </div>
-                            <p className="text-xs text-slate-500">Premier du classement général</p>
+                            <p className="text-xs text-slate-500">Premier de la direction · 1 lauréat</p>
                           </div>
                         </div>
                         <div className="space-y-1.5 pt-2">
@@ -1142,10 +1142,10 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                             </div>
                             <div>
                               <div className="flex items-center gap-2">
-                                <h4 className="font-semibold text-slate-900 text-base">Chief officer — 2e toutes entités confondues</h4>
+                                <h4 className="font-semibold text-slate-900 text-base">Chief officer — Meilleur agent du Département</h4>
                                 <span className="text-2xs font-bold uppercase tracking-wider bg-teal-100 text-teal-800 px-2 py-0.5 rounded-full">Palier 2</span>
                               </div>
-                              <p className="text-xs text-slate-500">Deuxième du classement général</p>
+                              <p className="text-xs text-slate-500">Premier de chaque département</p>
                             </div>
                           </div>
                           <div className="space-y-1.5 pt-2">
@@ -1168,10 +1168,10 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                             </div>
                             <div>
                               <div className="flex items-center gap-2">
-                                <h4 className="font-semibold text-slate-900 text-base">2nd officer — 3e toutes entités confondues</h4>
+                                <h4 className="font-semibold text-slate-900 text-base">2nd officer — Meilleur agent du Service</h4>
                                 <span className="text-2xs font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">Palier 3</span>
                               </div>
-                              <p className="text-xs text-slate-500">Troisième du classement général</p>
+                              <p className="text-xs text-slate-500">Premier de chaque service</p>
                             </div>
                           </div>
                           <div className="space-y-1.5 pt-2">
@@ -2583,28 +2583,23 @@ function ClassementCampagneView({
 
     // 1. Feuille Palmarès
     const palmaresData: any[] = []
-    const officiersExport = [
-      ['CAPTAIN', data.laureats?.majorGlobal, formData.prixDirection || formData.prixGlobal],
-      ['CHIEF_OFFICER', data.laureats?.chiefOfficer, formData.prixDepartement],
-      ['SECOND_OFFICER', data.laureats?.secondOfficer, formData.prixService],
-    ] as const
-    for (const [distinction, agent, prix] of officiersExport) {
-      if (!agent) continue
+    const captain = data.laureats?.majorGlobal
+    if (captain) {
       palmaresData.push({
-        Distinction: `${LIBELLES_DISTINCTION[distinction].titre} (${LIBELLES_DISTINCTION[distinction].rang})`,
-        Entité: agent.direction,
-        Matricule: agent.matricule,
-        Nom: agent.nom,
-        Prénom: agent.prenom,
-        Service: agent.service,
-        Département: agent.departement,
-        'Score Total (%)': agent.scoreTotal,
-        Dotation: prix || '—',
+        Distinction: libelleComplet('CAPTAIN'),
+        Entité: captain.direction,
+        Matricule: captain.matricule,
+        Nom: captain.nom,
+        Prénom: captain.prenom,
+        Service: captain.service,
+        Département: captain.departement,
+        'Score Total (%)': captain.scoreTotal,
+        Dotation: formData.prixDirection || formData.prixGlobal || '—',
       })
     }
     data.laureats?.majorsDepartement?.forEach((md: any) => {
       palmaresData.push({
-        Distinction: 'Premier du département',
+        Distinction: libelleComplet('CHIEF_OFFICER'),
         Entité: `${md.departementNom} (${md.directionNom})`,
         Matricule: md.major.matricule,
         Nom: md.major.nom,
@@ -2612,12 +2607,12 @@ function ClassementCampagneView({
         Service: md.major.service,
         Département: md.departementNom,
         'Score Total (%)': md.major.scoreTotal,
-        Dotation: '',
+        Dotation: formData.prixDepartement || '—',
       })
     })
     data.laureats?.majorsService?.forEach((ms: any) => {
       palmaresData.push({
-        Distinction: 'Premier du service',
+        Distinction: libelleComplet('SECOND_OFFICER'),
         Entité: `${ms.serviceNom} (${ms.departementNom})`,
         Matricule: ms.major.matricule,
         Nom: ms.major.nom,
@@ -2625,7 +2620,7 @@ function ClassementCampagneView({
         Service: ms.serviceNom,
         Département: ms.departementNom,
         'Score Total (%)': ms.major.scoreTotal,
-        Dotation: '',
+        Dotation: formData.prixService || '—',
       })
     })
     const wsPalmares = XLSX.utils.json_to_sheet(palmaresData)
@@ -2674,8 +2669,6 @@ function ClassementCampagneView({
 
   const allScores = data?.tousLesScores || []
   const majorGlobal = data?.laureats?.majorGlobal
-  const chiefOfficer = data?.laureats?.chiefOfficer
-  const secondOfficer = data?.laureats?.secondOfficer
   const majorsDepartement = data?.laureats?.majorsDepartement || []
   const majorsService = data?.laureats?.majorsService || []
   const groupesDirection = data?.groupesDirection || []
@@ -2868,7 +2861,7 @@ function ClassementCampagneView({
                       <div className="space-y-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-2xs font-bold uppercase tracking-widest bg-navy-900 text-gold-500 px-3 py-0.5 rounded-full border border-gold-500/30 flex items-center gap-1">
-                            <Trophy className="w-3 h-3" /> Captain · 1er toutes entités confondues
+                            <Trophy className="w-3 h-3" /> Captain · {LIBELLES_DISTINCTION.CAPTAIN.portee}
                           </span>
                           <span className="text-xs font-semibold text-amber-900">Palier 1</span>
                         </div>
@@ -2898,49 +2891,19 @@ function ClassementCampagneView({
                 </div>
               ) : null}
 
-              {/* Chief officer (2e) et 2nd officer (3e), toutes entités confondues */}
-              {(chiefOfficer || secondOfficer) && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {([
-                    ['CHIEF_OFFICER', chiefOfficer, formData.prixDepartement, Medal],
-                    ['SECOND_OFFICER', secondOfficer, formData.prixService, Gift],
-                  ] as const).map(([distinction, agent, prix, Icone]) =>
-                    agent ? (
-                      <div key={distinction} className="bg-white rounded-3xl p-6 ring-1 ring-slate-200 shadow-md space-y-3">
-                        <span className="inline-flex items-center gap-1 text-2xs font-bold uppercase tracking-widest bg-navy-900 text-gold-500 px-3 py-0.5 rounded-full">
-                          <Icone className="w-3 h-3" /> {LIBELLES_DISTINCTION[distinction].titre} · {LIBELLES_DISTINCTION[distinction].rang}
-                        </span>
-                        <div className="flex items-end justify-between gap-4">
-                          <div className="min-w-0">
-                            <h3 className="text-xl font-bold text-slate-900 truncate">
-                              {anonymized ? `Agent ${agent.matricule}` : `${agent.prenom} ${agent.nom}`}
-                            </h3>
-                            <p className="text-xs text-slate-600 font-medium">
-                              Matricule: <span className="font-semibold text-slate-800">{agent.matricule}</span> • {agent.service} ({agent.departement})
-                            </p>
-                          </div>
-                          <span className="shrink-0 text-2xl font-bold text-emerald-600">{agent.scoreTotal}%</span>
-                        </div>
-                        <p className="pt-2 border-t border-slate-100 text-2xs font-semibold text-slate-500">
-                          Dotation officielle : <span className="text-slate-800">{prix || '—'}</span>
-                        </p>
-                      </div>
-                    ) : null
-                  )}
-                </div>
-              )}
-
-              {/* Grid Majors Département */}
+              {/* Chief officers : le meilleur agent de chaque département */}
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <Medal className="w-5 h-5 text-teal-600" />
-                    <h4 className="font-bold text-slate-900 text-base">Meilleurs agents par département</h4>
+                    <h4 className="font-bold text-slate-900 text-base">Chief officers · Meilleur agent de chaque département</h4>
                     <span className="text-2xs font-bold bg-teal-100 text-teal-800 px-2.5 py-0.5 rounded-full">
-                      Premier de chaque département
+                      Palier 2 • {formData.prixDepartement || '—'}
                     </span>
                   </div>
-                  <span className="text-xs font-semibold text-slate-400">{majorsDepartement.length} départements</span>
+                  <span className="shrink-0 text-xs font-semibold text-slate-400">
+                    {majorsDepartement.length} Chief officer{majorsDepartement.length > 1 ? 's' : ''}
+                  </span>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -2962,24 +2925,26 @@ function ClassementCampagneView({
                       </div>
                       <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-2xs font-semibold text-slate-400">
                         <span>Sur {md.totalAgents} agents</span>
-                        <span className="text-teal-700">Premier du département</span>
+                        <span className="text-teal-700">Chief officer</span>
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* Grid Majors Service */}
+              {/* 2nd officers : le meilleur agent de chaque service */}
               <div className="space-y-3 pt-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <Gift className="w-5 h-5 text-emerald-600" />
-                    <h4 className="font-bold text-slate-900 text-base">Meilleurs agents par service</h4>
+                    <h4 className="font-bold text-slate-900 text-base">2nd officers · Meilleur agent de chaque service</h4>
                     <span className="text-2xs font-bold bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full">
-                      Premier de chaque service
+                      Palier 3 • {formData.prixService || '—'}
                     </span>
                   </div>
-                  <span className="text-xs font-semibold text-slate-400">{majorsService.length} services</span>
+                  <span className="shrink-0 text-xs font-semibold text-slate-400">
+                    {majorsService.length} 2nd officer{majorsService.length > 1 ? 's' : ''}
+                  </span>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -3001,7 +2966,7 @@ function ClassementCampagneView({
                       </div>
                       <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-2xs font-semibold text-slate-400">
                         <span>Sur {ms.totalAgents} agents</span>
-                        <span className="text-emerald-700 font-semibold">Premier du service</span>
+                        <span className="text-emerald-700 font-semibold">2nd officer</span>
                       </div>
                     </div>
                   ))}

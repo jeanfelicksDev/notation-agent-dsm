@@ -1,30 +1,39 @@
 import { describe, expect, it } from 'vitest'
-import { distinctionSelonPosition, LIBELLES_DISTINCTION, officiers } from '@/lib/distinctions'
+import { distinctionsDe, libelleComplet, LIBELLES_DISTINCTION } from '@/lib/distinctions'
 
-describe('distinctionSelonPosition', () => {
-  it('attribue Captain, Chief officer et 2nd officer aux trois premiers du classement général', () => {
-    expect([0, 1, 2].map(distinctionSelonPosition)).toEqual(['CAPTAIN', 'CHIEF_OFFICER', 'SECOND_OFFICER'])
+describe('distinctionsDe', () => {
+  it('nomme Chief officer le premier de son département', () => {
+    expect(distinctionsDe({ direction: false, departement: true, service: false })).toEqual(['CHIEF_OFFICER'])
   })
 
-  it("n'attribue rien à partir du 4e", () => {
-    expect(distinctionSelonPosition(3)).toBeNull()
-    expect(distinctionSelonPosition(40)).toBeNull()
+  it('nomme 2nd officer le premier de son service', () => {
+    expect(distinctionsDe({ direction: false, departement: false, service: true })).toEqual(['SECOND_OFFICER'])
+  })
+
+  it('cumule les distinctions du premier de la direction, du Captain au 2nd officer', () => {
+    expect(distinctionsDe({ direction: true, departement: true, service: true })).toEqual([
+      'CAPTAIN',
+      'CHIEF_OFFICER',
+      'SECOND_OFFICER',
+    ])
+  })
+
+  it("n'attribue rien à un agent qui n'est premier d'aucune entité", () => {
+    expect(distinctionsDe({ direction: false, departement: false, service: false })).toEqual([])
   })
 })
 
-describe('officiers', () => {
-  it('désigne les officiers dans l’ordre du classement général', () => {
-    expect(officiers(['awa', 'koffi', 'ines', 'yao'])).toEqual({ captain: 'awa', chiefOfficer: 'koffi', secondOfficer: 'ines' })
-  })
-
-  it('laisse vacantes les distinctions sans agent classé', () => {
-    expect(officiers(['awa'])).toEqual({ captain: 'awa', chiefOfficer: null, secondOfficer: null })
-    expect(officiers([])).toEqual({ captain: null, chiefOfficer: null, secondOfficer: null })
+describe('libelleComplet', () => {
+  it("associe le titre à l'entité récompensée", () => {
+    expect(libelleComplet('CHIEF_OFFICER')).toBe('Chief officer (meilleur agent du département)')
+    expect(libelleComplet('SECOND_OFFICER')).toBe('2nd officer (meilleur agent du service)')
   })
 })
 
 describe('LIBELLES_DISTINCTION', () => {
-  it('indique le rang de chaque officier', () => {
-    expect(LIBELLES_DISTINCTION.CHIEF_OFFICER).toEqual({ titre: 'Chief officer', rang: '2e toutes entités confondues' })
+  it("indique l'entité récompensée par chaque distinction", () => {
+    expect(LIBELLES_DISTINCTION.CAPTAIN).toEqual({ titre: 'Captain', portee: 'Meilleur agent de la direction' })
+    expect(LIBELLES_DISTINCTION.CHIEF_OFFICER).toEqual({ titre: 'Chief officer', portee: 'Meilleur agent du département' })
+    expect(LIBELLES_DISTINCTION.SECOND_OFFICER).toEqual({ titre: '2nd officer', portee: 'Meilleur agent du service' })
   })
 })

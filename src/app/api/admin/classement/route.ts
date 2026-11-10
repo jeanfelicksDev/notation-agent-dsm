@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma'
 import { requireAdmin } from '@/lib/auth'
 import { attribuerRangs, calculerScores, enregistrerScores } from '@/lib/scores'
 import { compterSituations, estClasse, type SituationScore } from '@/lib/eligibilite'
-import { distinctionSelonPosition, officiers, type Distinction } from '@/lib/distinctions'
+import { distinctionsDe, type Distinction } from '@/lib/distinctions'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,8 +43,8 @@ export interface RawAgentScore {
   isMajorDirection: boolean
   isMajorDepartement: boolean
   isMajorService: boolean
-  /** Captain, Chief officer ou 2nd officer : 1er, 2e et 3e du classement général */
-  distinction: Distinction | null
+  /** Captain (1er de la direction), Chief officer (1er du département), 2nd officer (1er du service) : cumulables */
+  distinctions: Distinction[]
   totalInDirection: number
   totalInDepartement: number
   totalInService: number
@@ -138,7 +138,7 @@ function versAgent(
     isMajorDirection: false,
     isMajorDepartement: false,
     isMajorService: false,
-    distinction: null,
+    distinctions: [],
     totalInDirection: 0,
     totalInDepartement: 0,
     totalInService: 0,
@@ -162,9 +162,6 @@ function computeRankings(rawList: RawAgentScore[]) {
     a.rangGlobal = rang
     a.isMajorGlobal = rang === 1
   })
-  global.forEach((a, position) => (a.distinction = distinctionSelonPosition(position)))
-  const { captain, chiefOfficer, secondOfficer } = officiers(global)
-
   const classerGroupes = (
     map: Map<string, RawAgentScore[]>,
     appliquer: (a: RawAgentScore, rang: number, total: number) => void
@@ -205,12 +202,25 @@ function computeRankings(rawList: RawAgentScore[]) {
       major: scores[0] ?? null,
     }))
 
+  // Un seul lauréat par entité, celui que retient le palmarès : en cas d'ex æquo parfait (rang 1 partagé),
+  // seul le premier dans l'ordre du classement porte la distinction.
+  // La DSM forme une seule direction : son meilleur agent (le Captain) est le premier du classement général.
+  const captain = global[0] ?? null
+  const chiefOfficers = new Set(groupesDepartement.map((g) => g.major))
+  const secondOfficers = new Set(groupesService.map((g) => g.major))
+  for (const a of global) {
+    a.distinctions = distinctionsDe({
+      direction: a === captain,
+      departement: chiefOfficers.has(a),
+      service: secondOfficers.has(a),
+    })
+  }
+
   return {
     tousLesScores: global,
     laureats: {
+      // Captain ; les Chief officers sont majorsDepartement, les 2nd officers majorsService.
       majorGlobal: captain,
-      chiefOfficer,
-      secondOfficer,
       majorsDirection: groupesDirection.filter((g) => g.major).map((g) => ({ directionNom: g.directionNom, major: g.major!, totalAgents: g.scores.length })),
       majorsDepartement: groupesDepartement.filter((g) => g.major).map((g) => ({ departementNom: g.departementNom, directionNom: g.directionNom, major: g.major!, totalAgents: g.scores.length })),
       majorsService: groupesService.filter((g) => g.major).map((g) => ({ serviceNom: g.serviceNom, departementNom: g.departementNom, directionNom: g.directionNom, major: g.major!, totalAgents: g.scores.length })),
@@ -311,7 +321,7 @@ async function getFullClassementData(cible?: string) {
       campagne: null,
       provisoire: false,
       toutesLesCampagnes,
-      laureats: { majorGlobal: null, chiefOfficer: null, secondOfficer: null, majorsDirection: [], majorsDepartement: [], majorsService: [] },
+      laureats: { majorGlobal: null, majorsDirection: [], majorsDepartement: [], majorsService: [] },
       groupesDirection: [],
       groupesDepartement: [],
       groupesService: [],

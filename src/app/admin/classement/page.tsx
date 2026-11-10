@@ -36,12 +36,12 @@ import {
 import { getAppreciationInfo } from '@/lib/default-criteres'
 import { resumerBilanCloture, type BilanCloture, type SituationScore } from '@/lib/eligibilite'
 import { BadgeSituation, ListeNonClasses, texteSituation } from '@/components/SituationNotants'
-import { LIBELLES_DISTINCTION, type Distinction } from '@/lib/distinctions'
+import { LIBELLES_DISTINCTION, libelleComplet, type Distinction } from '@/lib/distinctions'
 
 const STYLES_DISTINCTION: Record<Distinction, string> = {
   CAPTAIN: 'bg-amber-100 text-amber-800 border-amber-200',
-  CHIEF_OFFICER: 'bg-slate-100 text-slate-800 border-slate-300',
-  SECOND_OFFICER: 'bg-orange-50 text-orange-800 border-orange-200',
+  CHIEF_OFFICER: 'bg-teal-100 text-teal-800 border-teal-200',
+  SECOND_OFFICER: 'bg-emerald-100 text-emerald-800 border-emerald-200',
 }
 
 interface ScoreItem {
@@ -67,8 +67,8 @@ interface ScoreItem {
   isMajorDirection: boolean
   isMajorDepartement: boolean
   isMajorService: boolean
-  /** Captain, Chief officer ou 2nd officer (1er, 2e, 3e du classement général) */
-  distinction?: Distinction | null
+  /** Captain (1er de la direction), Chief officer (1er du département), 2nd officer (1er du service) : cumulables */
+  distinctions?: Distinction[]
   totalInDirection: number
   totalInDepartement: number
   totalInService: number
@@ -113,8 +113,6 @@ interface ClassementData {
   toutesLesCampagnes?: CampagneSummary[]
   laureats: {
     majorGlobal: ScoreItem | null
-    chiefOfficer?: ScoreItem | null
-    secondOfficer?: ScoreItem | null
     majorsDirection: Array<{ directionNom: string; major: ScoreItem; totalAgents: number }>
     majorsDepartement: Array<{ departementNom: string; directionNom: string; major: ScoreItem; totalAgents: number }>
     majorsService: Array<{ serviceNom: string; departementNom: string; directionNom: string; major: ScoreItem; totalAgents: number }>
@@ -270,45 +268,40 @@ export default function ClassementPage() {
 
     // 1. Feuille 1: Palmarès & Lauréats
     const laureatsData: any[] = []
-    const officiersExport: [Distinction, ScoreItem | null | undefined, string | undefined][] = [
-      ['CAPTAIN', data.laureats.majorGlobal, data.campagne?.prixGlobal],
-      ['CHIEF_OFFICER', data.laureats.chiefOfficer, data.campagne?.prixDepartement],
-      ['SECOND_OFFICER', data.laureats.secondOfficer, data.campagne?.prixService],
-    ]
-    for (const [distinction, agent, prix] of officiersExport) {
-      if (!agent) continue
+    const captain = data.laureats.majorGlobal
+    if (captain) {
       laureatsData.push({
-        Niveau: `${LIBELLES_DISTINCTION[distinction].titre} (${LIBELLES_DISTINCTION[distinction].rang})`,
-        Entité: `${agent.service} [${agent.departement}]`,
-        Matricule: agent.matricule,
-        Nom: agent.nom,
-        Prénom: agent.prenom,
-        'Score Total (%)': agent.scoreTotal,
-        'Prime & Dotation': prix ?? '',
+        Niveau: libelleComplet('CAPTAIN'),
+        Entité: captain.direction,
+        Matricule: captain.matricule,
+        Nom: captain.nom,
+        Prénom: captain.prenom,
+        'Score Total (%)': captain.scoreTotal,
+        'Prime & Dotation': data.campagne?.prixGlobal ?? '',
       })
     }
 
     data.laureats.majorsDepartement.forEach((md) => {
       laureatsData.push({
-        Niveau: 'Premier du département',
+        Niveau: libelleComplet('CHIEF_OFFICER'),
         Entité: `${md.departementNom} (${md.directionNom})`,
         Matricule: md.major.matricule,
         Nom: md.major.nom,
         Prénom: md.major.prenom,
         'Score Total (%)': md.major.scoreTotal,
-        'Prime & Dotation': '',
+        'Prime & Dotation': data.campagne?.prixDepartement ?? '',
       })
     })
 
     data.laureats.majorsService.forEach((ms) => {
       laureatsData.push({
-        Niveau: 'Premier du service',
+        Niveau: libelleComplet('SECOND_OFFICER'),
         Entité: `${ms.serviceNom} [${ms.departementNom}]`,
         Matricule: ms.major.matricule,
         Nom: ms.major.nom,
         Prénom: ms.major.prenom,
         'Score Total (%)': ms.major.scoreTotal,
-        'Prime & Dotation': '',
+        'Prime & Dotation': data.campagne?.prixService ?? '',
       })
     })
 
@@ -331,7 +324,7 @@ export default function ClassementPage() {
           'Part manager (pts)': s.partManager,
           'Score Total (/100)': s.scoreTotal,
           Appréciation: app.appreciation,
-          Titre: s.isMajorDirection ? 'Premier de la direction' : '',
+          Titre: s.distinctions?.includes('CAPTAIN') ? libelleComplet('CAPTAIN') : '',
         })
       })
     })
@@ -353,7 +346,7 @@ export default function ClassementPage() {
           Prénom: s.prenom,
           'Score Total (%)': s.scoreTotal,
           Appréciation: app.appreciation,
-          Titre: s.isMajorDepartement ? 'Premier du département' : '',
+          Titre: s.distinctions?.includes('CHIEF_OFFICER') ? libelleComplet('CHIEF_OFFICER') : '',
         })
       })
     })
@@ -376,7 +369,7 @@ export default function ClassementPage() {
           Prénom: s.prenom,
           'Score Total (%)': s.scoreTotal,
           Appréciation: app.appreciation,
-          Titre: s.isMajorService ? 'Premier du service' : '',
+          Titre: s.distinctions?.includes('SECOND_OFFICER') ? libelleComplet('SECOND_OFFICER') : '',
         })
       })
     })
@@ -405,7 +398,7 @@ export default function ClassementPage() {
         'Score Total (/100)': s.scoreTotal,
         Appréciation: app.appreciation,
         Interprétation: app.interpretation,
-        Distinction: s.distinction ? LIBELLES_DISTINCTION[s.distinction].titre : '',
+        Distinctions: (s.distinctions ?? []).map((d) => LIBELLES_DISTINCTION[d].titre).join(' + '),
       }
     })
     const wsGlobal = XLSX.utils.json_to_sheet(globalData)
@@ -672,15 +665,15 @@ export default function ClassementPage() {
                   Distinctions de la campagne
                 </h2>
                 <p className="mt-1 max-w-md text-sm text-navy-200">
-                  Les trois distinctions récompensent les trois premiers du classement général, toutes entités confondues.
-                  Le premier de chaque département et de chaque service est également désigné.
+                  Il y a un lauréat par entité : le Captain pour la direction, un Chief officer par département
+                  et un 2nd officer par service. Les distinctions se cumulent.
                 </p>
               </div>
               <dl className="grid w-full grid-cols-1 gap-3 sm:grid-cols-3 lg:w-auto">
                 {[
-                  { label: `Captain · ${LIBELLES_DISTINCTION.CAPTAIN.rang}`, valeur: data.campagne.prixGlobal, or: true },
-                  { label: `Chief officer · ${LIBELLES_DISTINCTION.CHIEF_OFFICER.rang}`, valeur: data.campagne.prixDepartement },
-                  { label: `2nd officer · ${LIBELLES_DISTINCTION.SECOND_OFFICER.rang}`, valeur: data.campagne.prixService },
+                  { label: `Captain · ${LIBELLES_DISTINCTION.CAPTAIN.portee}`, valeur: data.campagne.prixGlobal, or: true },
+                  { label: `Chief officer · ${LIBELLES_DISTINCTION.CHIEF_OFFICER.portee}`, valeur: data.campagne.prixDepartement },
+                  { label: `2nd officer · ${LIBELLES_DISTINCTION.SECOND_OFFICER.portee}`, valeur: data.campagne.prixService },
                 ].map((d) => (
                   <div key={d.label} className={`rounded-lg p-4 ring-1 ${d.or ? 'bg-gold-500/10 ring-gold-500/40' : 'bg-white/5 ring-white/10'}`}>
                     <dt className={`text-xs font-medium ${d.or ? 'text-gold-300' : 'text-navy-200'}`}>{d.label}</dt>
@@ -822,7 +815,7 @@ export default function ClassementPage() {
                     <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10">
                       <div className="space-y-2">
                         <p className="flex items-center gap-2 text-sm font-medium text-gold-400">
-                          <Crown className="w-4 h-4" aria-hidden /> Captain · Premier toutes entités confondues
+                          <Crown className="w-4 h-4" aria-hidden /> Captain · {LIBELLES_DISTINCTION.CAPTAIN.portee}
                         </p>
                         <h3 className="text-2xl sm:text-3xl font-bold">
                           {anonymized ? 'Collaborateur Anonyme' : `${data.laureats.majorGlobal.prenom} ${data.laureats.majorGlobal.nom}`}
@@ -860,28 +853,7 @@ export default function ClassementPage() {
                   </div>
                 )}
 
-                {/* Chief officer (2e) et 2nd officer (3e), toutes entités confondues */}
-                {(data.laureats.chiefOfficer || data.laureats.secondOfficer) && (
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    {([
-                      ['CHIEF_OFFICER', data.laureats.chiefOfficer, data.campagne?.prixDepartement],
-                      ['SECOND_OFFICER', data.laureats.secondOfficer, data.campagne?.prixService],
-                    ] as const).map(([distinction, agent, prix]) =>
-                      agent ? (
-                        <CarteOfficier
-                          key={distinction}
-                          distinction={distinction}
-                          agent={agent}
-                          prix={prix}
-                          anonymise={anonymized}
-                          onConsulter={() => setSelectedScore(agent)}
-                        />
-                      ) : null
-                    )}
-                  </div>
-                )}
-
-                {/* Section Meilleurs Agents par Département */}
+                {/* Chief officers : le meilleur agent de chaque département */}
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -889,12 +861,12 @@ export default function ClassementPage() {
                         <Medal className="w-5 h-5" />
                       </div>
                       <div>
-                        <h3 className="text-lg font-bold text-slate-900">Meilleur agent par département</h3>
-                        <p className="text-xs text-slate-500">Premier de chaque département</p>
+                        <h3 className="text-lg font-bold text-slate-900">Chief officers · Meilleur agent de chaque département</h3>
+                        <p className="text-xs text-slate-500">Premier de chaque département · {data.campagne?.prixDepartement || '—'}</p>
                       </div>
                     </div>
                     <span className="text-xs font-semibold text-teal-700 bg-teal-50 border border-teal-100 px-3 py-1 rounded-full">
-                      {data.laureats.majorsDepartement.length} département{data.laureats.majorsDepartement.length > 1 ? 's' : ''}
+                      {data.laureats.majorsDepartement.length} Chief officer{data.laureats.majorsDepartement.length > 1 ? 's' : ''}
                     </span>
                   </div>
 
@@ -950,7 +922,7 @@ export default function ClassementPage() {
                   </div>
                 </div>
 
-                {/* Section Meilleurs Agents par Service / Cellule */}
+                {/* 2nd officers : le meilleur agent de chaque service */}
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -958,12 +930,12 @@ export default function ClassementPage() {
                         <Award className="w-5 h-5" />
                       </div>
                       <div>
-                        <h3 className="text-lg font-bold text-slate-900">Meilleur agent par service</h3>
-                        <p className="text-xs text-slate-500">Premier de chaque service</p>
+                        <h3 className="text-lg font-bold text-slate-900">2nd officers · Meilleur agent de chaque service</h3>
+                        <p className="text-xs text-slate-500">Premier de chaque service · {data.campagne?.prixService || '—'}</p>
                       </div>
                     </div>
                     <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 px-3 py-1 rounded-full">
-                      {data.laureats.majorsService.length} service{data.laureats.majorsService.length > 1 ? 's' : ''}
+                      {data.laureats.majorsService.length} 2nd officer{data.laureats.majorsService.length > 1 ? 's' : ''}
                     </span>
                   </div>
 
@@ -1320,9 +1292,9 @@ export default function ClassementPage() {
                   {selectedScore.rangDirection === 1 ? '1er' : `${selectedScore.rangDirection}e`}
                   <span className="text-xs text-navy-700 font-normal"> / {selectedScore.totalInDirection}</span>
                 </div>
-                {selectedScore.isMajorDirection && (
-                  <span className="text-2xs font-bold text-navy-800 bg-navy-100 px-2 py-0.5 rounded-md mt-1 inline-block">
-                    Premier de la direction
+                {selectedScore.distinctions?.includes('CAPTAIN') && (
+                  <span className="text-2xs font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md mt-1 inline-block">
+                    Captain
                   </span>
                 )}
               </div>
@@ -1334,9 +1306,9 @@ export default function ClassementPage() {
                   {selectedScore.rangDepartement === 1 ? '1er' : `${selectedScore.rangDepartement}e`}
                   <span className="text-xs text-teal-600 font-normal"> / {selectedScore.totalInDepartement}</span>
                 </div>
-                {selectedScore.isMajorDepartement && (
+                {selectedScore.distinctions?.includes('CHIEF_OFFICER') && (
                   <span className="text-2xs font-bold text-teal-700 bg-teal-100 px-2 py-0.5 rounded-md mt-1 inline-block">
-                    Premier du département
+                    Chief officer
                   </span>
                 )}
               </div>
@@ -1348,9 +1320,9 @@ export default function ClassementPage() {
                   {selectedScore.rangService === 1 ? '1er' : `${selectedScore.rangService}e`}
                   <span className="text-xs text-emerald-600 font-normal"> / {selectedScore.totalInService}</span>
                 </div>
-                {selectedScore.isMajorService && (
+                {selectedScore.distinctions?.includes('SECOND_OFFICER') && (
                   <span className="text-2xs font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md mt-1 inline-block">
-                    Premier du service
+                    2nd officer
                   </span>
                 )}
               </div>
@@ -1397,11 +1369,6 @@ export default function ClassementPage() {
                             ? '3e'
                             : `${selectedScore.rangGlobal}e`}
                         </div>
-                        {selectedScore.distinction && (
-                          <div className="mt-1 text-xs font-semibold text-gold-300">
-                            {LIBELLES_DISTINCTION[selectedScore.distinction].titre}
-                          </div>
-                        )}
                       </div>
                       <div className="text-right">
                         <div className="text-xs text-slate-300 uppercase font-semibold">Score Global TAMIS</div>
@@ -1903,28 +1870,17 @@ function ScoreTable({
 
                 <td className="px-4 py-4 text-center">
                   <div className="flex flex-wrap items-center justify-center gap-1">
-                    {score.distinction && (
+                    {(score.distinctions ?? []).map((distinction) => (
                       <span
-                        title={LIBELLES_DISTINCTION[score.distinction].rang}
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-bold border shadow-sm ${STYLES_DISTINCTION[score.distinction]}`}
+                        key={distinction}
+                        title={LIBELLES_DISTINCTION[distinction].portee}
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-bold border shadow-sm ${STYLES_DISTINCTION[distinction]}`}
                       >
-                        {score.distinction === 'CAPTAIN' && '👑 '}
-                        {LIBELLES_DISTINCTION[score.distinction].titre}
+                        {distinction === 'CAPTAIN' && '👑 '}
+                        {LIBELLES_DISTINCTION[distinction].titre}
                       </span>
-                    )}
-                    {score.isMajorDepartement && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-semibold bg-teal-50 text-teal-800 border border-teal-200">
-                        1er dép.
-                      </span>
-                    )}
-                    {score.isMajorService && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                        1er serv.
-                      </span>
-                    )}
-                    {!score.distinction && !score.isMajorDepartement && !score.isMajorService && (
-                      <span className="text-xs text-slate-300">-</span>
-                    )}
+                    ))}
+                    {!score.distinctions?.length && <span className="text-xs text-slate-300">-</span>}
                   </div>
                 </td>
 
@@ -2005,50 +1961,6 @@ function ScoreTable({
           })}
         </tbody>
       </table>
-    </div>
-  )
-}
-
-interface CarteOfficierProps {
-  distinction: Exclude<Distinction, 'CAPTAIN'>
-  agent: ScoreItem
-  prix?: string
-  anonymise: boolean
-  onConsulter: () => void
-}
-
-/** Carte du Chief officer (2e) ou du 2nd officer (3e) du classement général. */
-function CarteOfficier({ distinction, agent, prix, anonymise, onConsulter }: CarteOfficierProps) {
-  const { titre, rang } = LIBELLES_DISTINCTION[distinction]
-  const Icone = distinction === 'CHIEF_OFFICER' ? Medal : Award
-  const position = distinction === 'CHIEF_OFFICER' ? 2 : 3
-  return (
-    <div className="relative flex flex-col justify-between gap-5 overflow-hidden rounded-[var(--radius-card)] bg-navy-900 p-6 text-white shadow-card ring-1 ring-white/10">
-      <span aria-hidden className="pointer-events-none absolute -top-6 -right-2 text-[7rem] leading-none font-bold text-white/[0.04]">
-        {position}
-      </span>
-      <div className="relative space-y-2">
-        <p className="flex items-center gap-2 text-sm font-medium text-gold-300">
-          <Icone className="h-4 w-4" aria-hidden /> {titre} · {rang}
-        </p>
-        <h3 className="text-xl font-bold sm:text-2xl">{anonymise ? 'Collaborateur Anonyme' : `${agent.prenom} ${agent.nom}`}</h3>
-        <p className="text-sm text-navy-100">
-          Matricule : <span className="font-mono font-semibold">{agent.matricule}</span> • Service : <strong>{agent.service}</strong>
-        </p>
-      </div>
-      <div className="relative flex items-end justify-between gap-4 border-t border-white/15 pt-4">
-        <div>
-          <div className="text-xs font-semibold text-navy-200 uppercase">Score global</div>
-          <div className="text-2xl font-bold">{agent.scoreTotal.toFixed(1)} %</div>
-          {prix && <div className="mt-1 text-xs font-semibold text-navy-100">Distinction : {prix}</div>}
-        </div>
-        <button
-          onClick={onConsulter}
-          className="shrink-0 rounded-xl bg-white px-4 py-2.5 text-xs font-semibold text-navy-900 shadow-md transition-all hover:bg-gold-50 active:scale-95"
-        >
-          Fiche Bilan
-        </button>
-      </div>
     </div>
   )
 }
