@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma'
 import { requireAdmin } from '@/lib/auth'
 import { attribuerRangs, calculerScores, enregistrerScores } from '@/lib/scores'
 import { compterSituations, estClasse, type SituationScore } from '@/lib/eligibilite'
+import { campagneParDefaut } from '@/lib/campagne-par-defaut'
 import { distinctionsDe, type Distinction } from '@/lib/distinctions'
 
 export const dynamic = 'force-dynamic'
@@ -313,8 +314,7 @@ async function getFullClassementData(cible?: string) {
     if (Number.isFinite(annee)) return palmaresAnnuel(annee, toutesLesCampagnes)
   }
 
-  const choisie =
-    campagnes.find((c) => c.id === cible) ?? campagnes.find((c) => c.statut === 'OUVERTE') ?? campagnes[0]
+  const choisie = campagnes.find((c) => c.id === cible) ?? campagneParDefaut(campagnes)
 
   if (!choisie) {
     return {
