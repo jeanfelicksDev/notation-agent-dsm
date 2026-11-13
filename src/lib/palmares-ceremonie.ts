@@ -6,7 +6,7 @@ import type { Distinction } from '@/lib/distinctions'
  * un niveau par distinction, un lauréat par entité, rangés par ordre de mérite.
  */
 
-/** Champs de la réponse de GET /api/admin/classement utilisés par la page des résultats. */
+/** Champs du classement (src/lib/classement.ts) utilisés par la page des résultats. */
 interface AgentClasse {
   matricule: string
   nom: string
@@ -58,6 +58,20 @@ function versLaureat(entite: string, agent: AgentClasse, precision: string): Lau
   }
 }
 
+/**
+ * Nom officiel des directions, tel qu'il s'affiche sur la page des résultats.
+ * La base garde son libellé d'origine : seul l'affichage de cette page est corrigé.
+ */
+const NOMS_OFFICIELS_DES_DIRECTIONS: Readonly<Record<string, string>> = {
+  'DIRECTION SOLUTION MARITIME': 'DIRECTION DES SOLUTIONS MARITIMES',
+}
+
+/** Carte du Captain : la clé reste le libellé enregistré, l'affichage prend le nom officiel. */
+function versCaptain(agent: AgentClasse): Laureat {
+  const laureat = versLaureat(agent.direction, agent, `${agent.service} · ${agent.departement}`)
+  return { ...laureat, entite: NOMS_OFFICIELS_DES_DIRECTIONS[agent.direction] ?? agent.direction }
+}
+
 /** Du plus méritant au moins méritant, dans l'ordre du classement (total, part manager, part collègues). */
 function parMerite<T extends { major: AgentClasse }>(laureats: readonly T[]): T[] {
   return [...laureats].sort((a, b) => comparerScores(a.major, b.major))
@@ -66,9 +80,7 @@ function parMerite<T extends { major: AgentClasse }>(laureats: readonly T[]): T[
 export function versPalmares(reponse: ReponseClassement): Palmares {
   const { majorGlobal, majorsDepartement, majorsService } = reponse.laureats
   const niveaux: Record<Distinction, Laureat[]> = {
-    CAPTAIN: majorGlobal
-      ? [versLaureat(majorGlobal.direction, majorGlobal, `${majorGlobal.service} · ${majorGlobal.departement}`)]
-      : [],
+    CAPTAIN: majorGlobal ? [versCaptain(majorGlobal)] : [],
     CHIEF_OFFICER: parMerite(majorsDepartement).map((d) => versLaureat(d.departementNom, d.major, d.major.service)),
     SECOND_OFFICER: parMerite(majorsService).map((s) => versLaureat(s.serviceNom, s.major, s.departementNom)),
   }

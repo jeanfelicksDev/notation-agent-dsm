@@ -5,6 +5,7 @@ import { requireAdmin } from '@/lib/auth'
 import { validerPoids } from '@/lib/campagne'
 import { enregistrerScores } from '@/lib/scores'
 import { compterSituations, lireSeuilNotants, SEUIL_NOTANTS_MAX } from '@/lib/eligibilite'
+import { lireDateResultats } from '@/lib/publication-resultats'
 
 export async function GET(
   request: NextRequest,
@@ -101,6 +102,15 @@ export async function PATCH(
         )
       }
       data.seuilNotants = seuilNotants
+    }
+
+    // Vide (null) : résultats non publiés, la page des résultats n'est visible que de l'administrateur
+    if (has('dateResultats')) {
+      const dateResultats = lireDateResultats(body.dateResultats)
+      if (dateResultats === undefined) {
+        return NextResponse.json({ error: 'La date d’affichage des résultats est invalide.' }, { status: 400 })
+      }
+      data.dateResultats = dateResultats
     }
 
     for (const k of ['prixDirection', 'prixDepartement', 'prixService', 'prixGlobal'] as const) {

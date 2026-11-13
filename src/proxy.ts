@@ -9,7 +9,7 @@ export function proxy(request: NextRequest) {
 
   if (!token) {
     const url = new URL('/', request.url)
-    if (pathname.startsWith('/admin') || pathname.startsWith('/resultats')) {
+    if (pathname.startsWith('/admin')) {
       url.searchParams.set('reason', 'admin_required')
     } else {
       url.searchParams.set('reason', 'auth_required')
@@ -20,6 +20,7 @@ export function proxy(request: NextRequest) {
   return NextResponse.next()
 }
 
+// La page des résultats (/resultats) est publique : elle décide elle-même de ce qu'elle montre.
 export const config = {
-  matcher: ['/evaluer/:path*', '/admin/:path*', '/resultats/:path*'],
+  matcher: ['/evaluer/:path*', '/admin/:path*'],
 }

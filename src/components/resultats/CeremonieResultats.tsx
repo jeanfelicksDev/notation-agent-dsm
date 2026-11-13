@@ -1,15 +1,13 @@
 'use client'
 
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
-import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
-import { BrandMark } from '@/components/BrandMark'
+import { CadreResultats, MessageResultats } from '@/components/resultats/CadreResultats'
 import { CarteLaureat, type TailleCarte } from '@/components/resultats/CarteLaureat'
 import { Decompte } from '@/components/resultats/Decompte'
 import { celebrer } from '@/components/resultats/confettis'
 import { useSonCeremonie } from '@/components/resultats/useSonCeremonie'
 import { LIBELLES_DISTINCTION, type Distinction } from '@/lib/distinctions'
-import { versPalmares, type Laureat, type Palmares, type ReponseClassement } from '@/lib/palmares-ceremonie'
+import type { Laureat, Palmares } from '@/lib/palmares-ceremonie'
 import {
   avancer,
   delaiAvantSuite,
@@ -51,43 +49,7 @@ const NIVEAUX: Record<Distinction, Niveau> = {
   },
 }
 
-const ERREUR_GENERIQUE = 'Les résultats n’ont pas pu être chargés. Vérifiez la connexion puis rechargez la page.'
-
-/** Erreur dont le message peut être montré tel quel à l'écran. */
-class ErreurResultats extends Error {}
-
-type Chargement = { statut: 'chargement' } | { statut: 'erreur'; message: string } | { statut: 'pret'; palmares: Palmares }
-
-async function chargerPalmares(campagneId: string, signal: AbortSignal): Promise<Palmares> {
-  const reponse = await fetch(`/api/admin/classement?campagneId=${encodeURIComponent(campagneId)}`, {
-    cache: 'no-store',
-    signal,
-  })
-  if (reponse.status === 401) throw new ErreurResultats('Votre session a expiré. Reconnectez-vous pour afficher les résultats.')
-  if (!reponse.ok) throw new ErreurResultats(ERREUR_GENERIQUE)
-
-  const donnees = (await reponse.json()) as Partial<ReponseClassement>
-  // Pour un identifiant inconnu, l'API retombe sur une autre campagne : on refuse ce repli.
-  if (!donnees.laureats || donnees.campagne?.id !== campagneId) throw new ErreurResultats('Cette campagne est introuvable.')
-  return versPalmares(donnees as ReponseClassement)
-}
-
-function usePalmares(campagneId: string): Chargement {
-  const [chargement, setChargement] = useState<Chargement>({ statut: 'chargement' })
-
-  useEffect(() => {
-    const controleur = new AbortController()
-    chargerPalmares(campagneId, controleur.signal)
-      .then((palmares) => setChargement({ statut: 'pret', palmares }))
-      .catch((erreur: unknown) => {
-        if (controleur.signal.aborted) return
-        setChargement({ statut: 'erreur', message: erreur instanceof ErreurResultats ? erreur.message : ERREUR_GENERIQUE })
-      })
-    return () => controleur.abort()
-  }, [campagneId])
-
-  return chargement
-}
+const ERREUR_GENERIQUE = 'Les résultats n’ont pas pu être chargés. Rechargez la page dans un instant.'
 
 /**
  * Le décompte part dès l'ouverture de la page, puis la séquence avance seule : chaque niveau,
@@ -108,57 +70,26 @@ function useRevelation(niveaux: Palmares['niveaux']) {
   return { etat, dernierRevele }
 }
 
-type CeremonieResultatsProps = { campagneId: string }
-
-export default function CeremonieResultats({ campagneId }: CeremonieResultatsProps) {
-  const chargement = usePalmares(campagneId)
-  // Le palmarès annuel n'a pas de page de campagne : on revient au classement.
-  const retour = campagneId.startsWith('ANNUEL_')
-    ? `/admin/classement?campagneId=${encodeURIComponent(campagneId)}`
-    : `/admin/campagnes/${encodeURIComponent(campagneId)}`
-
-  return (
-    <div className="flex min-h-dvh flex-col bg-navy-950 bg-[radial-gradient(ellipse_80%_45%_at_50%_0%,rgb(212_175_55/0.16),transparent_70%)] text-white">
-      <EnTete libelle={chargement.statut === 'pret' ? chargement.palmares.libelle : ''} retour={retour} />
-      {chargement.statut === 'chargement' && <Message>Chargement des résultats…</Message>}
-      {chargement.statut === 'erreur' && <Message role="alert">{chargement.message}</Message>}
-      {chargement.statut === 'pret' &&
-        (chargement.palmares.aucunLaureat ? (
-          <Message>Aucun agent n’est encore classé pour cette campagne : il n’y a pas de lauréat à révéler.</Message>
-        ) : (
-          <Scene palmares={chargement.palmares} />
-        ))}
-    </div>
-  )
+type CeremonieResultatsProps = {
+  campagneId: string
+  libelle: string
+  /** Palmarès préparé par le serveur, qui a déjà vérifié que le visiteur peut le voir ; null s'il n'a pas pu être calculé. */
+  palmares: Palmares | null
+  /** Lien de retour vers l'administration : réservé aux administrateurs. */
+  avecRetour: boolean
 }
 
-function EnTete({ libelle, retour }: { libelle: string; retour: string }) {
+export default function CeremonieResultats({ campagneId, libelle, palmares, avecRetour }: CeremonieResultatsProps) {
   return (
-    <header className="flex flex-wrap items-center justify-between gap-4 px-6 pt-6 sm:px-10">
-      <div className="flex min-w-0 items-center gap-4">
-        <BrandMark size={44} />
-        <div className="min-w-0">
-          <p className="text-2xs font-semibold tracking-[0.25em] text-gold-400 uppercase">DSM TAMIS · Résultats</p>
-          <h1 className="font-display text-2xl font-semibold sm:text-3xl">{libelle || 'Résultats de la campagne'}</h1>
-        </div>
-      </div>
-      <Link
-        href={retour}
-        className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-navy-200 transition-colors hover:bg-white/10 hover:text-white"
-      >
-        <ArrowLeft className="h-4 w-4" aria-hidden /> Retour
-      </Link>
-    </header>
-  )
-}
-
-function Message({ children, role }: { children: React.ReactNode; role?: 'alert' }) {
-  return (
-    <main className="flex flex-1 items-center justify-center px-6 py-16">
-      <p role={role} className="max-w-xl text-center text-lg text-navy-100">
-        {children}
-      </p>
-    </main>
+    <CadreResultats campagneId={campagneId} libelle={libelle} avecRetour={avecRetour}>
+      {palmares === null && <MessageResultats role="alert">{ERREUR_GENERIQUE}</MessageResultats>}
+      {palmares?.aucunLaureat && (
+        <MessageResultats>
+          Aucun agent n’est encore classé pour cette campagne : il n’y a pas de lauréat à révéler.
+        </MessageResultats>
+      )}
+      {palmares && !palmares.aucunLaureat && <Scene palmares={palmares} />}
+    </CadreResultats>
   )
 }
 

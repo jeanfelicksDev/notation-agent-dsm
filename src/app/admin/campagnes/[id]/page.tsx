@@ -26,6 +26,7 @@ import SuiviParNote from '@/components/SuiviParNote'
 import AvancementParService from '@/components/AvancementParService'
 import { statutEvaluateur } from '@/lib/suivi-par-note'
 import { aDesNonSoumises, avancementParService, cleServiceSuivi } from '@/lib/avancement-service'
+import { depuisSaisieLocale, versSaisieLocale } from '@/lib/publication-resultats'
 
 interface Critere {
   id: string
@@ -68,6 +69,8 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
     // Vide : règle historique (campagnes antérieures), sans protection contre les notants défaillants
     seuilNotants: SEUIL_NOTANTS_PAR_DEFAUT as number | '',
     statut: 'OUVERTE',
+    // Jour et heure d'affichage des résultats, en heure locale. Vide : aucune retenue.
+    dateResultats: '',
     prixGlobal: '',
     prixDirection: '',
     prixDepartement: '',
@@ -171,6 +174,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
             poidsClient: data.poidsClient ?? 25,
             seuilNotants: data.seuilNotants ?? '',
             statut: data.statut || 'OUVERTE',
+            dateResultats: versSaisieLocale(data.dateResultats),
             prixGlobal: data.prixGlobal ?? '',
             prixDirection: data.prixDirection ?? '',
             prixDepartement: data.prixDepartement ?? '',
@@ -187,6 +191,12 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault()
+    // L'heure saisie est celle du poste : elle part au serveur sous forme d'instant sans ambiguïté.
+    const dateResultats = depuisSaisieLocale(formData.dateResultats)
+    if (dateResultats === undefined) {
+      setError('Le jour et l’heure d’affichage des résultats sont illisibles. Corrigez-les ou videz le champ.')
+      return
+    }
     setSaving(true)
     setError('')
     setSaveSuccess(false)
@@ -195,7 +205,7 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
       const res = await fetch(`/api/admin/campagnes/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({ ...formData, dateResultats })
       })
 
       if (res.ok) {
@@ -547,6 +557,28 @@ export default function CampagneDetailPage({ params }: { params: Promise<{ id: s
                         <option value="CLOTUREE">🔒 Clôturée (Votes figés)</option>
                         <option value="CALCULEE">📊 Calculée (Scores générés)</option>
                       </select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label htmlFor="date-resultats" className="text-2xs font-bold text-slate-400 uppercase tracking-widest ml-1">
+                        Affichage des résultats (jour et heure)
+                      </label>
+                      <div className="relative">
+                        <input
+                          id="date-resultats"
+                          type="datetime-local"
+                          aria-describedby="date-resultats-aide"
+                          className="w-full px-5 py-3.5 pl-12 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 focus:bg-white transition-all outline-none font-semibold text-slate-800"
+                          value={formData.dateResultats}
+                          onChange={e => setFormData({ ...formData, dateResultats: e.target.value })}
+                        />
+                        <Clock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                      </div>
+                      <p id="date-resultats-aide" className="text-xs text-slate-500 ml-1">
+                        {formData.dateResultats
+                          ? 'À partir de ce moment, la page des résultats est ouverte à tous, sans connexion. Avant, elle n’affiche qu’un écran d’attente, puis la révélation démarre d’elle-même.'
+                          : 'Vide : les résultats ne sont pas publiés. Vous seul pouvez ouvrir la page des résultats, pour préparer la révélation.'}
+                      </p>
                     </div>
 
                     <div className="space-y-4 md:col-span-2 pt-4">

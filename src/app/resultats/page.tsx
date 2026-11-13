@@ -1,19 +1,19 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
-import { requireAdmin } from '@/lib/auth'
 import { campagneParDefaut } from '@/lib/campagne-par-defaut'
 import prisma from '@/lib/prisma'
 
 export const metadata: Metadata = { title: 'Résultats de la campagne' }
 
+// Lue en base à chaque visite : la campagne en cours change d'une campagne à l'autre.
+export const dynamic = 'force-dynamic'
+
 /**
- * Adresse courte /resultats : renvoie vers la page des résultats de la campagne en cours
- * (la campagne ouverte, sinon la plus récente), sans avoir à connaître son identifiant.
+ * Adresse courte /resultats, ouverte à tous sans connexion : renvoie vers la page des résultats
+ * de la campagne en cours (la campagne ouverte, sinon la plus récente), sans avoir à connaître
+ * son identifiant. C'est cette page qui décide de ce qu'un visiteur peut voir.
  */
 export default async function ResultatsCampagneEnCoursPage() {
-  const admin = await requireAdmin()
-  if (!admin) redirect('/?reason=admin_required')
-
   const campagnes = await prisma.campagne.findMany({
     select: { id: true, statut: true },
     orderBy: { dateDebut: 'desc' },

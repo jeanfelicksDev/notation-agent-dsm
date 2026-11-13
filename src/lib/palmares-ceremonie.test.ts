@@ -39,10 +39,24 @@ describe('versPalmares', () => {
     expect(palmares.provisoire).toBe(true)
   })
 
-  it('présente le Captain avec sa direction', () => {
+  it('présente le Captain avec le nom officiel de sa direction', () => {
     expect(versPalmares(reponse).niveaux.CAPTAIN).toEqual([
-      { cle: 'DIRECTION SOLUTION MARITIME', entite: 'DIRECTION SOLUTION MARITIME', nomComplet: 'Awa KONE', precision: 'Magasin · Manutention', scoreTotal: 87 },
+      {
+        cle: 'DIRECTION SOLUTION MARITIME',
+        entite: 'DIRECTION DES SOLUTIONS MARITIMES',
+        nomComplet: 'Awa KONE',
+        precision: 'Magasin · Manutention',
+        scoreTotal: 87,
+      },
     ])
+  })
+
+  it('affiche telle quelle une direction sans nom officiel connu', () => {
+    const ailleurs: ReponseClassement = {
+      ...reponse,
+      laureats: { ...reponse.laureats, majorGlobal: { ...awa, direction: 'Direction Logistique' } },
+    }
+    expect(versPalmares(ailleurs).niveaux.CAPTAIN[0].entite).toBe('Direction Logistique')
   })
 
   it('présente un Chief officer par département, du plus méritant au moins méritant', () => {

@@ -116,6 +116,9 @@ model Campagne {
   /// Nombre de notants (manager compris) à partir duquel un notant défaillant ne pénalise plus le noté.
   /// null : règle historique des campagnes antérieures (une note oubliée compte 0, pas d'exclusion).
   seuilNotants    Int?           @default(3)
+  /// Jour et heure à partir desquels la page des résultats (/resultats) est ouverte à tous, sans connexion.
+  /// null : résultats non publiés, la page n'est visible que de l'administrateur.
+  dateResultats   DateTime?
 
   @@index([statut])
 }
