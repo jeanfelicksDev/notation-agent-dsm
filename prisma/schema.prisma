@@ -113,6 +113,12 @@ model Campagne {
   prixDepartement String?        @default("Certificat de Mérite + Prime")
   prixService     String?        @default("Diplôme d'Honneur + Prime")
   prixGlobal      String?        @default("Super Lauréat DSM 360°")
+  /// Nombre de notants (manager compris) à partir duquel un notant défaillant ne pénalise plus le noté.
+  /// null : règle historique des campagnes antérieures (une note oubliée compte 0, pas d'exclusion).
+  seuilNotants    Int?           @default(3)
+  /// Jour et heure à partir desquels la page des résultats (/resultats) est ouverte à tous, sans connexion.
+  /// null : résultats non publiés, la page n'est visible que de l'administrateur.
+  dateResultats   DateTime?
 
   @@index([statut])
 }
@@ -147,6 +153,8 @@ model Affectation {
   motifInvalidation       MotifInvalidation?
   commentaireInvalidation String?
   invalideeAt             DateTime?
+  /// Date et heure de la soumission définitive (statut TERMINEE)
+  termineeAt   DateTime?
   createdAt    DateTime          @default(now())
   campagne     Campagne          @relation(fields: [campagneId], references: [id], onDelete: Cascade)
   evalue       Utilisateur       @relation("EvalueAffectations", fields: [evalueId], references: [id], onDelete: Cascade)
@@ -210,6 +218,12 @@ model ScoreFinal {
   /// Part manager / collègues neutralisée suite à l'invalidation de tous ses notants
   managerNeutralise   Boolean @default(false)
   colleguesNeutralise Boolean @default(false)
+  /// Situation du noté face aux notants défaillants (null : campagne en règle historique)
+  situation         SituationScore?
+  /// Notants ayant soumis / notants affectés, hors notants invalidés
+  nbNotants         Int @default(0)
+  nbNotantsAttendus Int @default(0)
+  /// null : non classé (aucune note du manager)
   rang           Int?
   createdAt      DateTime    @default(now())
   campagne       Campagne    @relation(fields: [campagneId], references: [id], onDelete: Cascade)
@@ -239,6 +253,22 @@ enum StatutAffectation {
   TERMINEE
 }
 
+/// Situation d'un noté à la clôture, selon les notants qui ont soumis leur évaluation
+enum SituationScore {
+  /// Tous ses notants ont soumis, seuil atteint
+  COMPLET
+  /// Seuil atteint, manager compris : les notants défaillants sont ignorés
+  PROTEGE
+  /// Ancienne règle (scores enregistrés avant la 0011) : seuil non atteint, chaque défaillant comptait 0
+  PENALISE
+  /// Aucune note du manager : non classé
+  SANS_MANAGER
+  /// N'a pas soumis ses propres évaluations : non classé
+  NON_NOTANT
+  /// Moins de notants que le seuil ont soumis : non classé
+  SEUIL_NON_ATTEINT
+}
+
 enum MotifInvalidation {
   FORCE_MAJEURE
   ACCIDENT
@@ -253,4 +283,6 @@ enum Role {
   /// Membre du personnel enregistré dans l'annuaire, hors campagne : ni noté, ni notant, sans connexion.
   CADRE
   EXTERNE
+  /// Agent de l'annuaire qui ne remplit pas les critères de participation : ni noté, ni notant, sans connexion.
+  NON_ELIGIBLE
 }

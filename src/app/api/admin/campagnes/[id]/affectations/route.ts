@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { requireAdmin } from '@/lib/auth'
+import { pairesManagersDuService } from '@/lib/repartition-service'
+import { memeServiceDeNotation, serviceDeNotation } from '@/lib/service-notation'
 
 export async function GET(
   req: NextRequest,
@@ -46,9 +48,9 @@ export async function POST(
       const managerUsers = allUsers.filter(u => u.role === 'MANAGER')
 
       for (const user of evalueUsers) {
-        // A. Assigner les collègues (pairs) du même service
+        // A. Assigner les collègues (pairs) du même service de notation, ainsi que les cadres du service (vote facultatif)
         if (user.service) {
-          const sameServicePeers = allUsers.filter(u => u.service === user.service && u.id !== user.id && u.role === 'UTILISATEUR')
+          const sameServicePeers = allUsers.filter(u => memeServiceDeNotation(u.service, user.service) && u.id !== user.id && (u.role === 'UTILISATEUR' || u.role === 'CADRE'))
           for (const peer of sameServicePeers) {
             const key = `${peer.id}_${user.id}`
             if (!existingKeys.has(key)) {
@@ -61,7 +63,7 @@ export async function POST(
         // B. Assigner les Managers (du même service ou du même département)
         const relevantManagers = managerUsers.filter(m => 
           (user.departement && m.departement === user.departement) ||
-          (user.service && m.service === user.service)
+          (user.service && memeServiceDeNotation(m.service, user.service))
         )
         for (const mgr of relevantManagers) {
           if (mgr.id !== user.id) {
@@ -84,6 +86,17 @@ export async function POST(
       return NextResponse.json({ success: true, count: newAffectationsData.length })
     }
 
+    // 1 bis. Les Pairs d'un même service se notent tous entre eux (paires manquantes seulement)
+    if (mode === 'pairs_service') {
+      const ajoutees = await affecterPairsDuService(id)
+      return NextResponse.json({ success: true, ajoutees })
+    }
+
+    // 1 ter. Chaque manager note tous les Pairs de son service (paires manquantes seulement)
+    if (mode === 'managers_service') {
+      return NextResponse.json({ success: true, ...(await affecterManagersDuService(id)) })
+    }
+
     // 2. Mode PAR COLLABORATEUR (Évalué) : la liste `evaluateurIds` devient celle des évaluateurs de `evalueId`.
     if (mode === 'by_evalue' || (evalueId && Array.isArray(evaluateurIds))) {
       if (!evalueId || !Array.isArray(evaluateurIds)) {
@@ -100,16 +113,94 @@ export async function POST(
     const resultat = await synchroniser(id, { evaluateurId }, 'evalueId', evalueIds, evaluateurId, internes)
     return NextResponse.json({ success: true, ...resultat })
   } catch (error) {
+    if (error instanceof ErreurAffectation) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
     console.error('Affectation error:', error)
     return NextResponse.json({ error: 'Erreur lors de la mise à jour des affectations' }, { status: 500 })
   }
 }
 
 /**
+ * Chaque Pair est noté par tous les autres Pairs de son service de notation (Magasin et Matériel
+ * n'en font qu'un). N'ajoute que les paires manquantes :
+ * les affectations existantes (managers, clients internes, statuts, notes) restent intactes.
+ */
+async function affecterPairsDuService(campagneId: string): Promise<number> {
+  const pairs = await prisma.utilisateur.findMany({
+    where: { role: 'UTILISATEUR', service: { not: null } },
+    select: { id: true, service: true },
+  })
+  const parService = new Map<string, string[]>()
+  for (const p of pairs) {
+    const service = serviceDeNotation(p.service)
+    if (!service) continue
+    parService.set(service, [...(parService.get(service) ?? []), p.id])
+  }
+
+  const data = [...parService.values()].flatMap((ids) =>
+    ids.flatMap((evaluateurId) =>
+      ids.filter((evalueId) => evalueId !== evaluateurId).map((evalueId) => ({ campagneId, evaluateurId, evalueId }))
+    )
+  )
+  if (data.length === 0) return 0
+  const { count } = await prisma.affectation.createMany({ data, skipDuplicates: true })
+  return count
+}
+
+/**
+ * Chaque manager note tous les Pairs de son service (règles : lib/repartition-service). N'ajoute que les
+ * paires manquantes : les affectations existantes (statuts, notes, qualité « client interne ») restent intactes.
+ */
+async function affecterManagersDuService(campagneId: string): Promise<{ ajoutees: number; managersSansService: number }> {
+  const agents = await prisma.utilisateur.findMany({
+    where: { role: { in: ['MANAGER', 'UTILISATEUR'] } },
+    select: { id: true, role: true, service: true },
+  })
+  const { paires, managersSansService } = pairesManagersDuService(agents)
+  if (paires.length === 0) return { ajoutees: 0, managersSansService }
+  const { count } = await prisma.affectation.createMany({
+    data: paires.map((p) => ({ campagneId, ...p })),
+    skipDuplicates: true,
+  })
+  return { ajoutees: count, managersSansService }
+}
+
+/**
+ * DELETE — remet à zéro la répartition de la campagne : toutes ses affectations et les notes internes
+ * qui en dépendent (brouillons comme évaluations soumises), ainsi que les scores enregistrés.
+ * Les avis clients (QR) sont conservés.
+ */
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const admin = await requireAdmin()
+  if (!admin) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
+
+  const { id } = await params
+  try {
+    // Les scores enregistrés reposaient sur ces notes : ils partent aussi
+    const [notes, affectations] = await prisma.$transaction([
+      prisma.note.deleteMany({ where: { campagneId: id } }),
+      prisma.affectation.deleteMany({ where: { campagneId: id } }),
+      prisma.scoreFinal.deleteMany({ where: { campagneId: id } }),
+    ])
+    return NextResponse.json({ success: true, affectations: affectations.count, notes: notes.count })
+  } catch (error) {
+    console.error('Réinitialisation error:', error)
+    return NextResponse.json({ error: 'Erreur lors de la réinitialisation des affectations' }, { status: 500 })
+  }
+}
+
+/** Demande de répartition contraire aux règles métier (renvoyée en 400). */
+class ErreurAffectation extends Error {}
+
+/**
  * Aligne les affectations sur la liste voulue SANS toucher à celles qui restent :
  * leur statut (brouillon, soumise) et leurs notes sont conservés. Seules les paires
  * retirées sont supprimées et les nouvelles créées ; la qualité « client interne » est
- * mise à jour sur toutes. L'auto-évaluation est toujours exclue.
+ * mise à jour sur toutes. L'auto-évaluation est toujours exclue, et un cadre n'est jamais noté.
  */
 async function synchroniser(
   campagneId: string,
@@ -119,7 +210,25 @@ async function synchroniser(
   soiMeme: string,
   internes: Set<string>
 ) {
-  const cibles = new Set(voulus.filter((v): v is string => typeof v === 'string' && v !== '' && v !== soiMeme))
+  const demandes = voulus.filter((v): v is string => typeof v === 'string' && v !== '' && v !== soiMeme)
+  // Un agent non-éligible n'apparaît dans aucune affectation, ni comme notant ni comme noté
+  const nonEligibles = await prisma.utilisateur.findMany({
+    where: { id: { in: [soiMeme, ...demandes] }, role: 'NON_ELIGIBLE' },
+    select: { prenom: true, nom: true },
+  })
+  if (nonEligibles.length > 0) {
+    const noms = nonEligibles.map((u) => `${u.prenom} ${u.nom}`.trim()).join(', ')
+    throw new ErreurAffectation(`Hors campagne, car non-éligible : ${noms}.`)
+  }
+  // Un cadre peut noter mais ne peut jamais être noté
+  const evaluesDemandes = cote === 'evalueId' ? demandes : 'evalueId' in fixe ? [fixe.evalueId] : []
+  const cadres = new Set(
+    (await prisma.utilisateur.findMany({ where: { id: { in: evaluesDemandes }, role: 'CADRE' }, select: { id: true } })).map((u) => u.id)
+  )
+  if ('evalueId' in fixe && cadres.has(fixe.evalueId)) {
+    throw new ErreurAffectation('Un cadre ne peut pas être noté.')
+  }
+  const cibles = new Set(demandes.filter((c) => !cadres.has(c)))
   const existantes = await prisma.affectation.findMany({
     where: { campagneId, ...fixe },
     select: { id: true, evaluateurId: true, evalueId: true, clientInterne: true },

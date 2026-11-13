@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { requireAdmin } from '@/lib/auth'
+import { compteCommeManager } from '@/lib/criteres'
 
 export const dynamic = 'force-dynamic'
 
@@ -94,13 +95,18 @@ export async function GET(
     // Statut de chaque évaluation : seules les évaluations soumises comptent dans le score.
     const affectations = await prisma.affectation.findMany({
       where: { evalueId: userId, campagneId: campagne.id },
-      select: { evaluateurId: true, statut: true },
+      select: { evaluateurId: true, statut: true, clientInterne: true },
     })
-    const statutPar = new Map(affectations.map((a) => [a.evaluateurId, a.statut]))
-    const evaluateursNotes = Array.from(evaluateurMap.values()).map((e) => ({
-      ...e,
-      soumis: statutPar.get(e.evaluateur.id) === 'TERMINEE',
-    }))
+    const affectationPar = new Map(affectations.map((a) => [a.evaluateurId, a]))
+    const evaluateursNotes = Array.from(evaluateurMap.values()).map((e) => {
+      const affectation = affectationPar.get(e.evaluateur.id)
+      return {
+        ...e,
+        soumis: affectation?.statut === 'TERMINEE',
+        // Bloc du score où comptent ses notes : un manager client interne compte avec les clients internes
+        bloc: compteCommeManager(e.evaluateur.role, affectation?.clientInterne ?? false) ? 'MANAGER' : 'COLLEGUES',
+      }
+    })
 
     // Grouper les notes clients par client (ipHash ou clientId)
     const clientMap = new Map<

@@ -4,32 +4,34 @@ import { Suspense, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
-import { AlertCircle, ArrowLeft, ArrowRight, ArrowUpRight, CircleCheck, Eye, EyeOff, Info, Loader2, Lock, Phone, Play, User } from 'lucide-react'
+import { AlertCircle, ArrowLeft, ArrowRight, ArrowUpRight, ChevronRight, CircleCheck, CirclePlay, Eye, EyeOff, Info, Loader2, Lock, Mail, Phone, User } from 'lucide-react'
 import { destinationPourRole } from '@/lib/roles'
 import { BrandMark } from '@/components/BrandMark'
+import { ParticipationModal } from '@/components/ParticipationModal'
 import { libelleCampagne } from '@/lib/libelle'
+import { CLE_TRANSMISSION, typeDeSaisie } from '@/lib/identifiant-client'
 
 const QRCode = dynamic(() => import('qrcode.react').then((m) => m.QRCodeSVG), { ssr: false })
 
-type Etape = 'identifiant' | 'choix' | 'connexion' | 'definir' | 'contact_admin'
+type Etape = 'identifiant' | 'connexion' | 'definir' | 'contact_admin'
 
-/** Guide animé de la connexion (page statique de /public), proposé sur téléphone après le matricule. */
-const PRESENTATION_CONNEXION = '/presentation-connexion.html'
-
-/** Téléphone ou tablette : c'est avec eux qu'on scanne le QR code de l'accueil. */
-function estAppareilMobile() {
-  const ua = navigator.userAgent
-  // iPadOS se présente comme un Mac : on le reconnaît à son écran tactile
-  return /Android|iPhone|iPad|iPod|Mobile/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)
-}
-
-type CampagnePublique = { libelle: string; dateFin: string; completionRate: number } | null
+type CampagnePublique = { libelle: string; dateFin: string; tauxInterne: number; tauxExterne: number | null } | null
 
 const MESSAGES_REDIRECTION: Record<string, string> = {
   admin_required: 'Cet espace est réservé aux administrateurs. Connectez-vous avec un compte administrateur.',
   auth_required: 'Connectez-vous pour continuer.',
   session_expired: 'Votre session a expiré. Connectez-vous à nouveau.',
 }
+
+/** Longueur des identifiants saisis : matricule DSM (4 caractères) et téléphone client (10 chiffres). */
+const LONGUEUR_MATRICULE = 4
+const LONGUEUR_TELEPHONE = 10
+const LONGUEUR_EMAIL_MAX = 254
+
+/** Client externe : une lettre ou un « @ » signale une adresse e-mail, sinon on ne garde que les chiffres du numéro. */
+const saisieEmail = (v: string) => /[a-z@]/i.test(v)
+const saisieClient = (v: string) =>
+  saisieEmail(v) ? v.replace(/\s/g, '').slice(0, LONGUEUR_EMAIL_MAX) : v.replace(/\D/g, '').slice(0, LONGUEUR_TELEPHONE)
 
 const ETAPES_GUIDE = [
   ['Identification', 'Saisissez votre matricule officiel DSM pour démarrer votre session.'],
@@ -73,8 +75,6 @@ export default function Accueil() {
 function AccueilContenu() {
   const reason = useSearchParams().get('reason')
   const [etape, setEtape] = useState<Etape>('identifiant')
-  // Étape du code PIN qui suit l'écran « choix » (présentation ou connexion immédiate)
-  const [etapePin, setEtapePin] = useState<'connexion' | 'definir'>('connexion')
   // Collaborateur : matricule ; client externe : téléphone, puis portail d'avis
   const [profil, setProfil] = useState<'collaborateur' | 'client'>('collaborateur')
   const [identifiant, setIdentifiant] = useState('')
@@ -86,6 +86,7 @@ function AccueilContenu() {
   const [error, setError] = useState(() => (reason && MESSAGES_REDIRECTION[reason]) || '')
   const [loading, setLoading] = useState(false)
   const [campagne, setCampagne] = useState<CampagnePublique>(null)
+  const [participationOuverte, setParticipationOuverte] = useState(false)
   const secretRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -131,10 +132,10 @@ function AccueilContenu() {
     setLoading(true)
     try {
       if (etape === 'identifiant' && profil === 'client') {
-        const tel = identifiant.trim()
-        if (tel.replace(/\D/g, '').length < 8) return setError('Saisissez votre numéro de téléphone complet.')
-        // Jamais dans l'adresse de la page : le numéro transite par le stockage de session.
-        sessionStorage.setItem('dsm-client-telephone', tel)
+        const saisie = identifiant.trim()
+        if (!typeDeSaisie(saisie)) return setError('Saisissez votre numéro de téléphone complet ou votre adresse e-mail.')
+        // Jamais dans l'adresse de la page : la saisie transite par le stockage de session.
+        sessionStorage.setItem(CLE_TRANSMISSION, saisie)
         window.location.href = '/qr'
         return
       }
@@ -143,14 +144,7 @@ function AccueilContenu() {
         const { res, data } = await post('/api/auth/identifier', { identifiant })
         if (!res.ok) return setError(data.error || 'Identifiant inconnu.')
         setEstAdmin(Boolean(data.admin))
-        const suivante = data.etat === 'pin_a_definir' ? 'definir' : data.etat === 'contact_admin' ? 'contact_admin' : 'connexion'
-        // Sur téléphone (QR code de l'accueil), l'agent reconnu choisit : voir la présentation ou se connecter
-        if (suivante !== 'contact_admin' && !data.admin && estAppareilMobile()) {
-          setEtapePin(suivante)
-          setEtape('choix')
-          return
-        }
-        setEtape(suivante)
+        setEtape(data.etat === 'pin_a_definir' ? 'definir' : data.etat === 'contact_admin' ? 'contact_admin' : 'connexion')
         return
       }
 
@@ -185,7 +179,6 @@ function AccueilContenu() {
   const estClient = profil === 'client'
   const titre = {
     identifiant: 'Connexion',
-    choix: 'Bienvenue',
     connexion: estAdmin ? 'Votre mot de passe' : 'Votre PIN',
     definir: 'Choisissez votre PIN',
     contact_admin: 'Compte à activer',
@@ -199,54 +192,62 @@ function AccueilContenu() {
       <Quadrillage />
       <Compas />
 
-      <div className="relative mx-auto flex min-h-dvh w-full max-w-[1480px] flex-col px-5 sm:px-10 lg:px-16">
+      <div className="relative flex min-h-dvh w-full flex-col px-5 sm:px-10 lg:px-[clamp(3rem,6vw,9rem)]">
         {/* ─── En-tête ─── */}
-        <header className="flex items-center gap-4 border-b border-white/[0.06] py-6 sm:py-7">
-          <span className="rounded-2xl bg-gradient-to-b from-gold-300 to-gold-600 p-[3px] shadow-[0_10px_28px_-8px_rgb(212_175_55/0.6)]">
-            <BrandMark size={50} />
-          </span>
-          <div className="leading-tight">
-            <p className="flex items-center gap-2.5 text-lg font-bold tracking-[0.02em] sm:text-xl">
-              DSM TAMIS
-              <span className="rounded-full px-2.5 py-0.5 text-[10.5px] font-semibold tracking-[0.12em] text-gold-300 ring-1 ring-gold-400/50">
-                OFFICIEL
-              </span>
-            </p>
-            <p className="mt-1 hidden text-sm tracking-[0.02em] text-navy-200 sm:block">Direction des Solutions Maritimes</p>
+        {/* Grand écran : marque | « Comment noter » centré | lien client ; en dessous, le bouton passe sur sa propre ligne */}
+        <header className="flex flex-wrap items-center gap-x-4 gap-y-5 border-b border-white/[0.06] py-6 sm:py-7 lg:grid lg:grid-cols-[1fr_auto_1fr]">
+          <div className="flex items-center gap-4">
+            <span className="rounded-2xl bg-gradient-to-b from-gold-300 to-gold-600 p-[3px] shadow-[0_10px_28px_-8px_rgb(212_175_55/0.6)]">
+              <BrandMark size={50} />
+            </span>
+            <div className="leading-tight">
+              <p className="flex items-center gap-2.5 text-lg font-semibold tracking-[0.02em] sm:text-xl">
+                DSM TAMIS
+                <span className="rounded-full px-2.5 py-0.5 text-2xs font-semibold tracking-[0.12em] text-gold-300 ring-1 ring-gold-400/50">
+                  OFFICIEL
+                </span>
+              </p>
+              <p className="mt-1 hidden text-sm tracking-[0.02em] text-navy-200 sm:block">Direction des Solutions Maritimes</p>
+            </div>
           </div>
-          <Link
-            href="/qr"
-            className="group ml-auto inline-flex items-center gap-2 rounded-full bg-white/[0.03] px-4 py-2.5 text-sm text-navy-100 ring-1 ring-white/15 transition-colors hover:bg-white/[0.07] hover:text-white hover:ring-gold-400/40"
-          >
-            <span className="hidden sm:inline">Vous êtes client ?</span>
-            <strong className="font-semibold text-white">Donnez votre avis</strong>
-            <ArrowUpRight className="h-4 w-4 text-gold-400 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" aria-hidden />
-          </Link>
+          <div className="flex w-full justify-center sm:order-last lg:order-none lg:w-auto">
+            {/* Didacticiel animé avec voix off, lancé dès l'ouverture ; sa dernière scène ramène ici. */}
+            <a
+              href="/presentation-connexion.html?lancer=1"
+              className="group inline-flex items-center justify-center gap-3 whitespace-nowrap rounded-full bg-gradient-to-b from-[#a6ff7a] to-[#39ff14] px-7 py-3.5 text-[#071a33] ring-2 ring-[#d4ffc2]/70 animate-clignote transition-[filter,transform] hover:animate-none hover:brightness-110 active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#39ff14] sm:gap-4 sm:px-9 sm:py-4"
+            >
+              <CirclePlay className="h-8 w-8 transition-transform group-hover:scale-110 sm:h-10 sm:w-10" aria-hidden />
+              <span className="flex flex-col items-start gap-1.5">
+                <span className="text-2xl leading-none font-bold sm:text-[1.75rem]">Comment noter&nbsp;?</span>
+                <span className="text-sm leading-none font-semibold text-[#071a33]/75">Cliquer pour suivre le tuto.</span>
+              </span>
+            </a>
+          </div>
+          <div className="flex w-full sm:ml-auto sm:w-auto lg:ml-0 lg:justify-self-end">
+            <Link
+              href="/qr"
+              className="group inline-flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full sm:flex-none bg-white/[0.03] px-4 py-2.5 text-sm text-navy-100 ring-1 ring-white/15 transition-colors hover:bg-white/[0.07] hover:text-white hover:ring-gold-400/40"
+            >
+              <span className="hidden sm:inline">Vous êtes client ?</span>
+              <strong className="font-semibold text-white">Donnez votre avis</strong>
+              <ArrowUpRight className="h-4 w-4 text-gold-400 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" aria-hidden />
+            </Link>
+          </div>
         </header>
 
-        <main className="grid flex-1 items-center gap-12 py-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,35rem)] lg:gap-16 xl:gap-24 lg:py-14">
+        <main className="grid flex-1 items-center gap-12 py-10 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:gap-[clamp(3rem,6vw,10rem)] lg:py-14 2xl:grid-cols-[minmax(0,1fr)_auto] 2xl:gap-[clamp(3rem,4vw,7rem)] 2xl:py-8">
           {/* ─── Présentation et campagne ─── */}
-          <section aria-labelledby="titre-page" className="min-w-0">
-            <span className="inline-flex animate-entree items-center gap-2.5 rounded-full bg-navy-900/70 px-4 py-2 text-xs font-semibold tracking-[0.08em] text-navy-100 ring-1 ring-white/15 sm:text-[13px]">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgb(52_211_153/0.7)]" aria-hidden />
-              PORTAIL RH INTERNE SÉCURISÉ
-            </span>
-
+          <section aria-labelledby="titre-page" className="min-w-0 lg:max-w-[clamp(40rem,46vw,60rem)]">
             <h1
               id="titre-page"
-              className="mt-8 animate-entree text-[2.9rem] leading-[1.02] font-bold tracking-[-0.035em] text-white [animation-delay:60ms] sm:text-[3.9rem] xl:text-[4.5rem]"
+              className="animate-entree text-[2.9rem] leading-[1.02] font-semibold tracking-[-0.035em] text-white [animation-delay:60ms] sm:text-[3.9rem] xl:text-[clamp(4.5rem,3.6vw,5.25rem)]"
             >
               Évaluation de la performance
-              <em className="mt-1 block font-display text-[0.95em] font-normal tracking-[-0.01em] text-gold-300 italic">des agents</em>
+              <em className="mt-1 block font-display text-[0.95em] font-normal tracking-[-0.01em] text-gold-300 italic">des agents de la DSM</em>
             </h1>
 
-            <p className="mt-6 max-w-[44rem] animate-entree text-base leading-relaxed text-navy-200 [animation-delay:120ms] sm:text-[1.2rem] sm:leading-[1.6]">
-              Notez, critère par critère, les collaborateurs qui vous sont attribués. Vos évaluations alimentent avec équité le classement
-              d’excellence de la campagne.
-            </p>
-
             {campagne ? (
-              <div className="relative mt-10 max-w-[45rem] animate-entree overflow-hidden rounded-2xl bg-gradient-to-b from-[#12294a] to-[#0d2140] p-6 shadow-[0_30px_60px_-30px_rgb(0_0_0/0.6),inset_0_1px_0_rgb(255_255_255/0.06)] ring-1 ring-white/10 [animation-delay:180ms] sm:p-9">
+              <div className="relative mt-10 max-w-[45rem] 2xl:mt-8 2xl:max-w-none animate-entree overflow-hidden rounded-2xl bg-gradient-to-b from-[#12294a] to-[#0d2140] p-6 shadow-[0_30px_60px_-30px_rgb(0_0_0/0.6),inset_0_1px_0_rgb(255_255_255/0.06)] ring-1 ring-white/10 [animation-delay:180ms] sm:p-9">
                 <span aria-hidden className="absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-gold-400/60 to-transparent" />
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <span className="inline-flex items-center gap-2 rounded-full bg-emerald-400/10 py-1.5 pr-3.5 pl-3 text-sm font-medium text-emerald-300 ring-1 ring-emerald-400/30">
@@ -259,278 +260,290 @@ function AccueilContenu() {
                   <span className="text-sm text-navy-200">Session annuelle {annee}</span>
                 </div>
 
-                <p className="mt-6 text-[1.7rem] leading-tight font-bold tracking-[-0.02em] text-white sm:text-[2rem]">
+                <p className="mt-6 text-[1.7rem] leading-tight font-semibold tracking-[-0.02em] text-white sm:text-[2rem]">
                   <TitreCampagne libelle={campagne.libelle} />
                 </p>
 
-                <dl className="mt-7 grid grid-cols-3 divide-x divide-white/10 border-t border-white/10 pt-7">
+                <dl className="mt-7 grid grid-cols-2 border-t border-white/10 pt-7">
                   <Statistique libelle="Clôture" className="pr-4">
                     {formatDateCourte(campagne.dateFin)}
                   </Statistique>
-                  <Statistique libelle="Temps restant" className="px-4 text-gold-300 sm:px-6">
+                  <Statistique libelle="Temps restant" className="border-l border-white/10 pl-4 text-gold-300 sm:pl-6">
                     {jours === 0 ? 'Dernier jour' : `${jours} jour${jours === 1 ? '' : 's'}`}
                   </Statistique>
-                  <Statistique libelle="Évaluations" className="pl-4 sm:pl-6">
-                    {campagne.completionRate}%<span className="ml-2 text-xs font-normal text-navy-200">soumises</span>
-                  </Statistique>
+                  <div className="col-span-2 mt-6 grid grid-cols-2 border-t border-white/10 pt-6">
+                    <div className="pr-4">
+                      <dt className="text-xs font-medium tracking-[0.1em] text-navy-200 uppercase">Pairs &amp; clients internes</dt>
+                      <dd className="mt-2">
+                        <button
+                          type="button"
+                          onClick={() => setParticipationOuverte(true)}
+                          aria-haspopup="dialog"
+                          className="group -ml-2 inline-flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg px-2 py-1 text-left transition-colors hover:bg-white/[0.06] focus-visible:outline-2 focus-visible:outline-gold-400"
+                        >
+                          <span className="text-xl font-semibold whitespace-nowrap tabular-nums sm:text-2xl">{campagne.tauxInterne}%</span>
+                          <span className="text-xs text-navy-200">soumises</span>
+                          <span className="inline-flex items-center gap-0.5 rounded-full bg-gold-400/10 py-0.5 pr-1.5 pl-2.5 text-xs font-medium text-gold-300 ring-1 ring-gold-400/30 transition-colors group-hover:bg-gold-400/20">
+                            Détail
+                            <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
+                          </span>
+                        </button>
+                      </dd>
+                    </div>
+                    <Statistique libelle="Clients externes" className="border-l border-white/10 pl-4 sm:pl-6">
+                      {campagne.tauxExterne === null ? (
+                        <span className="text-navy-300" title="Aucun client externe n’a d’agent affecté">—</span>
+                      ) : (
+                        <>
+                          {campagne.tauxExterne}%<span className="ml-2 text-xs font-normal text-navy-200">soumises</span>
+                        </>
+                      )}
+                    </Statistique>
+                  </div>
                 </dl>
+                {participationOuverte && <ParticipationModal onClose={() => setParticipationOuverte(false)} />}
               </div>
             ) : (
-              <p className="mt-10 max-w-[45rem] animate-entree rounded-2xl bg-white/[0.05] p-8 text-navy-100 ring-1 ring-white/10 [animation-delay:180ms]">
+              <p className="mt-10 max-w-[45rem] 2xl:max-w-none animate-entree rounded-2xl bg-white/[0.05] p-8 text-navy-100 ring-1 ring-white/10 [animation-delay:180ms]">
                 Aucune campagne d’évaluation n’est ouverte pour le moment.
               </p>
             )}
-
-            <ol className="mt-12 hidden max-w-[45rem] animate-entree gap-8 [animation-delay:260ms] sm:grid sm:grid-cols-3">
-              {ETAPES_GUIDE.map(([titreEtape, texte], i) => (
-                <li key={titreEtape}>
-                  <span className="font-display text-[2.1rem] leading-none text-gold-300 italic" aria-label={`Étape ${i + 1}`}>
-                    {String(i + 1).padStart(2, '0')}
-                  </span>
-                  <p className="mt-4 text-[1.05rem] font-semibold text-white">{titreEtape}</p>
-                  <p className="mt-2 text-sm leading-relaxed text-navy-200">{texte}</p>
-                </li>
-              ))}
-            </ol>
           </section>
 
-          {/* ─── Connexion ─── */}
-          <section aria-labelledby="titre-connexion" className="relative w-full animate-entree [animation-delay:140ms] lg:justify-self-end">
-            <div aria-hidden className="pointer-events-none absolute -inset-16 -z-10 rounded-full bg-[radial-gradient(closest-side,rgb(212_175_55/0.12),transparent)] blur-2xl" />
-            <div className="relative rounded-[28px] bg-[#f4f6f9] p-7 text-slate-900 shadow-[0_50px_90px_-30px_rgb(0_0_0/0.75),0_14px_30px_-14px_rgb(0_0_0/0.45)] sm:p-12">
-              <Lock className="absolute top-7 right-7 h-5 w-5 text-slate-300" aria-hidden />
-
-              {etape !== 'identifiant' && (
-                <button
-                  type="button"
-                  onClick={retour}
-                  className="-ml-2 mb-6 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-200/60 hover:text-slate-900"
-                >
-                  <ArrowLeft className="h-4 w-4" aria-hidden />
-                  Changer d’identifiant
-                </button>
-              )}
-
-              {etape === 'identifiant' && (
-                <div className="mt-4 mb-12 grid grid-cols-2 gap-1 rounded-2xl bg-slate-200/50 p-1.5 ring-1 ring-slate-200" role="radiogroup" aria-label="Je suis">
-                  {([
-                    ['collaborateur', 'Collaborateur'],
-                    ['client', 'Client externe'],
-                  ] as const).map(([valeur, libelle]) => (
-                    <button
-                      key={valeur}
-                      type="button"
-                      role="radio"
-                      aria-checked={profil === valeur}
-                      onClick={() => {
-                        setProfil(valeur)
-                        setIdentifiant('')
-                        setError('')
-                        setAideOuverte(false)
-                      }}
-                      className={`rounded-xl py-3 text-[15px] transition-all duration-200 ${
-                        profil === valeur
-                          ? 'bg-white font-medium text-navy-950 shadow-[0_1px_2px_rgb(0_43_73/0.08),0_6px_14px_-6px_rgb(0_43_73/0.2)]'
-                          : 'text-navy-500 hover:text-navy-900'
-                      }`}
-                    >
-                      {libelle}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              <h2 id="titre-connexion" className="font-display text-[2.6rem] leading-none font-medium tracking-[-0.02em] text-navy-950">
-                {titre}
-              </h2>
-              <p className="mt-4 text-[1.05rem] leading-relaxed text-navy-500">
-                {etape === 'identifiant' &&
-                  (estClient
-                    ? 'Le numéro de téléphone enregistré par la DSM est requis pour donner votre avis sur nos agents.'
-                    : 'Votre matricule de collaborateur DSM est requis pour poursuivre.')}
-                {etape === 'choix' && (
-                  <>
-                    Compte <strong className="font-semibold text-slate-900">{identifiant}</strong> reconnu. Que souhaitez-vous faire ?
-                  </>
-                )}
-                {etape === 'connexion' && (
-                  <>
-                    Compte <strong className="font-semibold text-slate-900">{identifiant}</strong>
-                    {champPin ? ' · le PIN à 4 chiffres que vous avez choisi.' : '.'}
-                  </>
-                )}
-                {etape === 'definir' && (
-                  <>
-                    Première connexion pour <strong className="font-semibold text-slate-900">{identifiant}</strong>. Ce PIN vous servira à chaque
-                    connexion ; seul un administrateur pourra le réinitialiser.
-                  </>
-                )}
-                {etape === 'contact_admin' &&
-                  'Ce compte administrateur n’a pas encore de mot de passe. Il doit être initialisé par la commande d’installation.'}
-              </p>
-
-              {etape === 'choix' && (
-                <div className="mt-9 space-y-4">
-                  {/* Nouvel onglet : la page de connexion reste prête pour revenir au code PIN */}
-                  <a
-                    href={PRESENTATION_CONNEXION}
-                    target="_blank"
-                    rel="noopener"
-                    className="flex items-center gap-4 rounded-2xl bg-white px-5 py-4 text-navy-950 ring-1 ring-slate-200 shadow-[0_10px_24px_-16px_rgb(0_43_73/0.45)] transition-[box-shadow,transform] duration-200 hover:-translate-y-px hover:ring-gold-400 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-gold-400"
-                  >
-                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-b from-gold-300 to-gold-500 text-navy-950">
-                      <Play className="ml-0.5 h-5 w-5 fill-current" aria-hidden />
-                    </span>
-                    <span>
-                      <span className="block text-[1.05rem] font-semibold">Voir la présentation</span>
-                      <span className="mt-0.5 block text-sm leading-snug text-navy-500">Comment se connecter, pas à pas · environ 3 minutes, avec voix off</span>
-                    </span>
-                  </a>
+          {/* ─── Connexion, avec les étapes juste à côté sur grand écran ─── */}
+          <div className="flex w-full items-center gap-[clamp(2.5rem,3vw,4rem)] lg:justify-self-center 2xl:w-auto">
+            <EtapesConnexion active={etape === 'identifiant' ? 0 : 1} />
+            <section aria-labelledby="titre-connexion" className="relative w-full animate-entree [animation-delay:140ms] lg:max-w-[clamp(28rem,22vw,33rem)] 2xl:w-[clamp(28rem,22vw,33rem)]">
+              <div aria-hidden className="pointer-events-none absolute -inset-16 -z-10 rounded-full bg-[radial-gradient(closest-side,rgb(212_175_55/0.12),transparent)] blur-2xl" />
+              <div className="relative rounded-[28px] bg-[#f4f6f9] p-7 text-slate-900 shadow-[0_50px_90px_-30px_rgb(0_0_0/0.75),0_14px_30px_-14px_rgb(0_0_0/0.45)] sm:p-12">
+                <Lock className="absolute top-7 right-7 h-5 w-5 text-slate-300" aria-hidden />
+  
+                {etape !== 'identifiant' && (
                   <button
                     type="button"
-                    onClick={() => setEtape(etapePin)}
-                    className="group relative flex h-[60px] w-full items-center justify-center gap-2.5 rounded-2xl bg-[#050d1a] px-5 text-[1.05rem] font-semibold text-white shadow-[0_18px_30px_-14px_rgb(5_13_26/0.8)] transition-[box-shadow,transform] duration-200 hover:-translate-y-px hover:shadow-[0_22px_36px_-14px_rgb(5_13_26/0.85)] active:translate-y-0"
+                    onClick={retour}
+                    className="-ml-2 mb-6 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-200/60 hover:text-slate-900"
                   >
-                    <span aria-hidden className="absolute inset-x-12 -bottom-px h-[2px] rounded-full bg-gradient-to-r from-transparent via-gold-400 to-transparent blur-[1px]" />
-                    Se connecter maintenant
-                    <ArrowRight className="h-5 w-5 text-gold-300 transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden />
+                    <ArrowLeft className="h-4 w-4" aria-hidden />
+                    Changer d’identifiant
                   </button>
-                </div>
-              )}
-
-              {etape !== 'contact_admin' && etape !== 'choix' && (
-                <form onSubmit={handleSubmit} className="mt-9 space-y-6" noValidate>
-                  {etape === 'identifiant' && (
-                    <div>
-                      <Champ label={estClient ? 'Numéro de téléphone' : 'Matricule collaborateur'} htmlFor="identifiant">
+                )}
+  
+                {etape === 'identifiant' && (
+                  <div className="mt-4 mb-12 grid grid-cols-2 gap-1 rounded-2xl bg-slate-200/50 p-1.5 ring-1 ring-slate-200" role="radiogroup" aria-label="Je suis">
+                    {([
+                      ['collaborateur', 'Collaborateur'],
+                      ['client', 'Client externe'],
+                    ] as const).map(([valeur, libelle]) => (
+                      <button
+                        key={valeur}
+                        type="button"
+                        role="radio"
+                        aria-checked={profil === valeur}
+                        onClick={() => {
+                          setProfil(valeur)
+                          setIdentifiant('')
+                          setError('')
+                          setAideOuverte(false)
+                        }}
+                        className={`rounded-xl py-3 text-[15px] transition-all duration-200 ${
+                          profil === valeur
+                            ? 'bg-white font-medium text-navy-950 shadow-[0_1px_2px_rgb(0_43_73/0.08),0_6px_14px_-6px_rgb(0_43_73/0.2)]'
+                            : 'text-navy-500 hover:text-navy-900'
+                        }`}
+                      >
+                        {libelle}
+                      </button>
+                    ))}
+                  </div>
+                )}
+  
+                <h2 id="titre-connexion" className="font-display text-[2.6rem] leading-none font-medium tracking-[-0.02em] text-navy-950">
+                  {titre}
+                </h2>
+                <p className="mt-4 text-[1.05rem] leading-relaxed text-navy-500">
+                  {etape === 'identifiant' &&
+                    (estClient
+                      ? 'Votre téléphone ou votre adresse e-mail enregistré par la DSM est requis pour donner votre avis sur nos agents.'
+                      : 'Votre matricule de collaborateur DSM est requis pour poursuivre.')}
+                  {etape === 'connexion' && (
+                    <>
+                      Compte <strong className="font-semibold text-slate-900">{identifiant}</strong>
+                      {champPin ? ' · le PIN à 4 chiffres que vous avez choisi.' : '.'}
+                    </>
+                  )}
+                  {etape === 'definir' && (
+                    <>
+                      Première connexion pour <strong className="font-semibold text-slate-900">{identifiant}</strong>. Ce PIN vous servira à chaque
+                      connexion ; seul un administrateur pourra le réinitialiser.
+                    </>
+                  )}
+                  {etape === 'contact_admin' &&
+                    'Ce compte administrateur n’a pas encore de mot de passe. Il doit être initialisé par la commande d’installation.'}
+                </p>
+  
+                {etape !== 'contact_admin' && (
+                  <form onSubmit={handleSubmit} className="mt-9 space-y-6" noValidate>
+                    {etape === 'identifiant' && (
+                      <div>
+                        <Champ label={estClient ? 'Téléphone ou adresse e-mail' : 'Matricule collaborateur'} htmlFor="identifiant">
+                          <div className="relative">
+                            {!estClient ? (
+                              <User className={ICONE_CHAMP} aria-hidden />
+                            ) : saisieEmail(identifiant) ? (
+                              <Mail className={ICONE_CHAMP} aria-hidden />
+                            ) : (
+                              <Phone className={ICONE_CHAMP} aria-hidden />
+                            )}
+                            <input
+                              key={profil}
+                              id="identifiant"
+                              value={identifiant}
+                              onChange={(e) =>
+                                setIdentifiant(
+                                  estClient ? saisieClient(e.target.value) : e.target.value.trim().slice(0, LONGUEUR_MATRICULE)
+                                )
+                              }
+                              maxLength={estClient ? undefined : LONGUEUR_MATRICULE}
+                              type="text"
+                              inputMode="text"
+                              autoComplete="username"
+                              autoCapitalize={estClient ? 'off' : 'characters'}
+                              placeholder={estClient ? 'Ex. : 0700000000 ou nom@exemple.ci' : 'Ex. : 1234'}
+                              spellCheck={false}
+                              autoFocus
+                              required
+                              disabled={loading}
+                              className={`${INPUT} pl-12`}
+                            />
+                          </div>
+                        </Champ>
+                        <p className="mt-3 flex items-start gap-2 text-xs text-navy-400">
+                          <Info className="mt-px h-4 w-4 shrink-0 text-gold-600" aria-hidden />
+                          {estClient
+                            ? 'Le numéro ou l’adresse e-mail communiqué à la DSM. Si vous avez donné les deux, utilisez votre numéro.'
+                            : 'Format d’identifiant habituel délivré par les Ressources Humaines.'}
+                        </p>
+                      </div>
+                    )}
+  
+                    {(etape === 'connexion' || etape === 'definir') && (
+                      <Champ label={etape === 'definir' ? 'Nouveau PIN (4 chiffres)' : champPin ? 'Code PIN' : 'Mot de passe'} htmlFor="secret">
                         <div className="relative">
-                          {estClient ? <Phone className={ICONE_CHAMP} aria-hidden /> : <User className={ICONE_CHAMP} aria-hidden />}
                           <input
-                            key={profil}
-                            id="identifiant"
-                            value={identifiant}
-                            onChange={(e) => setIdentifiant(e.target.value)}
-                            type={estClient ? 'tel' : 'text'}
-                            inputMode={estClient ? 'tel' : 'text'}
-                            autoComplete={estClient ? 'tel' : 'username'}
-                            autoCapitalize={estClient ? 'off' : 'characters'}
-                            placeholder={estClient ? 'Ex. : 07 00 00 00 00' : 'Ex. : 1234'}
-                            spellCheck={false}
-                            autoFocus
+                            ref={secretRef}
+                            id="secret"
+                            type={voirSecret ? 'text' : 'password'}
+                            value={secret}
+                            onChange={(e) => setSecret(champPin ? e.target.value.replace(/\D/g, '').slice(0, 4) : e.target.value)}
+                            inputMode={champPin ? 'numeric' : undefined}
+                            maxLength={champPin ? 4 : undefined}
+                            autoComplete={etape === 'definir' ? 'new-password' : 'current-password'}
                             required
                             disabled={loading}
-                            className={`${INPUT} pl-12`}
+                            className={`${INPUT} pr-12 ${champPin ? 'text-xl tracking-[0.5em] tabular-nums' : ''}`}
                           />
+                          <button
+                            type="button"
+                            onClick={() => setVoirSecret((v) => !v)}
+                            className="absolute inset-y-0 right-0 flex w-12 items-center justify-center rounded-r-xl text-slate-500 hover:text-slate-800"
+                            aria-label={voirSecret ? 'Masquer' : 'Afficher'}
+                          >
+                            {voirSecret ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                          </button>
                         </div>
                       </Champ>
-                      <p className="mt-3 flex items-start gap-2 text-[13px] text-navy-400">
-                        <Info className="mt-px h-4 w-4 shrink-0 text-gold-600" aria-hidden />
-                        {estClient ? 'Le numéro communiqué à la DSM lors de votre enregistrement.' : 'Format d’identifiant habituel délivré par les Ressources Humaines.'}
-                      </p>
-                    </div>
-                  )}
-
-                  {(etape === 'connexion' || etape === 'definir') && (
-                    <Champ label={etape === 'definir' ? 'Nouveau PIN (4 chiffres)' : champPin ? 'Code PIN' : 'Mot de passe'} htmlFor="secret">
-                      <div className="relative">
+                    )}
+  
+                    {etape === 'definir' && (
+                      <Champ label="Confirmez le PIN" htmlFor="confirmation">
                         <input
-                          ref={secretRef}
-                          id="secret"
+                          id="confirmation"
                           type={voirSecret ? 'text' : 'password'}
-                          value={secret}
-                          onChange={(e) => setSecret(champPin ? e.target.value.replace(/\D/g, '').slice(0, 4) : e.target.value)}
-                          inputMode={champPin ? 'numeric' : undefined}
-                          maxLength={champPin ? 4 : undefined}
-                          autoComplete={etape === 'definir' ? 'new-password' : 'current-password'}
+                          value={confirmation}
+                          onChange={(e) => setConfirmation(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                          inputMode="numeric"
+                          maxLength={4}
+                          autoComplete="new-password"
                           required
                           disabled={loading}
-                          className={`${INPUT} pr-12 ${champPin ? 'text-xl tracking-[0.5em] tabular-nums' : ''}`}
+                          className={`${INPUT} text-xl tracking-[0.5em] tabular-nums`}
                         />
-                        <button
-                          type="button"
-                          onClick={() => setVoirSecret((v) => !v)}
-                          className="absolute inset-y-0 right-0 flex w-12 items-center justify-center rounded-r-xl text-slate-500 hover:text-slate-800"
-                          aria-label={voirSecret ? 'Masquer' : 'Afficher'}
-                        >
-                          {voirSecret ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                        </button>
-                      </div>
-                    </Champ>
-                  )}
-
-                  {etape === 'definir' && (
-                    <Champ label="Confirmez le PIN" htmlFor="confirmation">
-                      <input
-                        id="confirmation"
-                        type={voirSecret ? 'text' : 'password'}
-                        value={confirmation}
-                        onChange={(e) => setConfirmation(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                        inputMode="numeric"
-                        maxLength={4}
-                        autoComplete="new-password"
-                        required
-                        disabled={loading}
-                        className={`${INPUT} text-xl tracking-[0.5em] tabular-nums`}
-                      />
-                    </Champ>
-                  )}
-
-                  {error && (
-                    <p role="alert" className="flex gap-2 rounded-xl bg-red-50 px-3.5 py-3 text-sm text-red-800 ring-1 ring-red-100">
-                      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" aria-hidden />
-                      {error}
-                    </p>
-                  )}
-
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="group relative flex h-[60px] w-full items-center justify-center gap-2.5 rounded-2xl bg-[#050d1a] px-5 text-[1.05rem] font-semibold text-white shadow-[0_18px_30px_-14px_rgb(5_13_26/0.8)] transition-[box-shadow,transform] duration-200 hover:-translate-y-px hover:shadow-[0_22px_36px_-14px_rgb(5_13_26/0.85)] active:translate-y-0 disabled:translate-y-0 disabled:opacity-60"
-                  >
-                    {/* Filet doré sous le bouton, comme sur la maquette */}
-                    <span aria-hidden className="absolute inset-x-12 -bottom-px h-[2px] rounded-full bg-gradient-to-r from-transparent via-gold-400 to-transparent blur-[1px]" />
-                    {loading ? (
-                      <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
-                    ) : (
-                      <>
-                        {etape === 'identifiant' ? 'Continuer' : etape === 'definir' ? 'Enregistrer mon PIN' : 'Se connecter'}
-                        <ArrowRight className="h-5 w-5 text-gold-300 transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden />
-                      </>
+                      </Champ>
                     )}
-                  </button>
-
-                  {etape === 'connexion' && champPin && (
-                    <p className="text-sm text-slate-500">PIN oublié ? Demandez une réinitialisation à votre administrateur.</p>
-                  )}
-                </form>
-              )}
-
-              <div className="mt-10 flex flex-wrap items-center justify-between gap-3 text-sm">
-                {etape === 'identifiant' && !estClient ? (
-                  <button
-                    type="button"
-                    onClick={() => setAideOuverte((v) => !v)}
-                    aria-expanded={aideOuverte}
-                    className="text-navy-500 underline-offset-4 hover:text-navy-900 hover:underline"
-                  >
-                    Matricule oublié ou perdu ?
-                  </button>
-                ) : (
-                  <span />
+  
+                    {error && (
+                      <p role="alert" className="flex gap-2 rounded-xl bg-red-50 px-3.5 py-3 text-sm text-red-800 ring-1 ring-red-100">
+                        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" aria-hidden />
+                        {error}
+                      </p>
+                    )}
+  
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="group relative flex h-[60px] w-full items-center justify-center gap-2.5 rounded-2xl bg-[#050d1a] px-5 text-[1.05rem] font-semibold text-white shadow-[0_18px_30px_-14px_rgb(5_13_26/0.8)] transition-[box-shadow,transform] duration-200 hover:-translate-y-px hover:shadow-[0_22px_36px_-14px_rgb(5_13_26/0.85)] active:translate-y-0 disabled:translate-y-0 disabled:opacity-60"
+                    >
+                      {/* Filet doré sous le bouton, comme sur la maquette */}
+                      <span aria-hidden className="absolute inset-x-12 -bottom-px h-[2px] rounded-full bg-gradient-to-r from-transparent via-gold-400 to-transparent blur-[1px]" />
+                      {loading ? (
+                        <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
+                      ) : (
+                        <>
+                          {etape === 'identifiant' ? 'Continuer' : etape === 'definir' ? 'Enregistrer mon PIN' : 'Se connecter'}
+                          <ArrowRight className="h-5 w-5 text-gold-300 transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden />
+                        </>
+                      )}
+                    </button>
+  
+                    {etape === 'connexion' && champPin && (
+                      <p className="text-sm text-slate-500">PIN oublié ? Demandez une réinitialisation à votre administrateur.</p>
+                    )}
+                  </form>
                 )}
-                <span className="inline-flex items-center gap-1.5 text-navy-400">
-                  <CircleCheck className="h-4 w-4 text-emerald-500" aria-hidden />
-                  Connexion chiffrée
-                </span>
+  
+                <div className="mt-10 flex flex-wrap items-center justify-between gap-3 text-sm">
+                  {etape === 'identifiant' && !estClient ? (
+                    <button
+                      type="button"
+                      onClick={() => setAideOuverte((v) => !v)}
+                      aria-expanded={aideOuverte}
+                      className="text-navy-500 underline-offset-4 hover:text-navy-900 hover:underline"
+                    >
+                      Matricule oublié ou perdu ?
+                    </button>
+                  ) : (
+                    <span />
+                  )}
+                  <span className="inline-flex items-center gap-1.5 text-navy-400">
+                    <CircleCheck className="h-4 w-4 text-emerald-500" aria-hidden />
+                    Connexion chiffrée
+                  </span>
+                </div>
+                {aideOuverte && etape === 'identifiant' && !estClient && (
+                  <p className="mt-3 rounded-xl bg-white px-4 py-3 text-sm leading-relaxed text-navy-600 ring-1 ring-slate-200">
+                    Adressez-vous aux Ressources Humaines ou à l’administrateur de la plateforme : ils vous communiqueront votre matricule.
+                  </p>
+                )}
               </div>
-              {aideOuverte && etape === 'identifiant' && !estClient && (
-                <p className="mt-3 rounded-xl bg-white px-4 py-3 text-sm leading-relaxed text-navy-600 ring-1 ring-slate-200">
-                  Adressez-vous aux Ressources Humaines ou à l’administrateur de la plateforme : ils vous communiqueront votre matricule.
-                </p>
-              )}
-            </div>
-          </section>
+            </section>
+          </div>
         </main>
+
+        {/* ─── Étapes : bandeau sur toute la largeur, quand la place manque à côté de la connexion ─── */}
+        <ol className="hidden animate-entree gap-8 border-t border-white/[0.06] py-8 [animation-delay:260ms] sm:grid sm:grid-cols-3 lg:gap-[clamp(3rem,6vw,10rem)] 2xl:hidden">
+          {ETAPES_GUIDE.map(([titreEtape, texte], i) => (
+            <li key={titreEtape} className="flex items-start gap-5">
+              <span className="shrink-0 font-display text-[2.1rem] leading-none text-gold-300 italic" aria-label={`Étape ${i + 1}`}>
+                {String(i + 1).padStart(2, '0')}
+              </span>
+              <div className="max-w-[26rem]">
+                <p className="text-[1.05rem] font-semibold text-white">{titreEtape}</p>
+                <p className="mt-1.5 text-sm leading-relaxed text-navy-200">{texte}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
 
         {/* ─── Pied de page ─── */}
         <footer className="flex flex-col gap-6 pb-8 sm:flex-row sm:items-end sm:justify-between">
@@ -560,6 +573,34 @@ const INPUT =
 
 const ICONE_CHAMP = 'pointer-events-none absolute top-1/2 left-4 h-5 w-5 -translate-y-1/2 text-slate-400'
 
+/** Étapes de connexion en colonne, à gauche de la carte (grands écrans) ; l’étape en cours est mise en avant. */
+function EtapesConnexion({ active }: { active: number }) {
+  return (
+    <ol aria-label="Étapes de connexion" className="relative hidden w-[15rem] shrink-0 animate-entree flex-col gap-10 [animation-delay:200ms] 2xl:flex">
+      <span aria-hidden className="absolute top-3 bottom-3 left-[1.05rem] w-px bg-gradient-to-b from-gold-400/50 via-white/10 to-transparent" />
+      {ETAPES_GUIDE.map(([titreEtape, texte], i) => {
+        const enCours = i === active
+        return (
+          <li key={titreEtape} aria-current={enCours ? 'step' : undefined} className="relative flex items-start gap-5">
+            <span
+              className={`relative shrink-0 bg-[#071a33] py-1 font-display text-[2.1rem] leading-none italic transition-colors ${
+                enCours ? 'text-gold-300' : 'text-gold-300/40'
+              }`}
+              aria-label={`Étape ${i + 1}`}
+            >
+              {String(i + 1).padStart(2, '0')}
+            </span>
+            <div className="pt-1">
+              <p className={`text-[1.05rem] font-semibold transition-colors ${enCours ? 'text-white' : 'text-navy-100/70'}`}>{titreEtape}</p>
+              <p className={`mt-1.5 text-sm leading-relaxed transition-colors ${enCours ? 'text-navy-200' : 'text-navy-300/70'}`}>{texte}</p>
+            </div>
+          </li>
+        )
+      })}
+    </ol>
+  )
+}
+
 function Champ({ label, htmlFor, children }: { label: string; htmlFor: string; children: React.ReactNode }) {
   return (
     <div>
@@ -575,7 +616,7 @@ function Statistique({ libelle, className, children }: { libelle: string; classN
   return (
     <div className={className}>
       <dt className="text-xs font-medium tracking-[0.1em] text-navy-200 uppercase">{libelle}</dt>
-      <dd className="mt-3 text-xl font-bold whitespace-nowrap tabular-nums sm:text-2xl">{children}</dd>
+      <dd className="mt-3 text-xl font-semibold whitespace-nowrap tabular-nums sm:text-2xl">{children}</dd>
     </div>
   )
 }
@@ -605,7 +646,7 @@ function Quadrillage() {
 /** Compas de carte marine en filigrane, centré en bas de page, avec sa ligne d'horizon. */
 function Compas() {
   return (
-    <div aria-hidden className="pointer-events-none absolute bottom-0 left-[45%] hidden h-[34rem] w-[34rem] -translate-x-1/2 translate-y-[38%] lg:block">
+    <div aria-hidden className="pointer-events-none absolute bottom-0 left-[60%] hidden h-[34rem] w-[34rem] -translate-x-1/2 translate-y-[38%] lg:block">
       <div className="absolute top-1/2 left-1/2 h-px w-[66rem] -translate-x-1/2 bg-gradient-to-r from-transparent via-white/15 to-transparent" />
       <svg viewBox="-300 -300 600 600" className="h-full w-full text-white" fill="none" stroke="currentColor">
         <g strokeOpacity="0.09">

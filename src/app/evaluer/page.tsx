@@ -23,6 +23,7 @@ import { getAppreciationInfo, getAppreciationOptions } from '@/lib/default-crite
 import { BrandMark } from '@/components/BrandMark'
 import { confirmer, toast } from '@/components/ui/feedback'
 import { libelleCampagne } from '@/lib/libelle'
+import { commentaireObligatoire, noteJustifiee, SEUIL_COMMENTAIRE_OBLIGATOIRE } from '@/lib/commentaire-obligatoire'
 
 /* ─── Types ─────────────────────────────────────────────────────── */
 
@@ -70,6 +71,9 @@ type Sauvegarde = { etat: 'idle' | 'pending' | 'saving' | 'saved' | 'error'; at?
 const AUTOSAVE_MS = 1200
 const MAX_COMMENTAIRE = 500
 
+/** Critère traité : noté, et commenté si la note est basse (lib/commentaire-obligatoire). */
+const estRenseignee = (n: NoteState | undefined) => !!n && n.valeur > 0 && noteJustifiee(n.valeur, n.commentaire)
+
 const nomComplet = (a: Affectation) => `${a.evalue.prenom} ${a.evalue.nom}`
 const initiales = (a: Affectation) => `${a.evalue.prenom?.[0] ?? ''}${a.evalue.nom?.[0] ?? ''}`
 
@@ -112,11 +116,12 @@ export default function EvaluerPage() {
     [critereParId]
   )
   const valeur = (evalueId: string, critereId: string) => notes[evalueId]?.[critereId]?.valeur ?? 0
+  const renseignee = (evalueId: string, critereId: string) => estRenseignee(notes[evalueId]?.[critereId])
 
   const estComplet = useCallback(
     (aff: Affectation) => {
       const cs = criteresDe(aff)
-      return cs.length > 0 && cs.every((c) => (notes[aff.evalueId]?.[c.id]?.valeur ?? 0) > 0)
+      return cs.length > 0 && cs.every((c) => estRenseignee(notes[aff.evalueId]?.[c.id]))
     },
     [criteresDe, notes]
   )
@@ -161,10 +166,10 @@ export default function EvaluerPage() {
         setSubmitted(true)
       } else {
         // Reprendre au premier collaborateur non terminé
-        const reprise = affs.findIndex((a) => a.statut !== 'TERMINEE' && !a.critereIds.every((id) => (charge[a.evalueId]?.[id]?.valeur ?? 0) > 0))
+        const reprise = affs.findIndex((a) => a.statut !== 'TERMINEE' && !a.critereIds.every((id) => estRenseignee(charge[a.evalueId]?.[id])))
         const idx = reprise >= 0 ? reprise : 0
         setCurrentIndex(idx)
-        const premierVide = affs[idx]?.critereIds.findIndex((id) => !(charge[affs[idx].evalueId]?.[id]?.valeur > 0)) ?? -1
+        const premierVide = affs[idx]?.critereIds.findIndex((id) => !estRenseignee(charge[affs[idx].evalueId]?.[id])) ?? -1
         setCritereIndex(Math.max(0, premierVide))
       }
     } catch {
@@ -250,6 +255,8 @@ export default function EvaluerPage() {
   const choisirNote = (aff: Affectation, critere: Critere, note: number) => {
     if (aff.statut === 'TERMINEE' || lectureSeule) return
     const premiereFois = valeur(aff.evalueId, critere.id) === 0
+    // Une note basse sans commentaire retient sur le critère : le champ commentaire devient obligatoire
+    const aJustifier = !noteJustifiee(note, notes[aff.evalueId]?.[critere.id]?.commentaire)
     setNotes((prev) => ({
       ...prev,
       [aff.evalueId]: {
@@ -262,7 +269,7 @@ export default function EvaluerPage() {
     // Auto-avance au critère suivant, seulement lors d'une première notation en mode focus
     const cs = criteresDe(aff)
     const idx = cs.findIndex((c) => c.id === critere.id)
-    if (vue === 'focus' && premiereFois && idx < cs.length - 1) {
+    if (vue === 'focus' && premiereFois && !aJustifier && idx < cs.length - 1) {
       setTimeout(() => setCritereIndex(idx + 1), 220)
     }
   }
@@ -289,7 +296,7 @@ export default function EvaluerPage() {
     if (quitte && sales.current.has(quitte.evalueId)) await sauvegarder(quitte.evalueId)
     setCurrentIndex(idx)
     const cible = affectations[idx]
-    setCritereIndex(Math.max(0, cible.critereIds.findIndex((id) => valeur(cible.evalueId, id) === 0)))
+    setCritereIndex(Math.max(0, cible.critereIds.findIndex((id) => !renseignee(cible.evalueId, id))))
     setTiroir(false)
   }
 
@@ -302,9 +309,20 @@ export default function EvaluerPage() {
   const soumettre = async () => {
     const incomplet = ouvertes.find((a) => !estComplet(a))
     if (incomplet) {
-      const manquant = criteresDe(incomplet).find((c) => valeur(incomplet.evalueId, c.id) === 0)
-      toast.error(`« ${manquant?.libelle} » n’est pas encore noté pour ${nomComplet(incomplet)}.`)
-      allerA(affectations.indexOf(incomplet))
+      const cs = criteresDe(incomplet)
+      const idxManquant = cs.findIndex((c) => !renseignee(incomplet.evalueId, c.id))
+      const manquant = cs[idxManquant]
+      toast.error(
+        valeur(incomplet.evalueId, manquant?.id ?? '') > 0
+          ? `Justifiez la note de « ${manquant?.libelle} » pour ${nomComplet(incomplet)} : un commentaire est obligatoire pour toute note inférieure ou égale à ${SEUIL_COMMENTAIRE_OBLIGATOIRE}.`
+          : `« ${manquant?.libelle} » n’est pas encore noté pour ${nomComplet(incomplet)}.`
+      )
+      if (incomplet === affectations[currentIndex]) {
+        setVue('focus')
+        setCritereIndex(Math.max(0, idxManquant))
+      } else {
+        allerA(affectations.indexOf(incomplet))
+      }
       return
     }
 
@@ -557,7 +575,7 @@ export default function EvaluerPage() {
               const fini = aff.statut === 'TERMINEE' || estComplet(aff)
               const ouvert = estDeverrouille(idx)
               const cs = criteresDe(aff)
-              const remplis = cs.filter((c) => valeur(aff.evalueId, c.id) > 0).length
+              const remplis = cs.filter((c) => renseignee(aff.evalueId, c.id)).length
               return (
                 <li key={aff.id}>
                   <button
@@ -635,7 +653,8 @@ export default function EvaluerPage() {
                   <ol className="flex items-center">
                     {criteresCourants.map((c, i) => {
                       const v = valeur(courant.evalueId, c.id)
-                      const ouvert = i === 0 || criteresCourants.slice(0, i).every((p) => valeur(courant.evalueId, p.id) > 0)
+                      // Évaluation verrouillée (déjà soumise, campagne fermée) : consultation libre, laissée en l'état
+                      const ouvert = i === 0 || verrouille || criteresCourants.slice(0, i).every((p) => renseignee(courant.evalueId, p.id))
                       const actif = vue === 'focus' && i === critereIndex
                       return (
                         <li key={c.id} className="flex shrink-0 items-center">
@@ -665,7 +684,7 @@ export default function EvaluerPage() {
                             }`}
                           >
                             <span
-                              className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold tabular-nums transition-colors ${
+                              className={`flex h-6 w-6 items-center justify-center rounded-full text-2xs font-semibold tabular-nums transition-colors ${
                                 actif
                                   ? v > 0
                                     ? 'bg-gold-400 text-navy-950'
@@ -741,7 +760,7 @@ export default function EvaluerPage() {
                   vue={vue}
                   critereIndex={critereIndex}
                   nbCriteres={criteresCourants.length}
-                  critereNote={valeur(courant.evalueId, criteresCourants[critereIndex]?.id ?? '') > 0}
+                  critereNote={verrouille || renseignee(courant.evalueId, criteresCourants[critereIndex]?.id ?? '')}
                   collaborateurComplet={courant.statut === 'TERMINEE' || estComplet(courant)}
                   dernier={currentIndex === affectations.length - 1}
                   pret={pret}
@@ -864,6 +883,16 @@ function CarteCritere({
   const commentaire = note?.commentaire ?? ''
   const nom = `note-${aff.evalueId}-${critere.id}`
   const premierRadio = useRef<HTMLInputElement>(null)
+  const champCommentaire = useRef<HTMLTextAreaElement>(null)
+  // Une évaluation verrouillée (déjà soumise) reste en l'état : ni mention obligatoire ni erreur
+  const obligatoire = !verrouille && commentaireObligatoire(v)
+  const aJustifier = !verrouille && !noteJustifiee(v, commentaire)
+
+  const choisir = (n: number) => {
+    onNote(n)
+    // Note basse sans commentaire : amener directement l'évaluateur au champ à remplir
+    if (!noteJustifiee(n, commentaire)) requestAnimationFrame(() => champCommentaire.current?.focus())
+  }
 
   useEffect(() => {
     if (autoFocus && !verrouille) premierRadio.current?.focus({ preventScroll: true })
@@ -913,7 +942,7 @@ function CarteCritere({
                   name={nom}
                   value={opt.note}
                   checked={choisi}
-                  onChange={() => onNote(opt.note)}
+                  onChange={() => choisir(opt.note)}
                   className="sr-only"
                 />
                 {choisi && (
@@ -954,18 +983,43 @@ function CarteCritere({
 
         <div className={compact ? 'mt-4' : 'mt-7'}>
           <label htmlFor={`com-${nom}`} className="flex items-baseline justify-between text-sm font-medium text-slate-800">
-            Commentaire <span className="text-xs font-normal text-slate-400">facultatif</span>
+            Commentaire
+            {obligatoire ? (
+              <span className="text-xs font-semibold text-red-700">obligatoire (note ≤ {SEUIL_COMMENTAIRE_OBLIGATOIRE})</span>
+            ) : (
+              <span className="text-xs font-normal text-slate-400">facultatif</span>
+            )}
           </label>
           <textarea
+            ref={champCommentaire}
             id={`com-${nom}`}
             rows={compact ? 2 : 3}
             value={commentaire}
             maxLength={MAX_COMMENTAIRE}
             disabled={verrouille || v === 0}
+            required={obligatoire}
+            aria-invalid={aJustifier || undefined}
+            aria-describedby={aJustifier ? `aide-${nom}` : undefined}
             onChange={(e) => onCommentaire(e.target.value)}
-            placeholder={v === 0 ? 'Choisissez d’abord une appréciation.' : 'Un fait marquant, un exemple concret, une piste de progrès…'}
-            className="mt-2 block w-full resize-y rounded-xl border border-slate-200 bg-slate-50/60 px-4 py-3 text-[15px] text-slate-900 shadow-[inset_0_1px_2px_rgb(0_43_73/0.04)] outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-navy-600 focus:bg-white focus:ring-4 focus:ring-navy-600/10 disabled:cursor-not-allowed disabled:hover:border-slate-200"
+            placeholder={
+              v === 0
+                ? 'Choisissez d’abord une appréciation.'
+                : obligatoire
+                  ? 'Expliquez cette note : faits observés, exemples concrets, attentes non atteintes…'
+                  : 'Un fait marquant, un exemple concret, une piste de progrès…'
+            }
+            className={`mt-2 block w-full resize-y rounded-xl border px-4 py-3 text-[15px] text-slate-900 shadow-[inset_0_1px_2px_rgb(0_43_73/0.04)] outline-none transition placeholder:text-slate-400 focus:bg-white focus:ring-4 disabled:cursor-not-allowed disabled:hover:border-slate-200 ${
+              aJustifier
+                ? 'border-red-300 bg-red-50/40 hover:border-red-400 focus:border-red-600 focus:ring-red-600/10'
+                : 'border-slate-200 bg-slate-50/60 hover:border-slate-300 focus:border-navy-600 focus:ring-navy-600/10'
+            }`}
           />
+          {aJustifier && (
+            <p id={`aide-${nom}`} className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-red-700">
+              <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              Toute note inférieure ou égale à {SEUIL_COMMENTAIRE_OBLIGATOIRE} doit être justifiée par un commentaire.
+            </p>
+          )}
           {commentaire.length > MAX_COMMENTAIRE - 80 && (
             <p className="mt-1 text-right text-xs text-slate-500 tabular-nums">
               {commentaire.length} / {MAX_COMMENTAIRE}

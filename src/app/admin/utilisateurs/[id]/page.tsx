@@ -8,6 +8,7 @@ import { confirmer, toast } from '@/components/ui/feedback'
 import { SEXES } from '@/lib/agents'
 import { ROLES_A_PIN } from '@/lib/roles'
 import { ChampListe, useListes } from '@/components/listes'
+import ConnexionClient from '@/components/ConnexionClient'
 
 export default function UtilisateurDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -115,6 +116,12 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
       })
 
       if (res.ok) {
+        const { retireesDeCampagne = 0 } = await res.json().catch(() => ({}))
+        if (retireesDeCampagne > 0) {
+          toast.success(
+            `Agent non-éligible : ${retireesDeCampagne} affectation${retireesDeCampagne > 1 ? 's' : ''} retirée${retireesDeCampagne > 1 ? 's' : ''} de la campagne en cours.`
+          )
+        }
         if (formData.role === 'ADMIN' && newPassword.trim().length >= 8) {
           setPwdSuccess(true)
           setNewPassword('')
@@ -173,7 +180,7 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
             <Link href="/admin/utilisateurs" className="text-gray-600 hover:text-gray-800">
               <ArrowLeft className="w-5 h-5" />
             </Link>
-            <h1 className="text-2xl font-bold text-gray-800">Détails de l'Utilisateur</h1>
+            <h1 className="text-2xl font-semibold text-gray-800">Détails de l'Utilisateur</h1>
           </div>
           <button
             onClick={handleDelete}
@@ -229,8 +236,14 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
                 />
               </div>
 
+              {formData.role === 'EXTERNE' && (
+                <div className="md:col-span-2">
+                  <ConnexionClient telephone={formData.telephone} email={formData.email} />
+                </div>
+              )}
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nom *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{formData.role === 'EXTERNE' ? 'Entité *' : 'Nom *'}</label>
                 <input
                   type="text"
                   required
@@ -241,10 +254,11 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Prénom *</label>
+                {/* Un client externe est inscrit sous le seul nom de son entité */}
+                <label className="block text-sm font-medium text-gray-700 mb-1">{formData.role === 'EXTERNE' ? 'Prénom' : 'Prénom *'}</label>
                 <input
                   type="text"
-                  required
+                  required={formData.role !== 'EXTERNE'}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy-600 outline-none"
                   value={formData.prenom}
                   onChange={e => setFormData({ ...formData, prenom: e.target.value })}
@@ -371,7 +385,7 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
                       <QrCode className={`w-5 h-5 ${formData.qrcodeActif ? 'text-white' : 'text-slate-500'}`} />
                     </div>
                     <div>
-                      <p className={`font-bold text-sm ${
+                      <p className={`font-semibold text-sm ${
                         formData.qrcodeActif ? 'text-amber-800' : 'text-slate-700'
                       }`}>Inclure dans la notation par QR Code unique</p>
                       <p className="text-xs text-slate-400 font-medium mt-0.5">
@@ -420,7 +434,7 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
                     <KeyRound className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <p className="font-bold text-navy-950 text-sm">Changer le mot de passe</p>
+                    <p className="font-semibold text-navy-950 text-sm">Changer le mot de passe</p>
                     <p className="text-xs text-navy-700">Laissez vide pour conserver le mot de passe actuel.</p>
                   </div>
                 </div>
@@ -440,7 +454,7 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-navy-900 mb-1 uppercase tracking-wide">Nouveau mot de passe</label>
+                    <label className="block text-xs font-semibold text-navy-900 mb-1 uppercase tracking-wide">Nouveau mot de passe</label>
                     <div className="relative">
                       <input
                         type={showNewPwd ? 'text' : 'password'}
@@ -460,7 +474,7 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-navy-900 mb-1 uppercase tracking-wide">Confirmer le mot de passe</label>
+                    <label className="block text-xs font-semibold text-navy-900 mb-1 uppercase tracking-wide">Confirmer le mot de passe</label>
                     <div className="relative">
                       <input
                         type={showConfirmPwd ? 'text' : 'password'}
@@ -492,7 +506,7 @@ export default function UtilisateurDetailPage({ params }: { params: Promise<{ id
               <button
                 type="submit"
                 disabled={saving}
-                className="flex items-center gap-2 bg-navy-700 hover:bg-navy-800 text-white px-8 py-2 rounded-lg font-bold disabled:opacity-50 transition-colors"
+                className="flex items-center gap-2 bg-navy-700 hover:bg-navy-800 text-white px-8 py-2 rounded-lg font-semibold disabled:opacity-50 transition-colors"
               >
                 {saving ? 'Enregistrement...' : <><Save className="w-4 h-4" /> Enregistrer</>}
               </button>

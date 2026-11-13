@@ -8,6 +8,7 @@
  */
 
 import type { TypeEval } from '@prisma/client'
+import { memeServiceDeNotation } from '@/lib/service-notation'
 
 export const TYPES_INTERNES = ['MANAGER', 'COLLEGUE', 'CLIENT_INTERNE'] as const
 
@@ -39,10 +40,19 @@ export function estEvaluateurManager(role: string | null | undefined) {
 }
 
 /**
- * Critères qu'un évaluateur interne doit noter pour un collaborateur donné :
+ * Les notes d'une paire comptent dans le bloc Manager seulement si le notant est manager
+ * et n'a pas été désigné « client interne » de l'agent ; sinon, bloc collègues / clients internes.
+ */
+export function compteCommeManager(role: string | null | undefined, clientInterne: boolean): boolean {
+  return estEvaluateurManager(role) && !clientInterne
+}
+
+/**
+ * Critères qu'un évaluateur interne doit noter pour un collaborateur donné
+ * (un cadre, notant facultatif, suit exactement les règles des pairs) :
+ * - notant désigné « client interne » lors de la répartition, manager compris → critères CLIENT_INTERNE ;
  * - manager → critères MANAGER ;
- * - pair désigné « client interne » lors de la répartition → critères CLIENT_INTERNE ;
- * - collègue du même service → critères COLLEGUE ;
+ * - collègue du même service de notation (Magasin et Matériel n'en font qu'un) → critères COLLEGUE ;
  * - agent d'un autre service → critères CLIENT_INTERNE.
  */
 export function criteresPourPaire<C extends CritereTypable>(
@@ -51,10 +61,10 @@ export function criteresPourPaire<C extends CritereTypable>(
   evalue: { service: string | null },
   clientInterne = false
 ): C[] {
-  if (estEvaluateurManager(evaluateur.role)) {
+  if (compteCommeManager(evaluateur.role, clientInterne)) {
     return criteres.filter((c) => typesDuCritere(c).includes('MANAGER'))
   }
-  const type = clientInterne || evaluateur.service !== evalue.service ? 'CLIENT_INTERNE' : 'COLLEGUE'
+  const type = clientInterne || !memeServiceDeNotation(evaluateur.service, evalue.service) ? 'CLIENT_INTERNE' : 'COLLEGUE'
   return criteres.filter((c) => typesDuCritere(c).includes(type))
 }
 

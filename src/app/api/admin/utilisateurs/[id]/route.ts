@@ -6,6 +6,8 @@ import type { Prisma } from '@prisma/client'
 import { normaliserSexe } from '@/lib/agents'
 import { estRole } from '@/lib/roles'
 import { completerListes } from '@/lib/listes-serveur'
+import { retirerDesCampagnesOuvertes } from '@/lib/non-eligible'
+import { identifiantsAcceptes, MESSAGE_CLIENT_SANS_IDENTIFIANT } from '@/lib/identifiant-client'
 import { requireAdmin, hashPassword, normalizeEmail, normalizeMatricule, pinEstDefini } from '@/lib/auth'
 
 export async function GET(
@@ -62,7 +64,7 @@ export async function PATCH(
 
     const actuel = await prisma.utilisateur.findUnique({
       where: { id },
-      select: { role: true, qrToken: true },
+      select: { role: true, qrToken: true, telephone: true, email: true },
     })
     if (!actuel) return NextResponse.json({ error: 'Utilisateur non trouvé' }, { status: 404 })
 
@@ -98,6 +100,14 @@ export async function PATCH(
 
     // Seul le mot de passe d'un administrateur se modifie ici ; le PIN d'un agent se réinitialise.
     const roleFinal = (data.role as string | undefined) ?? actuel.role
+    // Un client externe se connecte avec son téléphone ou son e-mail : il lui en faut au moins un utilisable
+    if (roleFinal === 'EXTERNE') {
+      const telephone = has('telephone') ? optionnel(body.telephone) : actuel.telephone
+      const email = has('email') && body.email ? normalizeEmail(String(body.email)) : actuel.email
+      if (identifiantsAcceptes({ telephone, email }).length === 0) {
+        return NextResponse.json({ error: MESSAGE_CLIENT_SANS_IDENTIFIANT }, { status: 400 })
+      }
+    }
     const mdp = typeof body.motDePasse === 'string' ? body.motDePasse.trim() : ''
     if (mdp) {
       if (roleFinal !== 'ADMIN') {
@@ -112,14 +122,20 @@ export async function PATCH(
       data.motDePasse = hashPassword(mdp)
     }
 
-    const utilisateur = await prisma.utilisateur.update({
-      where: { id },
-      data,
-      select: { id: true, matricule: true, nom: true, prenom: true, role: true },
+    // Un agent devenu non-éligible quitte les campagnes ouvertes, dans la même transaction
+    const devientNonEligible = data.role === 'NON_ELIGIBLE'
+    const { utilisateur, retireesDeCampagne } = await prisma.$transaction(async (tx) => {
+      const utilisateur = await tx.utilisateur.update({
+        where: { id },
+        data,
+        select: { id: true, matricule: true, nom: true, prenom: true, role: true },
+      })
+      const retireesDeCampagne = devientNonEligible ? await retirerDesCampagnesOuvertes(tx, id) : 0
+      return { utilisateur, retireesDeCampagne }
     })
     await completerListes([data])
 
-    return NextResponse.json(utilisateur)
+    return NextResponse.json({ ...utilisateur, retireesDeCampagne })
   } catch (error) {
     console.error('API PATCH Error [utilisateurs/[id]]:', error)
     if (codePrisma(error) === 'P2002') {

@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma'
 import { requireAdmin } from '@/lib/auth'
 import { emailConfigure, emailEstReel, envoyerRelance } from '@/lib/email'
 
-/** POST — relance par email les évaluateurs internes qui n'ont pas soumis leurs évaluations. */
+/** POST — relance par email les évaluateurs internes qui n'ont pas soumis leurs évaluations (hors cadres, dont le vote est facultatif). */
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -18,7 +18,7 @@ export async function POST(
       where: { id },
       include: {
         affectations: {
-          where: { statut: { in: ['EN_ATTENTE', 'BROUILLON'] }, evaluateur: { role: { not: 'EXTERNE' } } },
+          where: { statut: { in: ['EN_ATTENTE', 'BROUILLON'] }, evaluateur: { role: { notIn: ['EXTERNE', 'CADRE'] } } },
           include: {
             evaluateur: { select: { id: true, email: true, prenom: true, nom: true } },
             evalue: { select: { prenom: true, nom: true } },

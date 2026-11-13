@@ -94,7 +94,7 @@ export default function CampagnesPage() {
         }
       />
 
-      <main className="mx-auto w-full max-w-7xl px-5 py-6 sm:px-8 sm:py-8">
+      <main className="mx-auto w-full max-w-[104rem] px-5 py-6 sm:px-8 sm:py-8">
         {loading ? (
           <div className="space-y-3" aria-busy="true">
             {[0, 1, 2].map((i) => (

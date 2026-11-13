@@ -3,11 +3,13 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Save, AlertCircle, User, Mail, Briefcase, Loader2, QrCode } from 'lucide-react'
+import { ArrowLeft, Save, AlertCircle, User, Mail, Phone, Briefcase, Building2, Loader2, QrCode } from 'lucide-react'
 import AdminHeader from '@/components/AdminHeader'
 import { SEXES } from '@/lib/agents'
 import { valeurParDefaut } from '@/lib/listes'
 import { ChampListe, useListes } from '@/components/listes'
+import ConnexionClient from '@/components/ConnexionClient'
+import { erreurFicheClient } from '@/lib/identifiant-client'
 
 export default function NewUtilisateurPage() {
   const router = useRouter()
@@ -18,6 +20,7 @@ export default function NewUtilisateurPage() {
     nom: '',
     prenom: '',
     email: '',
+    telephone: '',
     motDePasse: '',
     role: 'UTILISATEUR',
     sexe: '',
@@ -39,16 +42,31 @@ export default function NewUtilisateurPage() {
     }))
   )
 
+  // Un client externe ne se décrit que par son entité, son téléphone et/ou son e-mail
+  const estClient = formData.role === 'EXTERNE'
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
     setError('')
 
+    const erreurClient = estClient
+      ? erreurFicheClient({ entite: formData.nom, telephone: formData.telephone, email: formData.email })
+      : null
+    if (erreurClient) {
+      setError(erreurClient)
+      return
+    }
+
+    const corps = estClient
+      ? { role: formData.role, nom: formData.nom, telephone: formData.telephone, email: formData.email }
+      : formData
+
+    setLoading(true)
     try {
       const res = await fetch('/api/admin/utilisateurs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(corps)
       })
 
       const data = await res.json()
@@ -71,7 +89,7 @@ export default function NewUtilisateurPage() {
         
         <main className="flex-1 overflow-y-auto p-6">
           <div className="max-w-3xl mx-auto space-y-6">
-            <Link href="/admin/utilisateurs" className="group flex items-center gap-2 text-slate-500 hover:text-slate-800 font-bold transition-colors">
+            <Link href="/admin/utilisateurs" className="group flex items-center gap-2 text-slate-500 hover:text-slate-800 font-semibold transition-colors">
               <ArrowLeft className="w-5 h-5 transition-transform group-hover:-translate-x-1" /> Retour à la liste
             </Link>
 
@@ -81,67 +99,125 @@ export default function NewUtilisateurPage() {
                   <User className="w-6 h-6" />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-bold text-slate-900">Profil Collaborateur</h2>
-                  <p className="text-slate-500 text-sm font-medium">Informations d'identification et accès système.</p>
+                  <h2 className="text-2xl font-semibold text-slate-900">{estClient ? 'Client externe' : 'Profil Collaborateur'}</h2>
+                  <p className="text-slate-500 text-sm font-medium">
+                    {estClient ? 'Entité et coordonnées de connexion du client.' : "Informations d'identification et accès système."}
+                  </p>
                 </div>
               </div>
 
               {error && (
                 <div className="mb-8 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 text-red-700">
                   <AlertCircle className="w-5 h-5" />
-                  <p className="font-bold">{error}</p>
+                  <p className="font-semibold">{error}</p>
                 </div>
               )}
 
               <form onSubmit={handleSubmit} className="space-y-8">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Matricule *</label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        required
-                        className="w-full px-5 py-3.5 pl-12 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold uppercase"
-                        value={formData.matricule}
-                        onChange={e => setFormData({ ...formData, matricule: e.target.value.toUpperCase() })}
-                        placeholder="Ex: MAT-001"
-                      />
-                      <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                    </div>
+                  {/* Le rôle se choisit d'abord : il détermine les champs à renseigner */}
+                  <div className="md:col-span-2">
+                    <ChampListe
+                      id="role"
+                      label="Rôle *"
+                      liste="ROLE"
+                      value={formData.role}
+                      onChange={(v) => setFormData((f) => ({ ...f, role: v }))}
+                      listes={listes}
+                      onListes={setListes}
+                      labelClassName="ml-1 block text-sm font-medium text-slate-700"
+                      selectClassName="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-semibold"
+                    />
                   </div>
 
+                  {estClient ? (
+                    <div className="md:col-span-2 space-y-2">
+                      <label htmlFor="entite" className="text-2xs font-bold text-slate-400 uppercase tracking-widest ml-1">Entité *</label>
+                      <div className="relative">
+                        <input
+                          id="entite"
+                          type="text"
+                          required
+                          className="w-full px-5 py-3.5 pl-12 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-semibold"
+                          value={formData.nom}
+                          onChange={e => setFormData({ ...formData, nom: e.target.value })}
+                          placeholder="Nom du client ou de son entreprise"
+                        />
+                        <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <label className="text-2xs font-bold text-slate-400 uppercase tracking-widest ml-1">Matricule *</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          required
+                          className="w-full px-5 py-3.5 pl-12 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-semibold uppercase"
+                          value={formData.matricule}
+                          onChange={e => setFormData({ ...formData, matricule: e.target.value.toUpperCase() })}
+                          placeholder="Ex: MAT-001"
+                        />
+                        <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                      </div>
+                    </div>
+                  )}
+
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email *</label>
+                    <label className="text-2xs font-bold text-slate-400 uppercase tracking-widest ml-1">Email{estClient ? '' : ' *'}</label>
                     <div className="relative">
                       <input
                         type="email"
-                        required
-                        className="w-full px-5 py-3.5 pl-12 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
+                        required={!estClient}
+                        className="w-full px-5 py-3.5 pl-12 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-semibold"
                         value={formData.email}
                         onChange={e => setFormData({ ...formData, email: e.target.value })}
-                        placeholder="email@dsm.com"
+                        placeholder={estClient ? 'contact@entreprise.com' : 'email@dsm.com'}
                       />
                       <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nom *</label>
+                    <label className="text-2xs font-bold text-slate-400 uppercase tracking-widest ml-1">Téléphone</label>
+                    <div className="relative">
+                      <input
+                        type="tel"
+                        className="w-full px-5 py-3.5 pl-12 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-semibold"
+                        value={formData.telephone}
+                        onChange={e => setFormData({ ...formData, telephone: e.target.value })}
+                        placeholder="+225 07 00 00 00 00"
+                      />
+                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                    </div>
+                  </div>
+
+                  {estClient ? (
+                    <div className="md:col-span-2 space-y-2">
+                      <p className="ml-1 text-xs text-slate-500">
+                        Renseignez au moins le téléphone ou l’e-mail : le client s’en servira pour se connecter.
+                      </p>
+                      <ConnexionClient telephone={formData.telephone} email={formData.email} />
+                    </div>
+                  ) : (
+                  <>
+                  <div className="space-y-2">
+                    <label className="text-2xs font-bold text-slate-400 uppercase tracking-widest ml-1">Nom *</label>
                     <input
                       type="text"
                       required
-                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
+                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-semibold"
                       value={formData.nom}
                       onChange={e => setFormData({ ...formData, nom: e.target.value })}
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Prénom *</label>
+                    <label className="text-2xs font-bold text-slate-400 uppercase tracking-widest ml-1">Prénom *</label>
                     <input
                       type="text"
                       required
-                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
+                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-semibold"
                       value={formData.prenom}
                       onChange={e => setFormData({ ...formData, prenom: e.target.value })}
                     />
@@ -151,7 +227,7 @@ export default function NewUtilisateurPage() {
                     <label htmlFor="sexe" className="ml-1 block text-sm font-medium text-slate-700">Sexe</label>
                     <select
                       id="sexe"
-                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
+                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-semibold"
                       value={formData.sexe}
                       onChange={e => setFormData({ ...formData, sexe: e.target.value })}
                     >
@@ -171,7 +247,7 @@ export default function NewUtilisateurPage() {
                     listes={listes}
                     onListes={setListes}
                     labelClassName="ml-1 block text-sm font-medium text-slate-700"
-                    selectClassName="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
+                    selectClassName="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-semibold"
                   />
 
                   <div className="space-y-2">
@@ -179,7 +255,7 @@ export default function NewUtilisateurPage() {
                     <input
                       id="emploi"
                       type="text"
-                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
+                      className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-semibold"
                       value={formData.emploi}
                       onChange={e => setFormData({ ...formData, emploi: e.target.value })}
                       placeholder="Ex : Agent de transit"
@@ -195,7 +271,7 @@ export default function NewUtilisateurPage() {
                     listes={listes}
                     onListes={setListes}
                     labelClassName="ml-1 block text-sm font-medium text-slate-700"
-                    selectClassName="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
+                    selectClassName="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-semibold"
                   />
 
                   <ChampListe
@@ -207,7 +283,7 @@ export default function NewUtilisateurPage() {
                     listes={listes}
                     onListes={setListes}
                     labelClassName="ml-1 block text-sm font-medium text-slate-700"
-                    selectClassName="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
+                    selectClassName="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-semibold"
                   />
 
                   <ChampListe
@@ -219,23 +295,8 @@ export default function NewUtilisateurPage() {
                     listes={listes}
                     onListes={setListes}
                     labelClassName="ml-1 block text-sm font-medium text-slate-700"
-                    selectClassName="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
+                    selectClassName="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-semibold"
                   />
-
-                  <ChampListe
-                    id="role"
-                    label="Rôle"
-                    liste="ROLE"
-                    value={formData.role}
-                    onChange={(v) => setFormData((f) => ({ ...f, role: v }))}
-                    listes={listes}
-                    onListes={setListes}
-                    labelClassName="ml-1 block text-sm font-medium text-slate-700"
-                    selectClassName="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
-                  />
-
-
-
 
                   {formData.role === 'ADMIN' ? (
                     <div className="md:col-span-2 space-y-2">
@@ -246,7 +307,7 @@ export default function NewUtilisateurPage() {
                         required
                         minLength={8}
                         autoComplete="new-password"
-                        className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-bold"
+                        className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-navy-100 focus:border-navy-700 transition-all outline-none font-semibold"
                         value={formData.motDePasse}
                         onChange={e => setFormData({ ...formData, motDePasse: e.target.value })}
                       />
@@ -293,7 +354,7 @@ export default function NewUtilisateurPage() {
                           <QrCode className={`w-5 h-5 ${formData.qrcodeActif ? 'text-white' : 'text-slate-500'}`} />
                         </div>
                         <div>
-                          <p className={`font-bold text-sm ${
+                          <p className={`font-semibold text-sm ${
                             formData.qrcodeActif ? 'text-amber-800' : 'text-slate-700'
                           }`}>Inclure dans la notation par QR Code unique</p>
                           <p className="text-xs text-slate-400 font-medium mt-0.5">
@@ -303,19 +364,21 @@ export default function NewUtilisateurPage() {
                       </div>
                     </label>
                   </div>
+                  </>
+                  )}
                 </div>
 
                 <div className="pt-6 border-t border-slate-100 flex justify-end gap-4">
                   <Link
                     href="/admin/utilisateurs"
-                    className="px-8 py-3.5 border border-slate-200 rounded-2xl text-slate-600 font-bold hover:bg-slate-50 transition-all active:scale-[0.98]"
+                    className="px-8 py-3.5 border border-slate-200 rounded-2xl text-slate-600 font-semibold hover:bg-slate-50 transition-all active:scale-[0.98]"
                   >
                     Annuler
                   </Link>
                   <button
                     type="submit"
                     disabled={loading}
-                    className="bg-slate-900 hover:bg-slate-800 text-white px-10 py-3.5 rounded-2xl font-black shadow-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center gap-2"
+                    className="bg-slate-900 hover:bg-slate-800 text-white px-10 py-3.5 rounded-2xl font-bold shadow-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center gap-2"
                   >
                     {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
                     Créer le profil

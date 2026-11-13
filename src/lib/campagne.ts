@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
 
 /**
@@ -9,6 +10,14 @@ export function getCampagneOuverte() {
     where: { statut: 'OUVERTE' },
     orderBy: [{ dateDebut: 'desc' }, { createdAt: 'desc' }],
   })
+}
+
+/** Campagnes qui entrent dans le palmarès annuel : celles de l'année, une fois terminées. */
+export function campagnesDuPalmaresAnnuel(annee: number): Prisma.CampagneWhereInput {
+  return {
+    statut: { not: 'OUVERTE' },
+    dateDebut: { gte: new Date(`${annee}-01-01T00:00:00Z`), lte: new Date(`${annee}-12-31T23:59:59.999Z`) },
+  }
 }
 
 /** La notation est possible du premier jour à la fin du dernier jour de la campagne. */

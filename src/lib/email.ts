@@ -8,10 +8,7 @@ const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null
 
 export const emailConfigure = Boolean(resend)
 
-/** Adresses générées à l'import, qui ne correspondent à aucune boîte réelle. */
-export function emailEstReel(email: string | null | undefined): email is string {
-  return Boolean(email && email.includes('@') && !email.toLowerCase().endsWith('@dsm.local'))
-}
+export { emailEstReel } from '@/lib/identifiant-client'
 
 export function escapeHtml(s: string): string {
   return s

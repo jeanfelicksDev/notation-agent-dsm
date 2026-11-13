@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import { AlertCircle, ArrowLeft, Check, CircleCheck, Loader2, Star } from 'lucide-react'
 import { BrandMark } from '@/components/BrandMark'
+import { CLE_TRANSMISSION } from '@/lib/identifiant-client'
+import { commentaireObligatoire, SEUIL_COMMENTAIRE_OBLIGATOIRE } from '@/lib/commentaire-obligatoire'
 
 interface Critere {
   id: string
@@ -26,7 +28,7 @@ const LIBELLES_ETOILES = ['Très insatisfait', 'Insatisfait', 'Correct', 'Satisf
 
 export default function PortailClient() {
   const [etape, setEtape] = useState<Etape>('identification')
-  const [telephone, setTelephone] = useState('')
+  const [identifiant, setIdentifiant] = useState('')
   const [chargement, setChargement] = useState(false)
   const [erreur, setErreur] = useState('')
   const [indisponible, setIndisponible] = useState<string | null>(null)
@@ -50,17 +52,17 @@ export default function PortailClient() {
       })
       .catch(() => setIndisponible('Connexion impossible. Vérifiez votre réseau puis rechargez la page.'))
 
-    // Numéro saisi sur la page d'accueil (onglet « Client externe ») : lu une seule fois puis effacé.
-    const transmis = sessionStorage.getItem('dsm-client-telephone')
+    // Téléphone ou e-mail saisi sur la page d'accueil (onglet « Client externe ») : lu une seule fois puis effacé.
+    const transmis = sessionStorage.getItem(CLE_TRANSMISSION)
     if (transmis) {
-      sessionStorage.removeItem('dsm-client-telephone')
-      setTelephone(transmis)
+      sessionStorage.removeItem(CLE_TRANSMISSION)
+      setIdentifiant(transmis)
       verifier(false, transmis)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const verifier = async (silencieux = false, numero = telephone) => {
+  const verifier = async (silencieux = false, saisie = identifiant) => {
     if (!silencieux) {
       setErreur('')
       setChargement(true)
@@ -69,11 +71,11 @@ export default function PortailClient() {
       const res = await fetch('/api/qr/verify-client', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ telephone: numero }),
+        body: JSON.stringify({ identifiant: saisie }),
       })
       const data = await res.json()
       if (!res.ok) {
-        if (!silencieux) setErreur(data.error || 'Numéro non reconnu.')
+        if (!silencieux) setErreur(data.error || 'Identifiant non reconnu.')
         return
       }
       setClient(data.client)
@@ -96,7 +98,12 @@ export default function PortailClient() {
     window.scrollTo({ top: 0 })
   }
 
-  const complet = criteres.length > 0 && criteres.every((c) => (notes[c.id] ?? 0) > 0)
+  const tousNotes = criteres.length > 0 && criteres.every((c) => (notes[c.id] ?? 0) > 0)
+  // Une note basse (≤ 2 étoiles) rend le commentaire général obligatoire
+  const critereBas = criteres.filter((c) => commentaireObligatoire(notes[c.id] ?? 0))
+  const commentaireRequis = critereBas.length > 0
+  const aJustifier = commentaireRequis && !commentaire.trim()
+  const complet = tousNotes && !aJustifier
 
   const envoyer = async () => {
     if (!complet || !agent || !client) return
@@ -152,7 +159,7 @@ export default function PortailClient() {
           <Carte>
             <h1 className="text-xl font-semibold tracking-tight text-navy-900">Votre avis sur nos agents</h1>
             <p className="mt-2 text-[15px] leading-relaxed text-slate-600">
-              Saisissez le numéro de téléphone enregistré par la DSM pour retrouver les agents qui vous ont accompagné.
+              Saisissez le numéro de téléphone ou l’adresse e-mail enregistré par la DSM pour retrouver les agents qui vous ont accompagné.
             </p>
             <form
               onSubmit={(e) => {
@@ -162,22 +169,24 @@ export default function PortailClient() {
               className="mt-6 space-y-4"
             >
               <div>
-                <label htmlFor="tel" className="mb-1.5 block text-sm font-medium text-slate-800">
-                  Numéro de téléphone
+                <label htmlFor="identifiant" className="mb-1.5 block text-sm font-medium text-slate-800">
+                  Téléphone ou adresse e-mail
                 </label>
                 <input
-                  id="tel"
-                  type="tel"
-                  inputMode="tel"
-                  autoComplete="tel"
+                  id="identifiant"
+                  type="text"
+                  autoComplete="username"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                  placeholder="Ex. : 0700000000 ou nom@exemple.ci"
                   required
-                  value={telephone}
-                  onChange={(e) => setTelephone(e.target.value)}
+                  value={identifiant}
+                  onChange={(e) => setIdentifiant(e.target.value)}
                   className="block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-3 text-base outline-none focus:border-navy-600 focus:ring-3 focus:ring-navy-600/15"
                 />
               </div>
               {erreur && <Erreur>{erreur}</Erreur>}
-              <button type="submit" disabled={chargement || !telephone.trim()} className={BTN}>
+              <button type="submit" disabled={chargement || !identifiant.trim()} className={BTN}>
                 {chargement ? <Loader2 className="h-4.5 w-4.5 animate-spin" aria-hidden /> : 'Continuer'}
               </button>
             </form>
@@ -249,16 +258,38 @@ export default function PortailClient() {
 
               <div className="mt-6">
                 <label htmlFor="com" className="flex items-baseline justify-between text-sm font-medium text-slate-800">
-                  Un commentaire ? <span className="text-xs font-normal text-slate-400">facultatif</span>
+                  {commentaireRequis ? 'Votre commentaire' : 'Un commentaire ?'}
+                  {commentaireRequis ? (
+                    <span className="text-xs font-semibold text-red-700">obligatoire</span>
+                  ) : (
+                    <span className="text-xs font-normal text-slate-400">facultatif</span>
+                  )}
                 </label>
                 <textarea
                   id="com"
                   rows={3}
                   maxLength={1000}
                   value={commentaire}
+                  required={commentaireRequis}
+                  aria-invalid={aJustifier || undefined}
+                  aria-describedby={aJustifier ? 'aide-com' : undefined}
                   onChange={(e) => setCommentaire(e.target.value)}
-                  className="mt-1.5 block w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-base outline-none focus:border-navy-600 focus:ring-3 focus:ring-navy-600/15"
+                  placeholder={commentaireRequis ? 'Dites-nous ce qui ne vous a pas satisfait.' : undefined}
+                  className={`mt-1.5 block w-full rounded-lg border px-3.5 py-2.5 text-base outline-none focus:ring-3 ${
+                    aJustifier
+                      ? 'border-red-300 bg-red-50/40 focus:border-red-600 focus:ring-red-600/15'
+                      : 'border-slate-300 focus:border-navy-600 focus:ring-navy-600/15'
+                  }`}
                 />
+                {aJustifier && (
+                  <p id="aide-com" className="mt-1.5 flex items-start gap-1.5 text-sm text-red-700">
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+                    <span>
+                      Vous avez attribué {SEUIL_COMMENTAIRE_OBLIGATOIRE} étoiles ou moins à « {critereBas.map((c) => c.libelle).join(' », « ')} » :
+                      merci d’expliquer votre appréciation.
+                    </span>
+                  </p>
+                )}
               </div>
 
               {erreur && (
@@ -270,7 +301,11 @@ export default function PortailClient() {
               <button onClick={envoyer} disabled={!complet || chargement} className={`${BTN} mt-6`}>
                 {chargement ? <Loader2 className="h-4.5 w-4.5 animate-spin" aria-hidden /> : 'Envoyer mon avis'}
               </button>
-              {!complet && <p className="mt-2 text-center text-sm text-slate-500">Notez chaque critère pour envoyer votre avis.</p>}
+              {!complet && (
+                <p className="mt-2 text-center text-sm text-slate-500">
+                  {tousNotes ? 'Ajoutez un commentaire pour envoyer votre avis.' : 'Notez chaque critère pour envoyer votre avis.'}
+                </p>
+              )}
             </Carte>
           </>
         ) : (

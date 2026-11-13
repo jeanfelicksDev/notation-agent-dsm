@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getSessionUser } from '@/lib/auth'
 import { campagneEnCours, getCampagneOuverte, messageHorsPeriode } from '@/lib/campagne'
-import { criteresPourPaire, estEvaluateurManager } from '@/lib/criteres'
+import { compteCommeManager, criteresPourPaire } from '@/lib/criteres'
 
 export async function GET() {
   try {
@@ -87,7 +87,8 @@ export async function GET() {
       criteres,
       affectations: affectationsAvecCriteres,
       notes,
-      isManager: estEvaluateurManager(evaluateur.role),
+      // « Évaluation manager » seulement s'il note au moins un agent en tant que manager (pas client interne)
+      isManager: affectations.some((a) => compteCommeManager(evaluateur.role, a.clientInterne)),
     })
   } catch (error) {
     console.error('evaluation/init error:', error)

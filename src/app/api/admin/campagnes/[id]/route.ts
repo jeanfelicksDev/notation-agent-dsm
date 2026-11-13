@@ -4,6 +4,8 @@ import type { Prisma } from '@prisma/client'
 import { requireAdmin } from '@/lib/auth'
 import { validerPoids } from '@/lib/campagne'
 import { enregistrerScores } from '@/lib/scores'
+import { compterSituations, lireSeuilNotants, SEUIL_NOTANTS_MAX } from '@/lib/eligibilite'
+import { lireDateResultats } from '@/lib/publication-resultats'
 
 export async function GET(
   request: NextRequest,
@@ -90,6 +92,27 @@ export async function PATCH(
       Object.assign(data, poids)
     }
 
+    // Vide (null) : règle historique, sans protection contre les notants défaillants
+    if (has('seuilNotants')) {
+      const seuilNotants = lireSeuilNotants(body.seuilNotants)
+      if (seuilNotants === undefined) {
+        return NextResponse.json(
+          { error: `Le seuil de notants doit être un nombre entier de 1 à ${SEUIL_NOTANTS_MAX}, ou vide.` },
+          { status: 400 }
+        )
+      }
+      data.seuilNotants = seuilNotants
+    }
+
+    // Vide (null) : résultats non publiés, la page des résultats n'est visible que de l'administrateur
+    if (has('dateResultats')) {
+      const dateResultats = lireDateResultats(body.dateResultats)
+      if (dateResultats === undefined) {
+        return NextResponse.json({ error: 'La date d’affichage des résultats est invalide.' }, { status: 400 })
+      }
+      data.dateResultats = dateResultats
+    }
+
     for (const k of ['prixDirection', 'prixDepartement', 'prixService', 'prixGlobal'] as const) {
       if (has(k)) data[k] = typeof body[k] === 'string' && body[k].trim() ? body[k].trim() : null
     }
@@ -117,8 +140,9 @@ export async function PATCH(
 
     // À la clôture, le classement est figé : les scores sont calculés et enregistrés.
     if (statut === 'CLOTUREE') {
-      await enregistrerScores(id)
-      return NextResponse.json(await prisma.campagne.update({ where: { id }, data: { statut: 'CALCULEE' } }))
+      const scores = await enregistrerScores(id)
+      const calculee = await prisma.campagne.update({ where: { id }, data: { statut: 'CALCULEE' } })
+      return NextResponse.json({ ...calculee, bilan: compterSituations(scores) })
     }
 
     return NextResponse.json(campagne)

@@ -44,6 +44,13 @@ async function etat(c) {
   }
   console.log('Campagnes (poidsClient passera de 0 à 25 si poidsCollegues >= 25) :')
   console.table(await q(`select libelle, statut, "poidsManager", "poidsCollegues", "poidsClient" from "Campagne" order by "dateDebut"`))
+  const seuil = await q(`select 1 from information_schema.columns where table_name='Campagne' and column_name='seuilNotants'`)
+  if (seuil.length) {
+    console.log('Seuil de notants par campagne (vide = règle historique) :')
+    console.table(await q(`select libelle, statut, "seuilNotants" from "Campagne" order by "dateDebut"`))
+  } else {
+    console.log('Colonne seuilNotants absente : à sa création, les campagnes non ouvertes passeront en règle historique.')
+  }
 }
 
 async function main() {
@@ -85,6 +92,8 @@ async function main() {
 }
 
 main().catch((e) => {
-  console.error('Erreur :', e.message)
+  // Un échec de connexion arrive souvent en AggregateError, dont le message est vide
+  const causes = e.errors?.length ? e.errors : [e]
+  for (const c of causes) console.error('Erreur :', c.code || '', c.message || String(c))
   process.exit(1)
 })

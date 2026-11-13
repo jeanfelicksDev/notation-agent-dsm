@@ -20,6 +20,7 @@ export function proxy(request: NextRequest) {
   return NextResponse.next()
 }
 
+// La page des résultats (/resultats) est publique : elle décide elle-même de ce qu'elle montre.
 export const config = {
   matcher: ['/evaluer/:path*', '/admin/:path*'],
 }
